@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 
 const NAV = [
   { label: 'Time Entries', href: '/admin' },
+  { label: 'Projects', href: '/admin/projects' },
   { label: 'Import', href: '/admin/import' },
 ]
 
@@ -23,7 +24,7 @@ export default function AdminLayout({ children }) {
   const router = useRouter()
   const path = usePathname()
   const [auth, setAuth] = useState(false)
-  const [user, setUser] = useState({name:'', role:''})
+  const [user, setUser] = useState({name:'',role:''})
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function AdminLayout({ children }) {
         ))}
       </nav>
       <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
-        {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'8px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
+        {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
         {user.role === 'admin' && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
         <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>
       </div>
@@ -76,7 +77,6 @@ export default function AdminLayout({ children }) {
       <div className="desktop-only" style={{width:'220px',minHeight:'100vh',background:'#111111',borderRight:'1px solid #1e1e1e',position:'fixed',top:0,left:0}}>
         {sidebar}
       </div>
-
       <div className="mobile-only" style={{position:'fixed',top:0,left:0,right:0,zIndex:100,background:'#111111',borderBottom:'1px solid #1e1e1e',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
           <XLogo size={24} />
@@ -84,7 +84,6 @@ export default function AdminLayout({ children }) {
         </div>
         <button onClick={() => setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'22px',cursor:'pointer'}}>☰</button>
       </div>
-
       {menuOpen && (
         <div style={{position:'fixed',inset:0,zIndex:200}} onClick={() => setMenuOpen(false)}>
           <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e'}} onClick={e => e.stopPropagation()}>
@@ -92,13 +91,8 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
       )}
-
-      <div className="desktop-only" style={{marginLeft:'220px',flex:1,padding:'32px'}}>
-        {children}
-      </div>
-      <div className="mobile-only" style={{flex:1,padding:'72px 16px 24px'}}>
-        {children}
-      </div>
+      <div className="desktop-only" style={{marginLeft:'220px',flex:1,padding:'32px'}}>{children}</div>
+      <div className="mobile-only" style={{flex:1,padding:'72px 16px 24px'}}>{children}</div>
     </div>
   )
 }
