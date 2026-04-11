@@ -3,12 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
-const NAV = [
-  { label: 'Time Entries', href: '/admin' },
-  { label: 'Projects', href: '/admin/projects' },
-  { label: 'Import', href: '/admin/import' },
-]
-
 function XLogo({ size = 28 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -30,9 +24,15 @@ export default function AdminLayout({ children }) {
   useEffect(() => {
     const a = sessionStorage.getItem('xantie_auth')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    if (!a) router.push('/login')
-    else { setAuth(true); setUser(u) }
-  }, [])
+    if (!a) { router.push('/login'); return; }
+    // Block non-admins from /admin/import
+    if (path === '/admin/import' && u.role !== 'admin') {
+      router.push('/admin')
+      return
+    }
+    setAuth(true)
+    setUser(u)
+  }, [path])
 
   function signOut() {
     sessionStorage.removeItem('xantie_auth')
@@ -41,6 +41,14 @@ export default function AdminLayout({ children }) {
   }
 
   if (!auth) return null
+
+  const isAdmin = user.role === 'admin'
+
+  const NAV = [
+    { label: 'Time Entries', href: '/admin' },
+    { label: 'Projects', href: '/admin/projects' },
+    ...(isAdmin ? [{ label: 'Import', href: '/admin/import' }] : []),
+  ]
 
   const sidebar = (
     <div style={{display:'flex',flexDirection:'column',height:'100%',padding:'24px 0'}}>
@@ -66,7 +74,7 @@ export default function AdminLayout({ children }) {
       </nav>
       <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
         {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
-        {user.role === 'admin' && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
+        {isAdmin && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
         <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>
       </div>
     </div>

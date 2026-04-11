@@ -74,7 +74,11 @@ export async function POST(req) {
     }
 
     if (action === 'import') {
-      const { entries } = body
+      // Extra server-side check — only admins should reach this
+      const { entries, userRole } = body
+      if (userRole !== 'admin') {
+        return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
+      }
       const values = entries.map(e => [e.name, e.email, e.date, e.hours, e.description, e.importedFrom || 'import', e.project || ''])
       await sheets.spreadsheets.values.append({
         spreadsheetId: SID(), range: 'TimeEntries!A:G',
