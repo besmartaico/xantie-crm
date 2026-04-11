@@ -14,25 +14,29 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [checking, setChecking] = useState(false)
   const [similarWarning, setSimilarWarning] = useState(null)
-  const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [apiError, setApiError] = useState('')
   const checkTimeout = useRef(null)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const res = await fetch('/api/projects')
-    setProjects(await res.json())
+    try {
+      const res = await fetch('/api/projects')
+      setProjects(await res.json())
+    } catch(e) { console.error(e) }
     setLoading(false)
   }
 
-  // Debounced AI similarity check as user types
+  // Debounced AI check — only runs when there are existing projects to compare
   useEffect(() => {
     setSimilarWarning(null)
+    setConfirmed(false)
     if (!name.trim() || projects.length === 0) return
     clearTimeout(checkTimeout.current)
+    setChecking(true)
     checkTimeout.current = setTimeout(async () => {
-      setChecking(true)
       try {
         const res = await fetch('/api/projects/check', {
           method: 'POST',
@@ -41,33 +45,40 @@ export default function ProjectsPage() {
         })
         const data = await res.json()
         if (data.similar) setSimilarWarning(data.message)
-      } catch {}
+      } catch(e) { /* silently ignore AI check errors */ }
       setChecking(false)
     }, 600)
-  }, [name, projects])
+    return () => clearTimeout(checkTimeout.current)
+  }, [name])
 
   async function handleSave() {
-    if (!name.trim()) return
     setSaving(true)
-    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add', name: name.trim(), description, createdBy: u.name || u.email || '' })
-    })
+    setApiError('')
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', name: name.trim(), description, createdBy: u.name || u.email || '' })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowAdd(false)
+        setName(''); setDescription(''); setSimilarWarning(null); setConfirmed(false)
+        load()
+      } else {
+        setApiError(data.error || 'Failed to create project.')
+      }
+    } catch(e) {
+      setApiError('Network error. Please try again.')
+    }
     setSaving(false)
-    setShowAdd(false)
-    setName(''); setDescription(''); setSimilarWarning(null); setPendingSubmit(false)
-    load()
   }
 
-  async function handleSubmitCheck() {
-    if (!name.trim()) return
-    // If there's a warning, show confirmation state
-    if (similarWarning && !pendingSubmit) {
-      setPendingSubmit(true)
-      return
-    }
+  function handleClick() {
+    if (!name.trim() || saving) return
+    // If there's an unconfirmed warning, first click confirms
+    if (similarWarning && !confirmed) { setConfirmed(true); return }
     handleSave()
   }
 
@@ -77,6 +88,15 @@ export default function ProjectsPage() {
     load()
   }
 
+  function openAdd() {
+    setShowAdd(true); setName(''); setDescription('')
+    setSimilarWarning(null); setConfirmed(false); setApiError('')
+  }
+
+  const btnDisabled = saving || !name.trim()
+  const btnLabel = saving ? 'Creating...' : (similarWarning && !confirmed) ? 'Create Anyway →' : 'Create Project'
+  const btnColor = similarWarning && !confirmed ? '#f59e0b' : '#8DC63F'
+
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
@@ -84,13 +104,12 @@ export default function ProjectsPage() {
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0,color:'#fff'}}>Projects</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => { setShowAdd(true); setName(''); setDescription(''); setSimilarWarning(null); setPendingSubmit(false) }}
+        <button onClick={openAdd}
           style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
           + New Project
         </button>
       </div>
 
-      {/* Projects grid */}
       {loading && <div style={{color:'#6b7280',fontSize:'14px'}}>Loading...</div>}
       {!loading && projects.length === 0 && (
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center'}}>
@@ -98,15 +117,16 @@ export default function ProjectsPage() {
           <p style={{color:'#6b7280',margin:0}}>No projects yet. Create your first one!</p>
         </div>
       )}
+
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'16px'}}>
         {projects.map(p => (
-          <div key={p.id} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px',position:'relative'}}>
+          <div key={p.id} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
             <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
               <div style={{fontSize:'15px',fontWeight:600,color:'#fff',lineHeight:1.3}}>{p.name}</div>
-              <button onClick={() => del(p.id)} style={{background:'none',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'16px',padding:'0',flexShrink:0,lineHeight:1}}>×</button>
+              <button onClick={() => del(p.id)} style={{background:'none',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'18px',padding:'0',lineHeight:1,flexShrink:0}}>×</button>
             </div>
             {p.description && <div style={{fontSize:'13px',color:'#6b7280',marginTop:'8px'}}>{p.description}</div>}
-            <div style={{display:'flex',alignItems:'center',gap:'12px',marginTop:'14px'}}>
+            <div style={{display:'flex',gap:'12px',marginTop:'14px'}}>
               {p.createdBy && <span style={{fontSize:'11px',color:'#4b5563'}}>{p.createdBy}</span>}
               {p.createdAt && <span style={{fontSize:'11px',color:'#4b5563'}}>{p.createdAt}</span>}
             </div>
@@ -114,7 +134,6 @@ export default function ProjectsPage() {
         ))}
       </div>
 
-      {/* Add modal */}
       {showAdd && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
           <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px'}}>
@@ -122,45 +141,40 @@ export default function ProjectsPage() {
 
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Project Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => { setName(e.target.value); setPendingSubmit(false) }}
-                placeholder="e.g. Q2 Data Migration"
-                style={inp}
-                autoFocus
-              />
-              {/* AI check status */}
-              {checking && <div style={{fontSize:'11px',color:'#6b7280',marginTop:'6px'}}>✦ Checking for similar projects...</div>}
+              <input type="text" value={name} onChange={e => setName(e.target.value)}
+                placeholder="e.g. Q2 Data Migration" style={inp} autoFocus />
+              {checking && <div style={{fontSize:'11px',color:'#6b7280',marginTop:'5px'}}>✦ Checking for similar names...</div>}
             </div>
 
-            {/* Similarity warning */}
-            {similarWarning && !pendingSubmit && (
-              <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px'}}>
+            {similarWarning && !confirmed && (
+              <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px'}}>
                 <p style={{margin:0,fontSize:'13px',color:'#fbbf24'}}>⚠️ {similarWarning}</p>
               </div>
             )}
-
-            {/* Confirmed override message */}
-            {pendingSubmit && (
-              <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px'}}>
-                <p style={{margin:0,fontSize:'13px',color:'#8DC63F'}}>✓ Got it — creating as a separate project.</p>
+            {confirmed && (
+              <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px'}}>
+                <p style={{margin:0,fontSize:'13px',color:'#8DC63F'}}>✓ Got it — will create as a new project.</p>
               </div>
             )}
 
             <div style={{marginBottom:'24px'}}>
               <label style={lbl}>Description <span style={{color:'#4b5563',fontWeight:400,textTransform:'none'}}>(optional)</span></label>
               <textarea rows={2} value={description} onChange={e => setDescription(e.target.value)}
-                placeholder="Brief description of this project"
-                style={{...inp, resize:'vertical'}} />
+                placeholder="Brief description" style={{...inp,resize:'vertical'}} />
             </div>
 
+            {apiError && (
+              <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>
+                {apiError}
+              </div>
+            )}
+
             <div style={{display:'flex',gap:'12px'}}>
-              <button onClick={handleSubmitCheck} disabled={saving || checking || !name.trim()}
-                style={{flex:1,background: similarWarning && !pendingSubmit ? '#f59e0b' : '#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer',opacity: (!name.trim() || saving) ? 0.6 : 1}}>
-                {saving ? 'Creating...' : similarWarning && !pendingSubmit ? 'Create Anyway' : 'Create Project'}
+              <button onClick={handleClick} disabled={btnDisabled}
+                style={{flex:1,background:btnColor,color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor: btnDisabled ? 'not-allowed' : 'pointer',opacity: btnDisabled ? 0.6 : 1}}>
+                {btnLabel}
               </button>
-              <button onClick={() => { setShowAdd(false); setSimilarWarning(null); setPendingSubmit(false) }}
+              <button onClick={() => setShowAdd(false)}
                 style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>
                 Cancel
               </button>
