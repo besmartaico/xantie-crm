@@ -15,16 +15,21 @@ function getSheets() {
 }
 
 export async function POST(req) {
-  const { email, password } = await req.json()
-  const sheets = getSheets()
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-    range: 'Users!A2:D'
-  })
-  const rows = res.data.values || []
-  const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())
-  if (!user) return NextResponse.json({ success: false }, { status: 401 })
-  const valid = await bcrypt.compare(password, user[2])
-  if (!valid) return NextResponse.json({ success: false }, { status: 401 })
-  return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3] || 'user' })
+  try {
+    const { email, password } = await req.json()
+    const sheets = getSheets()
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+      range: 'Users!A2:D'
+    })
+    const rows = res.data.values || []
+    const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())
+    if (!user) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
+    const valid = await bcrypt.compare(password, user[2])
+    if (!valid) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
+    return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3] || 'user' })
+  } catch (err) {
+    console.error('Login error:', err)
+    return NextResponse.json({ success: false, error: 'Server error. Make sure environment variables are configured.' }, { status: 500 })
+  }
 }
