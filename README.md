@@ -1,2 +1,2 @@
 # Xantie CRM
-Time tracking and management system.
+Time tracking, projects, and management system.
