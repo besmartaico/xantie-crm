@@ -6,6 +6,17 @@ import { useRouter } from 'next/navigation'
 const inp = { width:'100%', background:'#1a1a1a', border:'1px solid #2a2a2a', borderRadius:'8px', padding:'12px 14px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'6px', textTransform:'uppercase', letterSpacing:'0.07em' }
 
+function XLogo({ size = 48 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="0,0 14,0 44,44 30,44" fill="#8DC63F"/>
+      <polygon points="30,0 44,0 14,44 0,44" fill="#666666"/>
+      <polygon points="30,0 44,0 29,19 15,19" fill="#8DC63F"/>
+      <polygon points="0,44 14,44 29,25 15,25" fill="#8DC63F"/>
+    </svg>
+  )
+}
+
 export default function Login() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -40,17 +51,22 @@ export default function Login() {
   }
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#131313',padding:'20px'}}>
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
       <div style={{width:'100%',maxWidth:'380px'}}>
         <div style={{textAlign:'center',marginBottom:'36px'}}>
-          <div style={{fontSize:'32px',fontWeight:800,color:'#6366f1',marginBottom:'6px'}}>Xantie CRM</div>
-          <div style={{color:'#6b7280',fontSize:'14px'}}>Management System</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'14px',marginBottom:'12px'}}>
+            <XLogo size={52} />
+            <div style={{textAlign:'left'}}>
+              <div style={{fontSize:'28px',fontWeight:800,color:'#fff',letterSpacing:'-0.5px',lineHeight:1}}>Xantie</div>
+              <div style={{fontSize:'12px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase'}}>Management System</div>
+            </div>
+          </div>
         </div>
 
-        <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'16px',padding:'28px'}}>
-          <div style={{display:'flex',marginBottom:'24px',background:'#0f0f0f',borderRadius:'8px',padding:'4px'}}>
-            <button onClick={() => setMode('user')} style={{flex:1,padding:'8px',border:'none',borderRadius:'6px',background: mode==='user' ? '#6366f1' : 'transparent',color: mode==='user' ? '#fff' : '#6b7280',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>User Login</button>
-            <button onClick={() => setMode('admin')} style={{flex:1,padding:'8px',border:'none',borderRadius:'6px',background: mode==='admin' ? '#6366f1' : 'transparent',color: mode==='admin' ? '#fff' : '#6b7280',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>Admin PIN</button>
+        <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px'}}>
+          <div style={{display:'flex',marginBottom:'24px',background:'#0a0a0a',borderRadius:'8px',padding:'4px'}}>
+            <button onClick={() => setMode('user')} style={{flex:1,padding:'8px',border:'none',borderRadius:'6px',background: mode==='user' ? '#8DC63F' : 'transparent',color: mode==='user' ? '#0a0a0a' : '#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>User Login</button>
+            <button onClick={() => setMode('admin')} style={{flex:1,padding:'8px',border:'none',borderRadius:'6px',background: mode==='admin' ? '#8DC63F' : 'transparent',color: mode==='admin' ? '#0a0a0a' : '#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Admin PIN</button>
           </div>
 
           {mode === 'user' ? (
@@ -71,9 +87,9 @@ export default function Login() {
             </div>
           )}
 
-          {error && <div style={{background:'#2d1515',border:'1px solid #7f1d1d',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
+          {error && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
 
-          <button onClick={submit} disabled={loading} style={{width:'100%',background:'#6366f1',color:'#fff',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>
+          <button onClick={submit} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:'pointer',letterSpacing:'-0.2px'}}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </div>

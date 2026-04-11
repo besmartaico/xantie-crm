@@ -8,6 +8,17 @@ const NAV = [
   { label: 'Import', href: '/admin/import' },
 ]
 
+function XLogo({ size = 28 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="0,0 14,0 44,44 30,44" fill="#8DC63F"/>
+      <polygon points="30,0 44,0 14,44 0,44" fill="#666666"/>
+      <polygon points="30,0 44,0 29,19 15,19" fill="#8DC63F"/>
+      <polygon points="0,44 14,44 29,25 15,25" fill="#8DC63F"/>
+    </svg>
+  )
+}
+
 export default function AdminLayout({ children }) {
   const router = useRouter()
   const path = usePathname()
@@ -30,49 +41,54 @@ export default function AdminLayout({ children }) {
 
   const sidebar = (
     <div style={{display:'flex',flexDirection:'column',height:'100%',padding:'24px 0'}}>
-      <div style={{padding:'0 20px 24px',borderBottom:'1px solid #2a2a2a'}}>
-        <div style={{fontSize:'18px',fontWeight:700,color:'#6366f1'}}>Xantie CRM</div>
-        <div style={{fontSize:'12px',color:'#6b7280',marginTop:'2px'}}>Management System</div>
+      <div style={{padding:'0 20px 24px',borderBottom:'1px solid #252525'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+          <XLogo size={32} />
+          <div>
+            <div style={{fontSize:'17px',fontWeight:800,color:'#fff',letterSpacing:'-0.3px'}}>Xantie</div>
+            <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase'}}>CRM</div>
+          </div>
+        </div>
       </div>
       <nav style={{flex:1,padding:'16px 12px'}}>
         {NAV.map(n => (
           <a key={n.href} href={n.href} style={{
             display:'block',padding:'10px 12px',borderRadius:'8px',marginBottom:'4px',
             fontSize:'14px',fontWeight:500,
-            background: path === n.href ? '#1e1e3a' : 'transparent',
-            color: path === n.href ? '#6366f1' : '#d1d5db',
+            background: path === n.href ? 'rgba(141,198,63,0.12)' : 'transparent',
+            color: path === n.href ? '#8DC63F' : '#9ca3af',
+            borderLeft: path === n.href ? '2px solid #8DC63F' : '2px solid transparent',
           }}>{n.label}</a>
         ))}
       </nav>
-      <div style={{padding:'16px 20px',borderTop:'1px solid #2a2a2a'}}>
+      <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
         <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>
       </div>
     </div>
   )
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#131313'}}>
-      {/* Desktop sidebar */}
-      <div className="desktop-only" style={{width:'220px',minHeight:'100vh',background:'#0f0f0f',borderRight:'1px solid #1f1f1f',position:'fixed',top:0,left:0}}>
+    <div style={{display:'flex',minHeight:'100vh',background:'#0a0a0a'}}>
+      <div className="desktop-only" style={{width:'220px',minHeight:'100vh',background:'#111111',borderRight:'1px solid #1e1e1e',position:'fixed',top:0,left:0}}>
         {sidebar}
       </div>
 
-      {/* Mobile header */}
-      <div className="mobile-only" style={{position:'fixed',top:0,left:0,right:0,zIndex:100,background:'#0f0f0f',borderBottom:'1px solid #1f1f1f',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:'16px',fontWeight:700,color:'#6366f1'}}>Xantie CRM</span>
-        <button onClick={() => setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#fff',fontSize:'22px',cursor:'pointer'}}>☰</button>
+      <div className="mobile-only" style={{position:'fixed',top:0,left:0,right:0,zIndex:100,background:'#111111',borderBottom:'1px solid #1e1e1e',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <XLogo size={24} />
+          <span style={{fontSize:'16px',fontWeight:800,color:'#fff'}}>Xantie <span style={{color:'#8DC63F',fontSize:'12px'}}>CRM</span></span>
+        </div>
+        <button onClick={() => setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'22px',cursor:'pointer'}}>☰</button>
       </div>
 
-      {/* Mobile drawer */}
       {menuOpen && (
         <div style={{position:'fixed',inset:0,zIndex:200}} onClick={() => setMenuOpen(false)}>
-          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#0f0f0f',borderRight:'1px solid #1f1f1f'}} onClick={e => e.stopPropagation()}>
+          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e'}} onClick={e => e.stopPropagation()}>
             {sidebar}
           </div>
         </div>
       )}
 
-      {/* Main content */}
       <div className="desktop-only" style={{marginLeft:'220px',flex:1,padding:'32px'}}>
         {children}
       </div>
