@@ -23,12 +23,14 @@ export default function AdminLayout({ children }) {
   const router = useRouter()
   const path = usePathname()
   const [auth, setAuth] = useState(false)
+  const [user, setUser] = useState({name:'', role:''})
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const a = sessionStorage.getItem('xantie_auth')
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     if (!a) router.push('/login')
-    else setAuth(true)
+    else { setAuth(true); setUser(u) }
   }, [])
 
   function signOut() {
@@ -55,13 +57,15 @@ export default function AdminLayout({ children }) {
           <a key={n.href} href={n.href} style={{
             display:'block',padding:'10px 12px',borderRadius:'8px',marginBottom:'4px',
             fontSize:'14px',fontWeight:500,
-            background: path === n.href ? 'rgba(141,198,63,0.12)' : 'transparent',
+            background: path === n.href ? 'rgba(141,198,63,0.1)' : 'transparent',
             color: path === n.href ? '#8DC63F' : '#9ca3af',
             borderLeft: path === n.href ? '2px solid #8DC63F' : '2px solid transparent',
           }}>{n.label}</a>
         ))}
       </nav>
       <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
+        {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'8px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
+        {user.role === 'admin' && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
         <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>
       </div>
     </div>
