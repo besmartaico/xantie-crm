@@ -7,6 +7,16 @@ const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600,
 const th = { textAlign:'left', padding:'11px 16px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.08em', background:'#111111', borderBottom:'1px solid #1e1e1e' }
 const td = { padding:'11px 16px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
 
+function CloseBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center'}} aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  )
+}
+
 export default function TimeEntries() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
@@ -18,8 +28,13 @@ export default function TimeEntries() {
   const [saveError, setSaveError] = useState('')
   const [filter, setFilter] = useState('')
   const dateRef = useRef(null)
+  const [currentUser, setCurrentUser] = useState({})
 
-  useEffect(() => { load(); loadProjects() }, [])
+  useEffect(() => {
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    setCurrentUser(u)
+    load(); loadProjects()
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -35,26 +50,18 @@ export default function TimeEntries() {
     setSaving(true); setSaveError('')
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-      const payload = { name: u.name||'', email: u.email||'', ...form }
       const res = await fetch('/api/time', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(editEntry
-          ? { action:'update', id: editEntry.id, ...payload, importedFrom: editEntry.importedFrom }
-          : { action:'add', ...payload }
+          ? { action:'update', id: editEntry.id, name: u.name||'', email: u.email||'', ...form, importedFrom: editEntry.importedFrom }
+          : { action:'add', name: u.name||'', email: u.email||'', ...form }
         )
       })
       const data = await res.json()
       if (data.success) {
-        setShowAdd(false); setEditEntry(null)
-        setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' })
-        load()
-      } else {
-        setSaveError(data.error || 'Failed to save entry.')
-      }
-    } catch(e) {
-      setSaveError('Network error. Please try again.')
-    }
+        closeModal(); load()
+      } else setSaveError(data.error || 'Failed to save entry.')
+    } catch(e) { setSaveError('Network error. Please try again.') }
     setSaving(false)
   }
 
@@ -64,25 +71,16 @@ export default function TimeEntries() {
     load()
   }
 
-  function openEdit(e) {
-    setEditEntry(e); setSaveError('')
-    setForm({ date: e.date, hours: e.hours, description: e.description, project: e.project||'' })
-    setShowAdd(true)
-  }
+  function openEdit(e) { setEditEntry(e); setSaveError(''); setForm({ date: e.date, hours: e.hours, description: e.description, project: e.project||'' }); setShowAdd(true) }
+  function openAdd() { setEditEntry(null); setSaveError(''); setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' }); setShowAdd(true) }
+  function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError('') }
+  function openDatePicker() { if (dateRef.current) { try { dateRef.current.showPicker() } catch { dateRef.current.click() } } }
 
-  function openAdd() {
-    setEditEntry(null); setSaveError('')
-    setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' })
-    setShowAdd(true)
-  }
+  // Filter: non-admins only see their own entries
+  const isAdmin = currentUser.role === 'admin'
+  const visibleEntries = isAdmin ? entries : entries.filter(e => e.email === currentUser.email)
 
-  function openDatePicker() {
-    if (dateRef.current) {
-      try { dateRef.current.showPicker() } catch { dateRef.current.click() }
-    }
-  }
-
-  const filtered = entries.filter(e =>
+  const filtered = visibleEntries.filter(e =>
     !filter || e.name?.toLowerCase().includes(filter.toLowerCase()) ||
     e.description?.toLowerCase().includes(filter.toLowerCase()) ||
     e.date?.includes(filter) || e.project?.toLowerCase().includes(filter.toLowerCase())
@@ -96,9 +94,7 @@ export default function TimeEntries() {
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span></p>
         </div>
-        <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
-          + Add Entry
-        </button>
+        <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ Add Entry</button>
       </div>
 
       <div style={{marginBottom:'16px'}}>
@@ -109,13 +105,8 @@ export default function TimeEntries() {
         <table style={{width:'100%',borderCollapse:'collapse',minWidth:'640px'}}>
           <thead>
             <tr>
-              <th style={th}>Name</th>
-              <th style={th}>Project</th>
-              <th style={th}>Date</th>
-              <th style={th}>Hours</th>
-              <th style={th}>Description</th>
-              <th style={th}>Source</th>
-              <th style={th}></th>
+              <th style={th}>Name</th><th style={th}>Project</th><th style={th}>Date</th>
+              <th style={th}>Hours</th><th style={th}>Description</th><th style={th}>Source</th><th style={th}></th>
             </tr>
           </thead>
           <tbody>
@@ -142,7 +133,10 @@ export default function TimeEntries() {
       {showAdd && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
           <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px'}}>
-            <h2 style={{margin:'0 0 24px',fontSize:'18px'}}>{editEntry?'Edit Entry':'Add Time Entry'}</h2>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
+              <h2 style={{margin:0,fontSize:'18px'}}>{editEntry?'Edit Entry':'Add Time Entry'}</h2>
+              <CloseBtn onClick={closeModal}/>
+            </div>
 
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Project</label>
@@ -155,17 +149,10 @@ export default function TimeEntries() {
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Date</label>
               <div style={{position:'relative'}}>
-                <input ref={dateRef} type="date" value={form.date}
-                  onChange={e=>setForm({...form,date:e.target.value})}
-                  onClick={openDatePicker}
-                  style={{...inp, colorScheme:'dark', paddingRight:'40px', cursor:'pointer'}}
-                />
-                <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer'}}>
+                <input ref={dateRef} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} onClick={openDatePicker} style={{...inp,colorScheme:'dark',paddingRight:'40px',cursor:'pointer'}}/>
+                <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',pointerEvents:'none'}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8DC63F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
                 </div>
               </div>
@@ -180,19 +167,13 @@ export default function TimeEntries() {
               <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical'}}/>
             </div>
 
-            {saveError && (
-              <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>
-                {saveError}
-              </div>
-            )}
+            {saveError && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{saveError}</div>}
 
             <div style={{display:'flex',gap:'12px'}}>
               <button onClick={save} disabled={saving} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1}}>
                 {saving?'Saving...':editEntry?'Save Changes':'Add Entry'}
               </button>
-              <button onClick={()=>{setShowAdd(false);setEditEntry(null);setSaveError('')}} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>
-                Cancel
-              </button>
+              <button onClick={closeModal} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         </div>

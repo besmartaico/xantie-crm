@@ -25,7 +25,7 @@ export default function AdminLayout({ children }) {
     const a = sessionStorage.getItem('xantie_auth')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     if (!a) { router.push('/login'); return }
-    if (path==='/admin/import' && u.role!=='admin') { router.push('/admin'); return }
+    if ((path==='/admin/import' || path==='/admin/users') && u.role!=='admin') { router.push('/admin'); return }
     setAuth(true); setUser(u)
   }, [path])
 
@@ -42,7 +42,10 @@ export default function AdminLayout({ children }) {
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
     { label: 'Projects', href: '/admin/projects' },
-    ...(isAdmin ? [{ label: 'Import', href: '/admin/import' }] : []),
+    ...(isAdmin ? [
+      { label: 'Users', href: '/admin/users' },
+      { label: 'Import', href: '/admin/import' },
+    ] : []),
   ]
 
   const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
