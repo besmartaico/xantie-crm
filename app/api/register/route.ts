@@ -17,37 +17,32 @@ function getSheets() {
 export async function POST(req) {
   try {
     const { name, email, password } = await req.json()
-
     if (!name || !email || !password)
       return NextResponse.json({ success: false, error: 'All fields are required.' }, { status: 400 })
-
-    if (!email.toLowerCase().endsWith('@xantie.com'))
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail.endsWith('@xantie.com'))
       return NextResponse.json({ success: false, error: 'Registration is limited to @xantie.com email addresses.' }, { status: 403 })
-
     if (password.length < 8)
       return NextResponse.json({ success: false, error: 'Password must be at least 8 characters.' }, { status: 400 })
 
     const sheets = getSheets()
     const SID = process.env.GOOGLE_SHEETS_ID
-
     const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:D' })
     const rows = existing.data.values || []
-    if (rows.some(r => r[1]?.toLowerCase() === email.toLowerCase()))
+    if (rows.some(r => r[1]?.toLowerCase() === normalizedEmail))
       return NextResponse.json({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
 
-    const role = email.toLowerCase() === 'jeff@xantie.com' ? 'admin' : 'user'
+    const role = normalizedEmail === 'jeff@xantie.com' ? 'admin' : 'user'
     const hash = await bcrypt.hash(password, 10)
-
     await sheets.spreadsheets.values.append({
       spreadsheetId: SID,
-      range: 'Users!A:D',
+      range: 'Users',
       valueInputOption: 'RAW',
-      requestBody: { values: [[name, email.toLowerCase(), hash, role]] }
+      requestBody: { values: [[name, normalizedEmail, hash, role]] }
     })
-
-    return NextResponse.json({ success: true, name, email: email.toLowerCase(), role })
+    return NextResponse.json({ success: true, name, email: normalizedEmail, role })
   } catch (err) {
     console.error('Register error:', err)
-    return NextResponse.json({ success: false, error: 'Server error. Make sure environment variables are configured.' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Server error: ' + err.message }, { status: 500 })
   }
 }

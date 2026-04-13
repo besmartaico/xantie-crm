@@ -19,19 +19,11 @@ export async function GET() {
     const sheets = getSheets()
     const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'TimeEntries!A2:G' })
     const rows = (res.data.values || []).map((r, i) => ({
-      id: i + 2,
-      name: r[0] || '',
-      email: r[1] || '',
-      date: r[2] || '',
-      hours: r[3] || '',
-      description: r[4] || '',
-      importedFrom: r[5] || '',
-      project: r[6] || '',
+      id: i + 2, name: r[0]||'', email: r[1]||'', date: r[2]||'',
+      hours: r[3]||'', description: r[4]||'', importedFrom: r[5]||'', project: r[6]||'',
     }))
     return NextResponse.json(rows)
-  } catch (err) {
-    return NextResponse.json([], { status: 500 })
-  }
+  } catch (err) { return NextResponse.json([], { status: 500 }) }
 }
 
 export async function POST(req) {
@@ -43,9 +35,9 @@ export async function POST(req) {
     if (action === 'add') {
       const { name, email, date, hours, description, project } = body
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SID(), range: 'TimeEntries!A:G',
+        spreadsheetId: SID(), range: 'TimeEntries',
         valueInputOption: 'RAW',
-        requestBody: { values: [[name, email, date, hours, description, '', project || '']] }
+        requestBody: { values: [[name, email, date, hours, description, '', project||'']] }
       })
       return NextResponse.json({ success: true })
     }
@@ -55,7 +47,7 @@ export async function POST(req) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(), range: `TimeEntries!A${id}:G${id}`,
         valueInputOption: 'RAW',
-        requestBody: { values: [[name, email, date, hours, description, importedFrom || '', project || '']] }
+        requestBody: { values: [[name, email, date, hours, description, importedFrom||'', project||'']] }
       })
       return NextResponse.json({ success: true })
     }
@@ -74,23 +66,18 @@ export async function POST(req) {
     }
 
     if (action === 'import') {
-      // Extra server-side check — only admins should reach this
       const { entries, userRole } = body
-      if (userRole !== 'admin') {
-        return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
-      }
-      const values = entries.map(e => [e.name, e.email, e.date, e.hours, e.description, e.importedFrom || 'import', e.project || ''])
+      if (userRole !== 'admin') return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
+      const values = entries.map(e => [e.name, e.email, e.date, e.hours, e.description, e.importedFrom||'import', e.project||''])
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SID(), range: 'TimeEntries!A:G',
-        valueInputOption: 'RAW',
-        requestBody: { values }
+        spreadsheetId: SID(), range: 'TimeEntries',
+        valueInputOption: 'RAW', requestBody: { values }
       })
       return NextResponse.json({ success: true, count: values.length })
     }
 
     return NextResponse.json({ success: false }, { status: 400 })
   } catch (err) {
-    console.error('Time POST error:', err)
     return NextResponse.json({ success: false, error: err.message }, { status: 500 })
   }
 }

@@ -42,7 +42,7 @@ export async function POST(req) {
       const { name, description, createdBy } = body
       await sheets.spreadsheets.values.append({
         spreadsheetId: SID(),
-        range: 'Projects!A1',
+        range: 'Projects',
         valueInputOption: 'RAW',
         requestBody: { values: [[name, description || '', createdBy || '', new Date().toISOString().split('T')[0]]] }
       })
