@@ -27,22 +27,23 @@ export async function POST(req) {
 
     const sheets = getSheets()
     const SID = process.env.GOOGLE_SHEETS_ID
-    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:D' })
+    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:D5000' })
     const rows = existing.data.values || []
     if (rows.some(r => r[1]?.toLowerCase() === normalizedEmail))
       return NextResponse.json({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
 
     const role = normalizedEmail === 'jeff@xantie.com' ? 'admin' : 'user'
     const hash = await bcrypt.hash(password, 10)
-    await sheets.spreadsheets.values.append({
+    const nextRow = rows.length + 2
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SID,
-      range: 'Users',
+      range: `Users!A${nextRow}:D${nextRow}`,
       valueInputOption: 'RAW',
       requestBody: { values: [[name, normalizedEmail, hash, role]] }
     })
     return NextResponse.json({ success: true, name, email: normalizedEmail, role })
   } catch (err) {
-    console.error('Register error:', err)
+    console.error('Register error:', err.message)
     return NextResponse.json({ success: false, error: 'Server error: ' + err.message }, { status: 500 })
   }
 }

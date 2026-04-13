@@ -13,20 +13,15 @@ function getSheets() {
   return google.sheets({ version: 'v4', auth })
 }
 const SID = () => process.env.GOOGLE_SHEETS_ID
-
-async function getNextRow(sheets, sheetName) {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SID(),
-    range: `${sheetName}!A2:A5000`
-  })
-  const rows = res.data.values || []
-  return rows.length + 2
-}
+const SHEET = "'Time Entries'"
 
 export async function GET() {
   try {
     const sheets = getSheets()
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'TimeEntries!A2:G5000' })
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SID(),
+      range: SHEET + '!A2:G5000'
+    })
     const rows = (res.data.values || []).map((r, i) => ({
       id: i + 2, name: r[0]||'', email: r[1]||'', date: r[2]||'',
       hours: r[3]||'', description: r[4]||'', importedFrom: r[5]||'', project: r[6]||'',
@@ -34,7 +29,7 @@ export async function GET() {
     return NextResponse.json(rows)
   } catch (err) {
     console.error('Time GET error:', err.message)
-    return NextResponse.json([], { status: 500 })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
@@ -46,10 +41,13 @@ export async function POST(req) {
 
     if (action === 'add') {
       const { name, email, date, hours, description, project } = body
-      const nextRow = await getNextRow(sheets, 'TimeEntries')
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: SID(), range: SHEET + '!A2:A5000'
+      })
+      const nextRow = (existing.data.values || []).length + 2
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(),
-        range: `TimeEntries!A${nextRow}:G${nextRow}`,
+        range: SHEET + `!A${nextRow}:G${nextRow}`,
         valueInputOption: 'RAW',
         requestBody: { values: [[name, email, date, hours, description, '', project||'']] }
       })
@@ -60,7 +58,7 @@ export async function POST(req) {
       const { id, name, email, date, hours, description, project, importedFrom } = body
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(),
-        range: `TimeEntries!A${id}:G${id}`,
+        range: SHEET + `!A${id}:G${id}`,
         valueInputOption: 'RAW',
         requestBody: { values: [[name, email, date, hours, description, importedFrom||'', project||'']] }
       })
@@ -70,7 +68,8 @@ export async function POST(req) {
     if (action === 'delete') {
       const { id } = body
       const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
-      const sheet = meta.data.sheets?.find(s => s.properties?.title === 'TimeEntries')
+      const sheet = meta.data.sheets?.find(s => s.properties?.title === 'Time Entries')
+      if (!sheet) return NextResponse.json({ success: false, error: 'Sheet "Time Entries" not found' }, { status: 404 })
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SID(),
         requestBody: { requests: [{ deleteDimension: {
@@ -83,9 +82,12 @@ export async function POST(req) {
     if (action === 'import') {
       const { entries, userRole } = body
       if (userRole !== 'admin') return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
-      let nextRow = await getNextRow(sheets, 'TimeEntries')
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: SID(), range: SHEET + '!A2:A5000'
+      })
+      let nextRow = (existing.data.values || []).length + 2
       const data = entries.map(e => ({
-        range: `TimeEntries!A${nextRow++}:G${nextRow-1}`,
+        range: SHEET + `!A${nextRow++}:G${nextRow-1}`,
         values: [[e.name, e.email, e.date, e.hours, e.description, e.importedFrom||'import', e.project||'']]
       }))
       await sheets.spreadsheets.values.batchUpdate({
