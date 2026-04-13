@@ -14,12 +14,21 @@ function getSheets() {
 }
 const SID = () => process.env.GOOGLE_SHEETS_ID
 
+// Get the exact sheet title and sheetId by looking for a sheet whose title contains "roject"
+async function getProjectSheet(sheets) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
+  const sheet = meta.data.sheets?.find(s => s.properties?.title?.toLowerCase().includes('roject'))
+  if (!sheet) throw new Error('Could not find a Projects sheet. Sheet names: ' + meta.data.sheets?.map(s => s.properties?.title).join(', '))
+  return { title: sheet.properties.title, sheetId: sheet.properties.sheetId }
+}
+
 export async function GET() {
   try {
     const sheets = getSheets()
+    const { title } = await getProjectSheet(sheets)
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SID(),
-      range: 'Projects!A2:D'
+      range: `${title}!A2:D`
     })
     const rows = (res.data.values || []).map((r, i) => ({
       id: i + 2,
@@ -31,7 +40,7 @@ export async function GET() {
     return NextResponse.json(rows)
   } catch (err) {
     console.error('Projects GET error:', err)
-    return NextResponse.json([], { status: 500 })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
@@ -40,18 +49,19 @@ export async function POST(req) {
     const body = await req.json()
     const { action } = body
     const sheets = getSheets()
+    const { title, sheetId } = await getProjectSheet(sheets)
 
     if (action === 'add') {
       const { name, description, createdBy } = body
-      // Get current data to find next empty row
+      // Get all rows to find next empty row
       const existing = await sheets.spreadsheets.values.get({
         spreadsheetId: SID(),
-        range: 'Projects!A:A'
+        range: `${title}!A1:A`
       })
       const nextRow = (existing.data.values || []).length + 1
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(),
-        range: `Projects!A${nextRow}:D${nextRow}`,
+        range: `${title}!A${nextRow}:D${nextRow}`,
         valueInputOption: 'RAW',
         requestBody: { values: [[name, description || '', createdBy || '', new Date().toISOString().split('T')[0]]] }
       })
@@ -60,12 +70,10 @@ export async function POST(req) {
 
     if (action === 'delete') {
       const { id } = body
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
-      const sheet = meta.data.sheets?.find(s => s.properties?.title === 'Projects')
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SID(),
         requestBody: { requests: [{ deleteDimension: {
-          range: { sheetId: sheet.properties.sheetId, dimension: 'ROWS', startIndex: id - 1, endIndex: id }
+          range: { sheetId, dimension: 'ROWS', startIndex: id - 1, endIndex: id }
         }}]}
       })
       return NextResponse.json({ success: true })
