@@ -31,7 +31,8 @@ function BillableFilter({ value, onChange }) {
     <div style={{display:'flex',gap:'0',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
       {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
         <button key={o.v} onClick={()=>onChange(o.v)}
-          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
+          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',
+            background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
           {o.label}
         </button>
       ))}
@@ -43,21 +44,49 @@ export default function ProjectDetail() {
   const { projectName } = useParams()
   const router = useRouter()
   const name = decodeURIComponent(projectName)
-  const [entries, setEntries] = useState([])
+  const [allEntries, setAllEntries] = useState([])
+  const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
+  const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
-    fetch('/api/time').then(r=>r.json()).then(data => {
-      setEntries(data.filter(e=>e.project===name)); setLoading(false)
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    setCurrentUser(u)
+    Promise.all([
+      fetch('/api/time').then(r=>r.json()),
+      fetch('/api/projects').then(r=>r.json())
+    ]).then(([entries, projs]) => {
+      setAllEntries(entries.filter(e => e.project === name))
+      setProjects(projs)
+      setLoading(false)
     })
   }, [name])
 
-  const employees = [...new Set(entries.map(e=>e.name).filter(Boolean))].sort()
+  // Role-based access: same logic as dashboard
+  function getAccessibleEntries() {
+    const role = currentUser.role
+    const email = currentUser.email
+    if (role === 'admin') return allEntries
+    // Team lead for THIS project can see all entries
+    const thisProject = projects.find(p => p.name === name)
+    if (thisProject?.teamLead === email) return allEntries
+    // Everyone else: own entries only
+    return allEntries.filter(e => e.email === email)
+  }
+
+  const accessibleEntries = getAccessibleEntries()
+  const isAdmin = currentUser.role === 'admin'
+  const thisProject = projects.find(p => p.name === name)
+  const isLeadForThis = thisProject?.teamLead === currentUser.email
+  const canSeeAll = isAdmin || isLeadForThis
+
+  // Only show employee filter for admin/team lead
+  const employees = canSeeAll ? [...new Set(accessibleEntries.map(e=>e.name).filter(Boolean))].sort() : []
 
   function applyFilters(data) {
     let out = data
@@ -68,7 +97,7 @@ export default function ProjectDetail() {
     return out
   }
 
-  const filtered = applyFilters(entries)
+  const filtered = applyFilters(accessibleEntries)
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const hasFilters = dateFilter||employeeFilter||billableFilter
@@ -81,6 +110,7 @@ export default function ProjectDetail() {
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
           {filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span>
           {billableFilter==='' && <span style={{color:'#6b7280'}}> · <span style={{color:'#60a5fa'}}>{billableHours.toFixed(2)} billable</span></span>}
+          {!canSeeAll && <span style={{color:'#6b7280'}}> · your hours only</span>}
         </p>
       </div>
 
@@ -95,10 +125,12 @@ export default function ProjectDetail() {
             <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} style={{...sel,colorScheme:'dark'}}/>
           </>
         )}
-        <select value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} style={sel}>
-          <option value="">All Employees</option>
-          {employees.map(e=><option key={e} value={e}>{e}</option>)}
-        </select>
+        {employees.length > 0 && (
+          <select value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} style={sel}>
+            <option value="">All Employees</option>
+            {employees.map(e=><option key={e} value={e}>{e}</option>)}
+          </select>
+        )}
         <BillableFilter value={billableFilter} onChange={setBillableFilter}/>
         {hasFilters && (
           <button onClick={()=>{setDateFilter('');setEmployeeFilter('');setBillableFilter('');setCustomStart('');setCustomEnd('')}}
@@ -108,13 +140,13 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:'12px',marginBottom:'24px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:'12px',marginBottom:'24px'}}>
         {[
           { label:'Total Hours', value:totalHours.toFixed(2), color:'#8DC63F' },
-          { label:'Billable Hours', value:billableHours.toFixed(2), color:'#60a5fa' },
+          { label:'Billable', value:billableHours.toFixed(2), color:'#60a5fa' },
           { label:'Non-Billable', value:(totalHours-billableHours).toFixed(2), color:'#9ca3af' },
           { label:'Entries', value:filtered.length },
-          { label:'Employees', value:[...new Set(filtered.map(e=>e.name).filter(Boolean))].length },
+          ...(canSeeAll ? [{ label:'Employees', value:[...new Set(filtered.map(e=>e.name).filter(Boolean))].length }] : []),
         ].map(c=>(
           <div key={c.label} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'16px'}}>
             <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'6px'}}>{c.label}</div>
@@ -123,7 +155,8 @@ export default function ProjectDetail() {
         ))}
       </div>
 
-      {filtered.length > 0 && (
+      {/* Employee breakdown - only for admin/team lead */}
+      {canSeeAll && filtered.length > 0 && (
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px',marginBottom:'20px'}}>
           <h3 style={{margin:'0 0 16px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Employee</h3>
           {Object.entries(filtered.reduce((acc,e)=>{ acc[e.name]=(acc[e.name]||0)+(parseFloat(e.hours)||0); return acc },{})).sort((a,b)=>b[1]-a[1]).map(([emp,hrs])=>{
@@ -144,19 +177,20 @@ export default function ProjectDetail() {
       )}
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',minWidth:'540px'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',minWidth:'500px'}}>
           <thead>
             <tr>
-              <th style={th}>Employee</th><th style={th}>Date</th><th style={th}>Hours</th>
+              {canSeeAll && <th style={th}>Employee</th>}
+              <th style={th}>Date</th><th style={th}>Hours</th>
               <th style={th}>Billable</th><th style={th}>Description</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5} style={{...td,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
-            {!loading && filtered.length===0 && <tr><td colSpan={5} style={{...td,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
+            {loading && <tr><td colSpan={canSeeAll?5:4} style={{...td,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
+            {!loading && filtered.length===0 && <tr><td colSpan={canSeeAll?5:4} style={{...td,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
             {filtered.sort((a,b)=>b.date.localeCompare(a.date)).map(e=>(
               <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
-                <td style={td}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
+                {canSeeAll && <td style={td}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>}
                 <td style={td}>{e.date}</td>
                 <td style={td}><span style={{background:'rgba(141,198,63,0.12)',color:'#8DC63F',padding:'3px 8px',borderRadius:'6px',fontWeight:700,fontSize:'12px'}}>{e.hours}</span></td>
                 <td style={td}>
