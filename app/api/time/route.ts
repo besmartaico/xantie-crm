@@ -23,7 +23,10 @@ export async function GET() {
       hours: r[3]||'', description: r[4]||'', importedFrom: r[5]||'', project: r[6]||'',
     }))
     return NextResponse.json(rows)
-  } catch (err) { return NextResponse.json([], { status: 500 }) }
+  } catch (err) {
+    console.error('Time GET error:', err.message)
+    return NextResponse.json([], { status: 500 })
+  }
 }
 
 export async function POST(req) {
@@ -34,8 +37,14 @@ export async function POST(req) {
 
     if (action === 'add') {
       const { name, email, date, hours, description, project } = body
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SID(), range: 'TimeEntries',
+      // Get next empty row
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: SID(), range: 'TimeEntries!A:A'
+      })
+      const nextRow = (existing.data.values || []).length + 1
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(),
+        range: `TimeEntries!A${nextRow}:G${nextRow}`,
         valueInputOption: 'RAW',
         requestBody: { values: [[name, email, date, hours, description, '', project||'']] }
       })
@@ -68,16 +77,24 @@ export async function POST(req) {
     if (action === 'import') {
       const { entries, userRole } = body
       if (userRole !== 'admin') return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
-      const values = entries.map(e => [e.name, e.email, e.date, e.hours, e.description, e.importedFrom||'import', e.project||''])
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SID(), range: 'TimeEntries',
-        valueInputOption: 'RAW', requestBody: { values }
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: SID(), range: 'TimeEntries!A:A'
       })
-      return NextResponse.json({ success: true, count: values.length })
+      let nextRow = (existing.data.values || []).length + 1
+      const requests = entries.map(e => ({
+        range: `TimeEntries!A${nextRow++}:G${nextRow-1}`,
+        values: [[e.name, e.email, e.date, e.hours, e.description, e.importedFrom||'import', e.project||'']]
+      }))
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SID(),
+        requestBody: { valueInputOption: 'RAW', data: requests }
+      })
+      return NextResponse.json({ success: true, count: entries.length })
     }
 
-    return NextResponse.json({ success: false }, { status: 400 })
+    return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 })
   } catch (err) {
+    console.error('Time POST error:', err.message)
     return NextResponse.json({ success: false, error: err.message }, { status: 500 })
   }
 }

@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 
-const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box', cursor:'pointer' }
+const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.07em' }
 const th = { textAlign:'left', padding:'11px 16px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.08em', background:'#111111', borderBottom:'1px solid #1e1e1e' }
 const td = { padding:'11px 16px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
@@ -15,6 +15,7 @@ export default function TimeEntries() {
   const [editEntry, setEditEntry] = useState(null)
   const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], hours: '', description: '', project: '' })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [filter, setFilter] = useState('')
   const dateRef = useRef(null)
 
@@ -22,26 +23,39 @@ export default function TimeEntries() {
 
   async function load() {
     setLoading(true)
-    setEntries(await (await fetch('/api/time')).json())
+    try { setEntries(await (await fetch('/api/time')).json()) } catch(e) {}
     setLoading(false)
   }
 
   async function loadProjects() {
-    setProjects(await (await fetch('/api/projects')).json())
+    try { setProjects(await (await fetch('/api/projects')).json()) } catch(e) {}
   }
 
   async function save() {
-    setSaving(true)
-    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    const payload = { name: u.name||'', email: u.email||'', ...form }
-    if (editEntry) {
-      await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'update', id: editEntry.id, ...payload, importedFrom: editEntry.importedFrom }) })
-    } else {
-      await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', ...payload }) })
+    setSaving(true); setSaveError('')
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      const payload = { name: u.name||'', email: u.email||'', ...form }
+      const res = await fetch('/api/time', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(editEntry
+          ? { action:'update', id: editEntry.id, ...payload, importedFrom: editEntry.importedFrom }
+          : { action:'add', ...payload }
+        )
+      })
+      const data = await res.json()
+      if (data.success) {
+        setShowAdd(false); setEditEntry(null)
+        setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' })
+        load()
+      } else {
+        setSaveError(data.error || 'Failed to save entry.')
+      }
+    } catch(e) {
+      setSaveError('Network error. Please try again.')
     }
-    setSaving(false); setShowAdd(false); setEditEntry(null)
-    setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' })
-    load()
+    setSaving(false)
   }
 
   async function del(id) {
@@ -51,8 +65,14 @@ export default function TimeEntries() {
   }
 
   function openEdit(e) {
-    setEditEntry(e)
+    setEditEntry(e); setSaveError('')
     setForm({ date: e.date, hours: e.hours, description: e.description, project: e.project||'' })
+    setShowAdd(true)
+  }
+
+  function openAdd() {
+    setEditEntry(null); setSaveError('')
+    setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' })
     setShowAdd(true)
   }
 
@@ -69,8 +89,6 @@ export default function TimeEntries() {
   )
   const totalHours = filtered.reduce((s,e) => s+(parseFloat(e.hours)||0), 0)
 
-  const dateInputStyle = { ...inp, colorScheme:'dark' }
-
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
@@ -78,14 +96,13 @@ export default function TimeEntries() {
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span></p>
         </div>
-        <button onClick={() => { setEditEntry(null); setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' }); setShowAdd(true) }}
-          style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+        <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
           + Add Entry
         </button>
       </div>
 
       <div style={{marginBottom:'16px'}}>
-        <input placeholder="Search by name, project, date, or description..." value={filter} onChange={e=>setFilter(e.target.value)} style={{...inp,maxWidth:'400px',cursor:'text'}}/>
+        <input placeholder="Search by name, project, date, or description..." value={filter} onChange={e=>setFilter(e.target.value)} style={{...inp,maxWidth:'400px'}}/>
       </div>
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
@@ -104,7 +121,7 @@ export default function TimeEntries() {
           <tbody>
             {loading && <tr><td colSpan={7} style={{...td,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
             {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...td,textAlign:'center',color:'#6b7280'}}>No entries yet.</td></tr>}
-            {filtered.map(e => (
+            {filtered.map(e=>(
               <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                 <td style={td}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
                 <td style={td}>{e.project?<span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.project}</span>:<span style={{color:'#4b5563',fontSize:'12px'}}>—</span>}</td>
@@ -138,15 +155,12 @@ export default function TimeEntries() {
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Date</label>
               <div style={{position:'relative'}}>
-                <input
-                  ref={dateRef}
-                  type="date"
-                  value={form.date}
+                <input ref={dateRef} type="date" value={form.date}
                   onChange={e=>setForm({...form,date:e.target.value})}
                   onClick={openDatePicker}
-                  style={{...dateInputStyle, paddingRight:'40px'}}
+                  style={{...inp, colorScheme:'dark', paddingRight:'40px', cursor:'pointer'}}
                 />
-                <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',pointerEvents:'none'}}>
+                <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer'}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8DC63F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                     <line x1="16" y1="2" x2="16" y2="6"/>
@@ -159,18 +173,26 @@ export default function TimeEntries() {
 
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Hours (decimal)</label>
-              <input type="number" step="0.25" placeholder="e.g. 2.5" value={form.hours} onChange={e=>setForm({...form,hours:e.target.value})} style={{...inp,cursor:'text'}}/>
+              <input type="number" step="0.25" placeholder="e.g. 2.5" value={form.hours} onChange={e=>setForm({...form,hours:e.target.value})} style={inp}/>
             </div>
             <div style={{marginBottom:'24px'}}>
               <label style={lbl}>Description</label>
-              <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical',cursor:'text'}}/>
+              <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical'}}/>
             </div>
 
+            {saveError && (
+              <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>
+                {saveError}
+              </div>
+            )}
+
             <div style={{display:'flex',gap:'12px'}}>
-              <button onClick={save} disabled={saving} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+              <button onClick={save} disabled={saving} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1}}>
                 {saving?'Saving...':editEntry?'Save Changes':'Add Entry'}
               </button>
-              <button onClick={()=>{setShowAdd(false);setEditEntry(null)}} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
+              <button onClick={()=>{setShowAdd(false);setEditEntry(null);setSaveError('')}} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>
