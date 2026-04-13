@@ -24,17 +24,18 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleLogin(e) {
-    e.preventDefault()
+  async function handleLogin() {
     setLoading(true); setError('')
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
       })
       const data = await res.json()
       if (data.success) {
@@ -44,14 +45,11 @@ export default function Login() {
       } else {
         setError(data.error || 'Invalid email or password.')
       }
-    } catch (err) {
-      setError('Network error. Please try again.')
-    }
+    } catch { setError('Network error. Please try again.') }
     setLoading(false)
   }
 
-  async function handleRegister(e) {
-    e.preventDefault()
+  async function handleRegister() {
     setLoading(true); setError('')
     if (password !== confirmPassword) { setError('Passwords do not match.'); setLoading(false); return }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return }
@@ -59,7 +57,7 @@ export default function Login() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email: email.trim().toLowerCase(), password })
       })
       const data = await res.json()
       if (data.success) {
@@ -69,18 +67,24 @@ export default function Login() {
       } else {
         setError(data.error || 'Registration failed.')
       }
-    } catch (err) {
-      setError('Network error. Please try again.')
-    }
+    } catch { setError('Network error. Please try again.') }
     setLoading(false)
   }
 
-  function switchMode(m) { setMode(m); setError(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName('') }
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !loading) {
+      mode === 'login' ? handleLogin() : handleRegister()
+    }
+  }
+
+  function switchMode(m) { setMode(m); setError(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName(''); setShowPassword(false); setShowConfirm(false) }
+
+  const pwFieldStyle = { position: 'relative', marginBottom: '16px' }
+  const eyeBtn = { position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'#6b7280', cursor:'pointer', fontSize:'14px', padding:'4px' }
 
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
       <div style={{width:'100%',maxWidth:'390px'}}>
-
         <div style={{textAlign:'center',marginBottom:'36px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'14px',marginBottom:'4px'}}>
             <XLogo size={52} />
@@ -101,11 +105,12 @@ export default function Login() {
             <>
               <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Email</label>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@xantie.com" style={inp} autoComplete="email" />
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="you@xantie.com" style={inp} autoComplete="email" />
               </div>
-              <div style={{marginBottom:'24px'}}>
+              <div style={pwFieldStyle}>
                 <label style={lbl}>Password</label>
-                <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" style={inp} autoComplete="current-password" />
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="••••••••" style={{...inp, paddingRight:'44px'}} autoComplete="current-password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeBtn}>{showPassword ? '🙈' : '👁️'}</button>
               </div>
             </>
           )}
@@ -115,21 +120,23 @@ export default function Login() {
               <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 14px',marginBottom:'20px'}}>
                 <p style={{margin:0,fontSize:'12px',color:'#8DC63F'}}>🔒 Open to <strong>@xantie.com</strong> email addresses only.</p>
               </div>
-              <div style={{marginBottom:'14px'}}>
+              <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Full Name</label>
-                <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Jane Smith" style={inp} autoComplete="name" />
+                <input type="text" value={name} onChange={e=>setName(e.target.value)} onKeyDown={handleKeyDown} placeholder="Jane Smith" style={inp} autoComplete="name" />
               </div>
-              <div style={{marginBottom:'14px'}}>
+              <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Email</label>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@xantie.com" style={inp} autoComplete="email" />
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="you@xantie.com" style={inp} autoComplete="email" />
               </div>
-              <div style={{marginBottom:'14px'}}>
+              <div style={pwFieldStyle}>
                 <label style={lbl}>Password</label>
-                <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Min 8 characters" style={inp} autoComplete="new-password" />
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="Min 8 characters" style={{...inp,paddingRight:'44px'}} autoComplete="new-password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeBtn}>{showPassword ? '🙈' : '👁️'}</button>
               </div>
-              <div style={{marginBottom:'24px'}}>
+              <div style={{...pwFieldStyle, marginBottom:'24px'}}>
                 <label style={lbl}>Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Repeat password" style={inp} autoComplete="new-password" />
+                <input type={showConfirm ? 'text' : 'password'} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="Repeat password" style={{...inp,paddingRight:'44px'}} autoComplete="new-password" />
+                <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={eyeBtn}>{showConfirm ? '🙈' : '👁️'}</button>
               </div>
             </>
           )}
@@ -143,7 +150,7 @@ export default function Login() {
           <button
             onClick={mode === 'login' ? handleLogin : handleRegister}
             disabled={loading}
-            style={{width:'100%',background: loading ? '#5a7a28' : '#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor: loading ? 'not-allowed' : 'pointer'}}>
+            style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor: loading ? 'not-allowed' : 'pointer',opacity: loading ? 0.7 : 1}}>
             {loading ? (mode === 'login' ? 'Signing in...' : 'Creating account...') : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </button>
         </div>

@@ -17,7 +17,7 @@ const SID = () => process.env.GOOGLE_SHEETS_ID
 export async function GET() {
   try {
     const sheets = getSheets()
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Projects!A2:E' })
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Projects!A2:D' })
     const rows = (res.data.values || []).map((r, i) => ({
       id: i + 2,
       name: r[0] || '',
@@ -41,9 +41,10 @@ export async function POST(req) {
     if (action === 'add') {
       const { name, description, createdBy } = body
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SID(), range: 'Projects!A:E',
+        spreadsheetId: SID(),
+        range: 'Projects!A1',
         valueInputOption: 'RAW',
-        requestBody: { values: [[name, description || '', createdBy || '', new Date().toISOString().split('T')[0], '']] }
+        requestBody: { values: [[name, description || '', createdBy || '', new Date().toISOString().split('T')[0]]] }
       })
       return NextResponse.json({ success: true })
     }
