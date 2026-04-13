@@ -25,7 +25,7 @@ export default function AdminLayout({ children }) {
     const a = sessionStorage.getItem('xantie_auth')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     if (!a) { router.push('/login'); return }
-    if (path === '/admin/import' && u.role !== 'admin') { router.push('/admin'); return }
+    if (path==='/admin/import' && u.role!=='admin') { router.push('/admin'); return }
     setAuth(true); setUser(u)
   }, [path])
 
@@ -37,11 +37,15 @@ export default function AdminLayout({ children }) {
 
   if (!auth) return null
   const isAdmin = user.role === 'admin'
+
   const NAV = [
-    { label: 'Time Entries', href: '/admin' },
-    { label: 'Projects', href: '/admin/projects' },
-    ...(isAdmin ? [{ label: 'Import', href: '/admin/import' }] : []),
+    { label: '📊 Dashboard', href: '/admin/dashboard' },
+    { label: '⏱ Time Entries', href: '/admin' },
+    { label: '📁 Projects', href: '/admin/projects' },
+    ...(isAdmin ? [{ label: '📥 Import', href: '/admin/import' }] : []),
   ]
+
+  const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
 
   const sidebar = (
     <div style={{display:'flex',flexDirection:'column',height:'100%',padding:'24px 0'}}>
@@ -59,9 +63,9 @@ export default function AdminLayout({ children }) {
           <a key={n.href} href={n.href} style={{
             display:'block',padding:'10px 12px',borderRadius:'8px',marginBottom:'4px',
             fontSize:'14px',fontWeight:500,cursor:'pointer',
-            background: path===n.href ? 'rgba(141,198,63,0.1)' : 'transparent',
-            color: path===n.href ? '#8DC63F' : '#9ca3af',
-            borderLeft: path===n.href ? '2px solid #8DC63F' : '2px solid transparent',
+            background: isActive(n.href) ? 'rgba(141,198,63,0.1)' : 'transparent',
+            color: isActive(n.href) ? '#8DC63F' : '#9ca3af',
+            borderLeft: isActive(n.href) ? '2px solid #8DC63F' : '2px solid transparent',
           }}>{n.label}</a>
         ))}
       </nav>
@@ -81,11 +85,11 @@ export default function AdminLayout({ children }) {
           <XLogo size={24}/>
           <span style={{fontSize:'16px',fontWeight:800,color:'#fff'}}>Xantie <span style={{color:'#8DC63F',fontSize:'12px'}}>CRM</span></span>
         </div>
-        <button onClick={() => setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'22px',cursor:'pointer'}}>☰</button>
+        <button onClick={()=>setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'22px',cursor:'pointer'}}>☰</button>
       </div>
       {menuOpen && (
-        <div style={{position:'fixed',inset:0,zIndex:200,cursor:'pointer'}} onClick={() => setMenuOpen(false)}>
-          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e',cursor:'default'}} onClick={e => e.stopPropagation()}>
+        <div style={{position:'fixed',inset:0,zIndex:200}} onClick={()=>setMenuOpen(false)}>
+          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e'}} onClick={e=>e.stopPropagation()}>
             {sidebar}
           </div>
         </div>
