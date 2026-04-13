@@ -3,6 +3,29 @@ html, body { max-width: 100vw; overflow-x: hidden; background: #0a0a0a; color: #
 a { color: inherit; text-decoration: none; cursor: pointer; }
 button, [role="button"], select, a { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+
+/* Date input calendar icon - make visible on dark bg */
+input[type="date"] {
+  color-scheme: dark;
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.5);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0.8;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: rgba(141,198,63,0.15);
+}
+
+/* Select arrow visible on dark bg */
+select {
+  color-scheme: dark;
+}
+
 @media (max-width: 768px) {
   .desktop-only { display: none !important; }
   .page-pad { padding: 16px !important; max-width: 100% !important; }
