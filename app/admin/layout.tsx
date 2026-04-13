@@ -39,10 +39,10 @@ export default function AdminLayout({ children }) {
   const isAdmin = user.role === 'admin'
 
   const NAV = [
-    { label: '📊 Dashboard', href: '/admin/dashboard' },
-    { label: '⏱ Time Entries', href: '/admin' },
-    { label: '📁 Projects', href: '/admin/projects' },
-    ...(isAdmin ? [{ label: '📥 Import', href: '/admin/import' }] : []),
+    { label: 'Dashboard', href: '/admin/dashboard' },
+    { label: 'Time Entries', href: '/admin' },
+    { label: 'Projects', href: '/admin/projects' },
+    ...(isAdmin ? [{ label: 'Import', href: '/admin/import' }] : []),
   ]
 
   const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
@@ -59,13 +59,13 @@ export default function AdminLayout({ children }) {
         </div>
       </div>
       <nav style={{flex:1,padding:'16px 12px'}}>
-        {NAV.map(n => (
+        {NAV.map(n=>(
           <a key={n.href} href={n.href} style={{
             display:'block',padding:'10px 12px',borderRadius:'8px',marginBottom:'4px',
             fontSize:'14px',fontWeight:500,cursor:'pointer',
-            background: isActive(n.href) ? 'rgba(141,198,63,0.1)' : 'transparent',
-            color: isActive(n.href) ? '#8DC63F' : '#9ca3af',
-            borderLeft: isActive(n.href) ? '2px solid #8DC63F' : '2px solid transparent',
+            background: isActive(n.href)?'rgba(141,198,63,0.1)':'transparent',
+            color: isActive(n.href)?'#8DC63F':'#9ca3af',
+            borderLeft: isActive(n.href)?'2px solid #8DC63F':'2px solid transparent',
           }}>{n.label}</a>
         ))}
       </nav>
