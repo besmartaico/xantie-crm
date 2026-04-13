@@ -23,6 +23,19 @@ function getRange(filter, start, end) {
 
 const sel = { background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'8px 12px', color:'#fff', fontSize:'13px', cursor:'pointer', outline:'none' }
 
+function BillableFilter({ value, onChange }) {
+  return (
+    <div style={{display:'flex',gap:'0',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
+      {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
+        <button key={o.v} onClick={()=>onChange(o.v)}
+          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
@@ -31,41 +44,34 @@ export default function Dashboard() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
+  const [billableFilter, setBillableFilter] = useState('')
   const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     setCurrentUser(u)
-    Promise.all([
-      fetch('/api/time').then(r=>r.json()),
-      fetch('/api/projects').then(r=>r.json())
-    ]).then(([e, p]) => { setEntries(e); setProjects(p); setLoading(false) })
+    Promise.all([fetch('/api/time').then(r=>r.json()), fetch('/api/projects').then(r=>r.json())])
+      .then(([e,p]) => { setEntries(e); setProjects(p); setLoading(false) })
   }, [])
 
-  // Role-based data access
   function getAccessibleEntries() {
-    const role = currentUser.role
-    const email = currentUser.email
+    const role = currentUser.role; const email = currentUser.email
     if (role === 'admin') return entries
-    // Team lead: see all entries for projects they lead
-    const ledProjects = projects.filter(p => p.teamLead === email).map(p => p.name)
-    if (ledProjects.length > 0) {
-      return entries.filter(e => e.email === email || ledProjects.includes(e.project))
-    }
-    // Viewer/editor: own entries only
-    return entries.filter(e => e.email === email)
+    const ledProjects = projects.filter(p=>p.teamLead===email).map(p=>p.name)
+    if (ledProjects.length > 0) return entries.filter(e=>e.email===email||ledProjects.includes(e.project))
+    return entries.filter(e=>e.email===email)
   }
 
   const accessibleEntries = getAccessibleEntries()
   const isAdmin = currentUser.role === 'admin'
-  const ledProjects = projects.filter(p => p.teamLead === currentUser.email).map(p => p.name)
+  const ledProjects = projects.filter(p=>p.teamLead===currentUser.email).map(p=>p.name)
   const isTeamLead = ledProjects.length > 0
-
-  const employees = isAdmin ? [...new Set(accessibleEntries.map(e=>e.name).filter(Boolean))].sort() : []
+  const employees = (isAdmin||isTeamLead) ? [...new Set(accessibleEntries.map(e=>e.name).filter(Boolean))].sort() : []
 
   function applyFilters(data) {
     let out = data
     if (employeeFilter) out = out.filter(e=>e.name===employeeFilter)
+    if (billableFilter) out = out.filter(e=>e.billable===billableFilter)
     const range = getRange(dateFilter, customStart, customEnd)
     if (range) out = out.filter(e=>{ const d=new Date(e.date); return d>=range[0]&&d<=range[1] })
     return out
@@ -73,19 +79,15 @@ export default function Dashboard() {
 
   const filtered = applyFilters(accessibleEntries)
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+  const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+  const nonBillableHours = filtered.filter(e=>e.billable==='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const uniqueProjects = [...new Set(filtered.map(e=>e.project).filter(Boolean))]
   const uniqueEmployees = [...new Set(filtered.map(e=>e.name).filter(Boolean))]
   const datesWithEntries = [...new Set(filtered.map(e=>e.date).filter(Boolean))]
   const avgPerDay = datesWithEntries.length?(totalHours/datesWithEntries.length):0
 
-  const byProject = Object.entries(
-    filtered.reduce((acc,e)=>{ const k=e.project||'No Project'; acc[k]=(acc[k]||0)+(parseFloat(e.hours)||0); return acc },{})
-  ).sort((a,b)=>b[1]-a[1])
-
-  const byEmployee = Object.entries(
-    filtered.reduce((acc,e)=>{ if(e.name) acc[e.name]=(acc[e.name]||0)+(parseFloat(e.hours)||0); return acc },{})
-  ).sort((a,b)=>b[1]-a[1])
-
+  const byProject = Object.entries(filtered.reduce((acc,e)=>{ const k=e.project||'No Project'; acc[k]=(acc[k]||0)+(parseFloat(e.hours)||0); return acc },{})).sort((a,b)=>b[1]-a[1])
+  const byEmployee = Object.entries(filtered.reduce((acc,e)=>{ if(e.name) acc[e.name]=(acc[e.name]||0)+(parseFloat(e.hours)||0); return acc },{})).sort((a,b)=>b[1]-a[1])
   const byMonth = {}
   filtered.forEach(e => {
     if (!e.date) return
@@ -93,24 +95,25 @@ export default function Dashboard() {
     const key = d.toLocaleString('default',{month:'short',year:'numeric'})
     byMonth[key]=(byMonth[key]||0)+(parseFloat(e.hours)||0)
   })
-
-  const maxP = byProject[0]?.[1]||1
-  const maxE = byEmployee[0]?.[1]||1
+  const maxP = byProject[0]?.[1]||1; const maxE = byEmployee[0]?.[1]||1
 
   const kpis = [
     { label:'Total Hours', value: loading?'…':totalHours.toFixed(1), color:'#8DC63F' },
-    { label:'Entries', value: loading?'…':filtered.length },
+    { label:'Billable', value: loading?'…':billableHours.toFixed(1), color:'#60a5fa' },
+    { label:'Non-Billable', value: loading?'…':nonBillableHours.toFixed(1), color:'#9ca3af' },
     ...(isAdmin||isTeamLead ? [{ label:'Active Projects', value: loading?'…':uniqueProjects.length }] : []),
     ...(isAdmin||isTeamLead ? [{ label:'Employees', value: loading?'…':uniqueEmployees.length }] : []),
     { label:'Avg Hrs / Day', value: loading?'…':avgPerDay.toFixed(1) },
   ]
+
+  const hasFilters = dateFilter||employeeFilter||billableFilter
 
   return (
     <div>
       <div style={{marginBottom:'24px'}}>
         <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
-          {isAdmin ? 'All team data' : isTeamLead ? 'Your hours + projects you lead' : 'Your hours'}
+          {isAdmin?'All team data':isTeamLead?'Your hours + projects you lead':'Your hours'}
         </p>
       </div>
 
@@ -131,8 +134,9 @@ export default function Dashboard() {
             {employees.map(e=><option key={e} value={e}>{e}</option>)}
           </select>
         )}
-        {(dateFilter||employeeFilter) && (
-          <button onClick={()=>{setDateFilter('');setEmployeeFilter('');setCustomStart('');setCustomEnd('')}}
+        <BillableFilter value={billableFilter} onChange={setBillableFilter}/>
+        {hasFilters && (
+          <button onClick={()=>{setDateFilter('');setEmployeeFilter('');setBillableFilter('');setCustomStart('');setCustomEnd('')}}
             style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 12px',fontSize:'13px',cursor:'pointer'}}>
             Clear filters
           </button>
@@ -145,19 +149,19 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:'12px',marginBottom:'28px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'28px'}}>
         {kpis.map(c=>(
           <div key={c.label} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'18px'}}>
-            <div style={{fontSize:'28px',fontWeight:800,color:c.color||'#fff',lineHeight:1,marginBottom:'6px'}}>{c.value}</div>
+            <div style={{fontSize:'26px',fontWeight:800,color:c.color||'#fff',lineHeight:1,marginBottom:'6px'}}>{c.value}</div>
             <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.07em'}}>{c.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns: (isAdmin||isTeamLead)?'1fr 1fr':'1fr',gap:'20px',marginBottom:'20px'}}>
+      <div style={{display:'grid',gridTemplateColumns:(isAdmin||isTeamLead)?'1fr 1fr':'1fr',gap:'20px',marginBottom:'20px'}}>
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
           <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Project</h3>
-          {byProject.length===0 && <div style={{color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
+          {byProject.length===0&&<div style={{color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
           {byProject.map(([proj,hrs])=>(
             <div key={proj} style={{marginBottom:'14px'}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
@@ -170,11 +174,10 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
-
         {(isAdmin||isTeamLead) && (
           <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
             <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Employee</h3>
-            {byEmployee.length===0 && <div style={{color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
+            {byEmployee.length===0&&<div style={{color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
             {byEmployee.map(([emp,hrs])=>(
               <div key={emp} style={{marginBottom:'14px'}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>

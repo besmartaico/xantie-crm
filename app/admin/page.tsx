@@ -17,23 +17,55 @@ function CloseBtn({ onClick }) {
   )
 }
 
+function BillableToggle({ value, onChange }) {
+  return (
+    <div style={{display:'flex',gap:'12px'}}>
+      {[{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
+        <label key={o.v} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',userSelect:'none'}}>
+          <div onClick={() => onChange(o.v)} style={{
+            width:'18px', height:'18px', borderRadius:'50%', border: value===o.v ? '2px solid #8DC63F' : '2px solid #3a3a3a',
+            background: value===o.v ? '#8DC63F' : 'transparent', cursor:'pointer', flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s',
+          }}>
+            {value===o.v && <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#0a0a0a'}}/>}
+          </div>
+          <span style={{fontSize:'14px',color: value===o.v ? '#fff' : '#9ca3af', fontWeight: value===o.v ? 600 : 400}}>{o.label}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function BillableFilter({ value, onChange }) {
+  return (
+    <div style={{display:'flex',gap:'0',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
+      {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
+        <button key={o.v} onClick={()=>onChange(o.v)}
+          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function TimeEntries() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
-  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], hours: '', description: '', project: '' })
+  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], hours: '', description: '', project: '', billable: 'yes' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [filter, setFilter] = useState('')
+  const [billableFilter, setBillableFilter] = useState('')
   const dateRef = useRef(null)
   const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setCurrentUser(u)
-    load(); loadProjects()
+    setCurrentUser(u); load(); loadProjects()
   }, [])
 
   async function load() {
@@ -51,17 +83,16 @@ export default function TimeEntries() {
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
       const res = await fetch('/api/time', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify(editEntry
-          ? { action:'update', id: editEntry.id, name: u.name||'', email: u.email||'', ...form, importedFrom: editEntry.importedFrom }
-          : { action:'add', name: u.name||'', email: u.email||'', ...form }
+          ? { action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', ...form, importedFrom:editEntry.importedFrom }
+          : { action:'add', name:u.name||'', email:u.email||'', ...form }
         )
       })
       const data = await res.json()
-      if (data.success) {
-        closeModal(); load()
-      } else setSaveError(data.error || 'Failed to save entry.')
-    } catch(e) { setSaveError('Network error. Please try again.') }
+      if (data.success) { closeModal(); load() }
+      else setSaveError(data.error || 'Failed to save.')
+    } catch(e) { setSaveError('Network error.') }
     setSaving(false)
   }
 
@@ -71,55 +102,68 @@ export default function TimeEntries() {
     load()
   }
 
-  function openEdit(e) { setEditEntry(e); setSaveError(''); setForm({ date: e.date, hours: e.hours, description: e.description, project: e.project||'' }); setShowAdd(true) }
-  function openAdd() { setEditEntry(null); setSaveError(''); setForm({ date: new Date().toISOString().split('T')[0], hours:'', description:'', project:'' }); setShowAdd(true) }
+  function openEdit(e) { setEditEntry(e); setSaveError(''); setForm({ date:e.date, hours:e.hours, description:e.description, project:e.project||'', billable:e.billable||'yes' }); setShowAdd(true) }
+  function openAdd() { setEditEntry(null); setSaveError(''); setForm({ date:new Date().toISOString().split('T')[0], hours:'', description:'', project:'', billable:'yes' }); setShowAdd(true) }
   function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError('') }
   function openDatePicker() { if (dateRef.current) { try { dateRef.current.showPicker() } catch { dateRef.current.click() } } }
 
-  // Filter: non-admins only see their own entries
   const isAdmin = currentUser.role === 'admin'
   const visibleEntries = isAdmin ? entries : entries.filter(e => e.email === currentUser.email)
 
-  const filtered = visibleEntries.filter(e =>
-    !filter || e.name?.toLowerCase().includes(filter.toLowerCase()) ||
-    e.description?.toLowerCase().includes(filter.toLowerCase()) ||
-    e.date?.includes(filter) || e.project?.toLowerCase().includes(filter.toLowerCase())
-  )
+  const filtered = visibleEntries.filter(e => {
+    if (billableFilter && e.billable !== billableFilter) return false
+    if (!filter) return true
+    return e.name?.toLowerCase().includes(filter.toLowerCase()) ||
+      e.description?.toLowerCase().includes(filter.toLowerCase()) ||
+      e.date?.includes(filter) || e.project?.toLowerCase().includes(filter.toLowerCase())
+  })
+
   const totalHours = filtered.reduce((s,e) => s+(parseFloat(e.hours)||0), 0)
+  const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e) => s+(parseFloat(e.hours)||0), 0)
 
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
-          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span></p>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
+            {filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span>
+            {billableFilter==='' && <span style={{color:'#6b7280'}}> · <span style={{color:'#60a5fa'}}>{billableHours.toFixed(2)} billable</span></span>}
+          </p>
         </div>
         <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ Add Entry</button>
       </div>
 
-      <div style={{marginBottom:'16px'}}>
-        <input placeholder="Search by name, project, date, or description..." value={filter} onChange={e=>setFilter(e.target.value)} style={{...inp,maxWidth:'400px'}}/>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginBottom:'16px',alignItems:'center'}}>
+        <input placeholder="Search..." value={filter} onChange={e=>setFilter(e.target.value)} style={{...inp,maxWidth:'260px'}}/>
+        <BillableFilter value={billableFilter} onChange={setBillableFilter}/>
       </div>
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',minWidth:'640px'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',minWidth:'700px'}}>
           <thead>
             <tr>
               <th style={th}>Name</th><th style={th}>Project</th><th style={th}>Date</th>
-              <th style={th}>Hours</th><th style={th}>Description</th><th style={th}>Source</th><th style={th}></th>
+              <th style={th}>Hours</th><th style={th}>Billable</th><th style={th}>Description</th><th style={th}></th>
             </tr>
           </thead>
           <tbody>
             {loading && <tr><td colSpan={7} style={{...td,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
-            {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...td,textAlign:'center',color:'#6b7280'}}>No entries yet.</td></tr>}
+            {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...td,textAlign:'center',color:'#6b7280'}}>No entries found.</td></tr>}
             {filtered.map(e=>(
               <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                 <td style={td}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
                 <td style={td}>{e.project?<span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.project}</span>:<span style={{color:'#4b5563',fontSize:'12px'}}>—</span>}</td>
                 <td style={td}>{e.date}</td>
                 <td style={td}><span style={{background:'rgba(141,198,63,0.12)',color:'#8DC63F',padding:'3px 8px',borderRadius:'6px',fontWeight:700,fontSize:'12px'}}>{e.hours}</span></td>
+                <td style={td}>
+                  <span style={{
+                    background: e.billable==='no' ? 'rgba(156,163,175,0.1)' : 'rgba(96,165,250,0.1)',
+                    color: e.billable==='no' ? '#9ca3af' : '#60a5fa',
+                    padding:'2px 8px', borderRadius:'5px', fontSize:'12px', fontWeight:600
+                  }}>{e.billable==='no'?'Non-Billable':'Billable'}</span>
+                </td>
                 <td style={td}><span style={{color:'#9ca3af'}}>{e.description}</span></td>
-                <td style={td}><span style={{fontSize:'11px',color:'#6b7280'}}>{e.importedFrom||'manual'}</span></td>
                 <td style={td}>
                   <button onClick={()=>openEdit(e)} style={{background:'none',border:'none',color:'#8DC63F',cursor:'pointer',fontSize:'12px',marginRight:'8px',fontWeight:600}}>Edit</button>
                   <button onClick={()=>del(e.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px'}}>Del</button>
@@ -162,6 +206,12 @@ export default function TimeEntries() {
               <label style={lbl}>Hours (decimal)</label>
               <input type="number" step="0.25" placeholder="e.g. 2.5" value={form.hours} onChange={e=>setForm({...form,hours:e.target.value})} style={inp}/>
             </div>
+
+            <div style={{marginBottom:'16px'}}>
+              <label style={lbl}>Billing</label>
+              <BillableToggle value={form.billable} onChange={v=>setForm({...form,billable:v})}/>
+            </div>
+
             <div style={{marginBottom:'24px'}}>
               <label style={lbl}>Description</label>
               <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical'}}/>
