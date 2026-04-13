@@ -14,10 +14,19 @@ function getSheets() {
 }
 const SID = () => process.env.GOOGLE_SHEETS_ID
 
+async function getNextRow(sheets, sheetName) {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SID(),
+    range: `${sheetName}!A2:A5000`
+  })
+  const rows = res.data.values || []
+  return rows.length + 2
+}
+
 export async function GET() {
   try {
     const sheets = getSheets()
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'TimeEntries!A2:G' })
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'TimeEntries!A2:G5000' })
     const rows = (res.data.values || []).map((r, i) => ({
       id: i + 2, name: r[0]||'', email: r[1]||'', date: r[2]||'',
       hours: r[3]||'', description: r[4]||'', importedFrom: r[5]||'', project: r[6]||'',
@@ -37,11 +46,7 @@ export async function POST(req) {
 
     if (action === 'add') {
       const { name, email, date, hours, description, project } = body
-      // Get next empty row
-      const existing = await sheets.spreadsheets.values.get({
-        spreadsheetId: SID(), range: 'TimeEntries!A:A'
-      })
-      const nextRow = (existing.data.values || []).length + 1
+      const nextRow = await getNextRow(sheets, 'TimeEntries')
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(),
         range: `TimeEntries!A${nextRow}:G${nextRow}`,
@@ -54,7 +59,8 @@ export async function POST(req) {
     if (action === 'update') {
       const { id, name, email, date, hours, description, project, importedFrom } = body
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `TimeEntries!A${id}:G${id}`,
+        spreadsheetId: SID(),
+        range: `TimeEntries!A${id}:G${id}`,
         valueInputOption: 'RAW',
         requestBody: { values: [[name, email, date, hours, description, importedFrom||'', project||'']] }
       })
@@ -77,17 +83,14 @@ export async function POST(req) {
     if (action === 'import') {
       const { entries, userRole } = body
       if (userRole !== 'admin') return NextResponse.json({ success: false, error: 'Admin access required.' }, { status: 403 })
-      const existing = await sheets.spreadsheets.values.get({
-        spreadsheetId: SID(), range: 'TimeEntries!A:A'
-      })
-      let nextRow = (existing.data.values || []).length + 1
-      const requests = entries.map(e => ({
+      let nextRow = await getNextRow(sheets, 'TimeEntries')
+      const data = entries.map(e => ({
         range: `TimeEntries!A${nextRow++}:G${nextRow-1}`,
         values: [[e.name, e.email, e.date, e.hours, e.description, e.importedFrom||'import', e.project||'']]
       }))
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: SID(),
-        requestBody: { valueInputOption: 'RAW', data: requests }
+        requestBody: { valueInputOption: 'RAW', data }
       })
       return NextResponse.json({ success: true, count: entries.length })
     }
