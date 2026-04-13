@@ -29,17 +29,32 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    const { action, id, role } = await req.json()
+    const body = await req.json()
+    const { action } = body
     const sheets = getSheets()
+
     if (action === 'update_role') {
+      const { id, role } = body
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(),
-        range: `Users!D${id}`,
-        valueInputOption: 'RAW',
-        requestBody: { values: [[role]] }
+        spreadsheetId: SID(), range: `Users!D${id}`,
+        valueInputOption: 'RAW', requestBody: { values: [[role]] }
       })
       return NextResponse.json({ success: true })
     }
+
+    if (action === 'delete') {
+      const { id } = body
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
+      const sheet = meta.data.sheets?.find(s => s.properties?.title === 'Users')
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SID(),
+        requestBody: { requests: [{ deleteDimension: {
+          range: { sheetId: sheet.properties.sheetId, dimension: 'ROWS', startIndex: id - 1, endIndex: id }
+        }}]}
+      })
+      return NextResponse.json({ success: true })
+    }
+
     return NextResponse.json({ success: false }, { status: 400 })
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 })

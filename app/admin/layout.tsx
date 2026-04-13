@@ -20,29 +20,55 @@ export default function AdminLayout({ children }) {
   const [auth, setAuth] = useState(false)
   const [user, setUser] = useState({name:'',role:''})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [impersonating, setImpersonating] = useState(false)
+  const [realAdmin, setRealAdmin] = useState(null)
 
   useEffect(() => {
     const a = sessionStorage.getItem('xantie_auth')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    const backup = sessionStorage.getItem('xantie_admin_backup')
     if (!a) { router.push('/login'); return }
-    if ((path==='/admin/import' || path==='/admin/users') && u.role!=='admin') { router.push('/admin'); return }
+    if ((path==='/admin/import'||path==='/admin/users') && u.role!=='admin' && !backup) { router.push('/admin'); return }
     setAuth(true); setUser(u)
+    if (backup) {
+      setImpersonating(true)
+      setRealAdmin(JSON.parse(backup))
+    } else {
+      setImpersonating(false)
+      setRealAdmin(null)
+    }
   }, [path])
 
   function signOut() {
     sessionStorage.removeItem('xantie_auth')
     sessionStorage.removeItem('xantie_user')
+    sessionStorage.removeItem('xantie_admin_backup')
+    sessionStorage.removeItem('xantie_admin_auth_backup')
     router.push('/login')
   }
 
-  if (!auth) return null
-  const isAdmin = user.role === 'admin'
+  function stopImpersonating() {
+    const backup = sessionStorage.getItem('xantie_admin_backup')
+    const authBackup = sessionStorage.getItem('xantie_admin_auth_backup')
+    if (backup) sessionStorage.setItem('xantie_user', backup)
+    if (authBackup) sessionStorage.setItem('xantie_auth', authBackup)
+    sessionStorage.removeItem('xantie_admin_backup')
+    sessionStorage.removeItem('xantie_admin_auth_backup')
+    router.push('/admin/users')
+  }
 
-  const NAV = [
+  if (!auth) return null
+  const isAdmin = user.role === 'admin' || impersonating
+
+  const NAV = impersonating ? [
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
     { label: 'Projects', href: '/admin/projects' },
-    ...(isAdmin ? [
+  ] : [
+    { label: 'Dashboard', href: '/admin/dashboard' },
+    { label: 'Time Entries', href: '/admin' },
+    { label: 'Projects', href: '/admin/projects' },
+    ...(user.role==='admin' ? [
       { label: 'Users', href: '/admin/users' },
       { label: 'Import', href: '/admin/import' },
     ] : []),
@@ -74,8 +100,8 @@ export default function AdminLayout({ children }) {
       </nav>
       <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
         {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
-        {isAdmin && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
-        <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>
+        {!impersonating && user.role==='admin' && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
+        {!impersonating && <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>}
       </div>
     </div>
   )
@@ -97,8 +123,35 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
       )}
-      <div className="desktop-only" style={{marginLeft:'220px',flex:1,padding:'32px'}}>{children}</div>
-      <div className="mobile-only" style={{flex:1,padding:'72px 16px 24px'}}>{children}</div>
+
+      <div className="desktop-only" style={{marginLeft:'220px',flex:1,display:'flex',flexDirection:'column'}}>
+        {/* Impersonation banner */}
+        {impersonating && (
+          <div style={{background:'rgba(251,191,36,0.1)',borderBottom:'1px solid rgba(251,191,36,0.3)',padding:'10px 32px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span style={{fontSize:'13px',color:'#fbbf24'}}>
+              👁 Viewing as <strong>{user.name}</strong> ({user.email}) — {user.role} view
+            </span>
+            <button onClick={stopImpersonating}
+              style={{background:'#fbbf24',color:'#0a0a0a',border:'none',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+              Exit — Back to Admin
+            </button>
+          </div>
+        )}
+        <div style={{flex:1,padding:'32px'}}>{children}</div>
+      </div>
+
+      <div className="mobile-only" style={{flex:1,display:'flex',flexDirection:'column'}}>
+        {impersonating && (
+          <div style={{background:'rgba(251,191,36,0.1)',borderBottom:'1px solid rgba(251,191,36,0.3)',padding:'8px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'56px'}}>
+            <span style={{fontSize:'12px',color:'#fbbf24'}}>Viewing as <strong>{user.name}</strong></span>
+            <button onClick={stopImpersonating}
+              style={{background:'#fbbf24',color:'#0a0a0a',border:'none',borderRadius:'6px',padding:'4px 10px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>
+              Exit
+            </button>
+          </div>
+        )}
+        <div style={{flex:1,padding: impersonating ? '12px 16px 24px' : '72px 16px 24px'}}>{children}</div>
+      </div>
     </div>
   )
 }
