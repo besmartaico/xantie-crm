@@ -110,6 +110,42 @@ export default function Dashboard() {
   })
   const maxP = byProject[0]?.[1]||1; const maxE = byEmployee[0]?.[1]||1
 
+
+  function exportCSV(mode) {
+    let rows, filename
+    if (mode === 'project') {
+      rows = [['Project','Total Hours','Billable Hours','Non-Billable Hours']]
+      byProject.forEach(([proj, hrs]) => {
+        const projEntries = filtered.filter(e => (e.project||'No Project') === proj)
+        const bill = projEntries.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+        rows.push([proj, hrs.toFixed(2), bill.toFixed(2), (hrs-bill).toFixed(2)])
+      })
+      filename = 'hours-by-project.csv'
+    } else if (mode === 'employee') {
+      rows = [['Employee','Email','Total Hours','Billable Hours','Non-Billable Hours']]
+      byEmployee.forEach(([emp, hrs]) => {
+        const empEntries = filtered.filter(e => e.name === emp)
+        const email = empEntries[0]?.email || ''
+        const bill = empEntries.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+        rows.push([emp, email, hrs.toFixed(2), bill.toFixed(2), (hrs-bill).toFixed(2)])
+      })
+      filename = 'hours-by-employee.csv'
+    } else {
+      rows = [['Employee','Email','Project','Date','Hours','Billable','Description']]
+      filtered.sort((a,b)=>a.date?.localeCompare(b.date)).forEach(e => {
+        rows.push([e.name, e.email, e.project||'', e.date, e.hours, e.billable==='no'?'No':'Yes', e.description])
+      })
+      filename = 'all-entries.csv'
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], {type:'text/csv'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const [showExportMenu, setShowExportMenu] = useState(false)
+
   const kpis = [
     { label:'Total Hours', value: loading?'…':totalHours.toFixed(1), color:'#8DC63F' },
     { label:'Billable', value: loading?'…':billableHours.toFixed(1), color:'#60a5fa' },
@@ -122,7 +158,7 @@ export default function Dashboard() {
   const hasFilters = dateFilter||employeeFilter||billableFilter
 
   return (
-    <div>
+    <div onClick={()=>showExportMenu&&setShowExportMenu(false)}>
       <div style={{marginBottom:'24px'}}>
         <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
@@ -161,6 +197,31 @@ export default function Dashboard() {
             Clear filters
           </button>
         )}
+
+        {/* Export dropdown */}
+        <div style={{position:'relative'}}>
+          <button onClick={()=>setShowExportMenu(!showExportMenu)}
+            style={{background:'#1e1e1e',border:'1px solid #2a2a2a',color:'#9ca3af',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+            Export CSV
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {showExportMenu && (
+            <div style={{position:'absolute',top:'calc(100% + 6px)',right:0,background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'6px',zIndex:50,minWidth:'180px',boxShadow:'0 8px 24px rgba(0,0,0,0.4)'}}>
+              {[
+                {mode:'project', label:'By Project'},
+                {mode:'employee', label:'By Employee'},
+                {mode:'all', label:'All Entries (Detail)'},
+              ].map(opt => (
+                <button key={opt.mode} onClick={()=>{exportCSV(opt.mode);setShowExportMenu(false)}}
+                  style={{display:'block',width:'100%',textAlign:'left',background:'none',border:'none',color:'#d1d5db',padding:'8px 12px',fontSize:'13px',cursor:'pointer',borderRadius:'6px'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='#252525'}
+                  onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {isTeamLead && !isAdmin && (
