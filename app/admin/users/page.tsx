@@ -13,14 +13,12 @@ export default function UsersPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
   const [currentUser, setCurrentUser] = useState({})
-  const [impersonating, setImpersonating] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     setCurrentUser(u)
-    // Check if currently impersonating
-    setImpersonating(!!sessionStorage.getItem('xantie_admin_backup'))
     load()
   }, [])
 
@@ -33,7 +31,10 @@ export default function UsersPage() {
   async function updateRole(user, role) {
     setSaving(user.id)
     try {
-      await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'update_role', id: user.id, role }) })
+      await fetch('/api/users', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'update_role', id: user.id, role })
+      })
       setUsers(prev => prev.map(u => u.id === user.id ? {...u, role} : u))
     } catch(e) {}
     setSaving(null)
@@ -41,33 +42,30 @@ export default function UsersPage() {
 
   async function deleteUser(user) {
     if (!confirm(`Remove ${user.name} (${user.email})? This cannot be undone.`)) return
-    setSaving(user.id)
+    setSaving(user.id); setDeleteError('')
     try {
-      await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', id: user.id }) })
-      setUsers(prev => prev.filter(u => u.id !== user.id))
-    } catch(e) {}
+      const res = await fetch('/api/users', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'delete', id: user.id })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setUsers(prev => prev.filter(u => u.id !== user.id))
+      } else {
+        setDeleteError(data.error || 'Failed to remove user.')
+      }
+    } catch(e) {
+      setDeleteError('Network error. Please try again.')
+    }
     setSaving(null)
   }
 
   function impersonate(user) {
-    // Save real admin session
     sessionStorage.setItem('xantie_admin_backup', sessionStorage.getItem('xantie_user'))
     sessionStorage.setItem('xantie_admin_auth_backup', sessionStorage.getItem('xantie_auth'))
-    // Switch to impersonated user
     sessionStorage.setItem('xantie_user', JSON.stringify({ name: user.name, email: user.email, role: user.role }))
     sessionStorage.setItem('xantie_auth', user.role)
     router.push('/admin/dashboard')
-  }
-
-  function stopImpersonating() {
-    // Restore admin session
-    const backup = sessionStorage.getItem('xantie_admin_backup')
-    const authBackup = sessionStorage.getItem('xantie_admin_auth_backup')
-    if (backup) sessionStorage.setItem('xantie_user', backup)
-    if (authBackup) sessionStorage.setItem('xantie_auth', authBackup)
-    sessionStorage.removeItem('xantie_admin_backup')
-    sessionStorage.removeItem('xantie_admin_auth_backup')
-    router.push('/admin/users')
   }
 
   return (
@@ -81,10 +79,16 @@ export default function UsersPage() {
         <p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>
           <span style={{color:'#8DC63F',fontWeight:600}}>Admin</span> — full access.{'  '}
           <span style={{color:'#60a5fa',fontWeight:600}}>Editor</span> — can add/edit entries.{'  '}
-          <span style={{color:'#9ca3af',fontWeight:600}}>Viewer</span> — read-only, own data only.{'  '}
-          Click <strong style={{color:'#fff'}}>View As</strong> to impersonate any user and see exactly what they see.
+          <span style={{color:'#9ca3af',fontWeight:600}}>Viewer</span> — read-only.{'  '}
+          Click <strong style={{color:'#fff'}}>View As</strong> to see exactly what a user sees.
         </p>
       </div>
+
+      {deleteError && (
+        <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',marginBottom:'16px'}}>
+          {deleteError}
+        </div>
+      )}
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
         <table style={{width:'100%',borderCollapse:'collapse',minWidth:'560px'}}>
@@ -103,29 +107,29 @@ export default function UsersPage() {
               <tr key={u.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                 <td style={td}>
                   <div style={{fontWeight:500,color:'#fff'}}>{u.name}</div>
-                  {u.email === currentUser.email && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>You</div>}
+                  {u.email===currentUser.email && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em'}}>You</div>}
                 </td>
                 <td style={td}><span style={{color:'#9ca3af'}}>{u.email}</span></td>
                 <td style={td}>
                   <span style={{
                     background: u.role==='admin'?'rgba(141,198,63,0.12)':u.role==='editor'?'rgba(96,165,250,0.12)':'rgba(156,163,175,0.12)',
                     color: ROLE_COLORS[u.role]||'#9ca3af',
-                    padding:'3px 10px', borderRadius:'6px', fontSize:'12px', fontWeight:600, textTransform:'capitalize'
+                    padding:'3px 10px',borderRadius:'6px',fontSize:'12px',fontWeight:600,textTransform:'capitalize'
                   }}>{u.role||'viewer'}</span>
                 </td>
                 <td style={td}>
-                  {u.email !== currentUser.email ? (
+                  {u.email!==currentUser.email ? (
                     <div style={{display:'flex',gap:'6px'}}>
                       {ROLES.map(r => (
-                        <button key={r} onClick={() => updateRole(u, r)}
-                          disabled={saving===u.id || u.role===r}
+                        <button key={r} onClick={()=>updateRole(u,r)}
+                          disabled={saving===u.id||u.role===r}
                           style={{
-                            background: u.role===r?'rgba(141,198,63,0.15)':'#1e1e1e',
-                            border: u.role===r?'1px solid rgba(141,198,63,0.3)':'1px solid #2a2a2a',
-                            color: u.role===r?'#8DC63F':'#6b7280',
-                            borderRadius:'6px', padding:'4px 10px', fontSize:'11px', fontWeight:600,
-                            cursor: u.role===r?'default':'pointer', textTransform:'capitalize',
-                            opacity: saving===u.id?0.5:1
+                            background:u.role===r?'rgba(141,198,63,0.15)':'#1e1e1e',
+                            border:u.role===r?'1px solid rgba(141,198,63,0.3)':'1px solid #2a2a2a',
+                            color:u.role===r?'#8DC63F':'#6b7280',
+                            borderRadius:'6px',padding:'4px 10px',fontSize:'11px',fontWeight:600,
+                            cursor:u.role===r?'default':'pointer',textTransform:'capitalize',
+                            opacity:saving===u.id?0.5:1
                           }}>
                           {r}
                         </button>
@@ -135,19 +139,19 @@ export default function UsersPage() {
                 </td>
                 <td style={td}>
                   <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                    {u.email !== currentUser.email && (
-                      <button onClick={() => impersonate(u)}
+                    {u.email!==currentUser.email && (
+                      <button onClick={()=>impersonate(u)}
                         style={{background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.25)',color:'#60a5fa',borderRadius:'6px',padding:'5px 10px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
                         View As
                       </button>
                     )}
-                    {u.email !== currentUser.email && (
-                      <button onClick={() => deleteUser(u)} disabled={saving===u.id}
-                        style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',padding:'4px',opacity:saving===u.id?0.5:1}}>
-                        Remove
+                    {u.email!==currentUser.email && (
+                      <button onClick={()=>deleteUser(u)} disabled={saving===u.id}
+                        style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',color:'#f87171',borderRadius:'6px',padding:'5px 10px',fontSize:'12px',fontWeight:600,cursor:saving===u.id?'not-allowed':'pointer',opacity:saving===u.id?0.5:1}}>
+                        {saving===u.id?'Removing…':'Remove'}
                       </button>
                     )}
-                    {u.email === currentUser.email && <span style={{fontSize:'12px',color:'#4b5563'}}>—</span>}
+                    {u.email===currentUser.email && <span style={{fontSize:'12px',color:'#4b5563'}}>—</span>}
                   </div>
                 </td>
               </tr>
