@@ -19,17 +19,18 @@ function CloseBtn({ onClick }) {
 
 function BillableToggle({ value, onChange }) {
   return (
-    <div style={{display:'flex',gap:'12px'}}>
+    <div style={{display:'flex',gap:'16px'}}>
       {[{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
-        <label key={o.v} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',userSelect:'none'}}>
-          <div onClick={() => onChange(o.v)} style={{
-            width:'18px', height:'18px', borderRadius:'50%', border: value===o.v ? '2px solid #8DC63F' : '2px solid #3a3a3a',
-            background: value===o.v ? '#8DC63F' : 'transparent', cursor:'pointer', flexShrink:0,
-            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s',
+        <label key={o.v} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',userSelect:'none'}} onClick={() => onChange(o.v)}>
+          <div style={{
+            width:'18px',height:'18px',borderRadius:'50%',flexShrink:0,
+            border: value===o.v ? '2px solid #8DC63F' : '2px solid #3a3a3a',
+            background: value===o.v ? '#8DC63F' : 'transparent',
+            display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.15s',
           }}>
             {value===o.v && <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'#0a0a0a'}}/>}
           </div>
-          <span style={{fontSize:'14px',color: value===o.v ? '#fff' : '#9ca3af', fontWeight: value===o.v ? 600 : 400}}>{o.label}</span>
+          <span style={{fontSize:'14px',color:value===o.v?'#fff':'#9ca3af',fontWeight:value===o.v?600:400}}>{o.label}</span>
         </label>
       ))}
     </div>
@@ -38,10 +39,11 @@ function BillableToggle({ value, onChange }) {
 
 function BillableFilter({ value, onChange }) {
   return (
-    <div style={{display:'flex',gap:'0',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
+    <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
       {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
         <button key={o.v} onClick={()=>onChange(o.v)}
-          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
+          style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',
+            background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
           {o.label}
         </button>
       ))}
@@ -62,6 +64,10 @@ export default function TimeEntries() {
   const [billableFilter, setBillableFilter] = useState('')
   const dateRef = useRef(null)
   const [currentUser, setCurrentUser] = useState({})
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [savingProject, setSavingProject] = useState(false)
+  const [projectError, setProjectError] = useState('')
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -78,7 +84,36 @@ export default function TimeEntries() {
     try { setProjects(await (await fetch('/api/projects')).json()) } catch(e) {}
   }
 
+  async function saveNewProject() {
+    if (!newProjectName.trim()) return
+    setSavingProject(true); setProjectError('')
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      const res = await fetch('/api/projects', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'add', name: newProjectName.trim(), description:'', createdBy: u.name||u.email||'' })
+      })
+      const data = await res.json()
+      if (data.success) {
+        await loadProjects()
+        setForm(f => ({...f, project: newProjectName.trim()}))
+        setNewProjectName(''); setShowNewProject(false)
+      } else setProjectError(data.error || 'Failed to create project.')
+    } catch(e) { setProjectError('Network error.') }
+    setSavingProject(false)
+  }
+
+  function handleProjectChange(e) {
+    const val = e.target.value
+    if (val === '__new__') {
+      setShowNewProject(true); setNewProjectName(''); setProjectError('')
+    } else {
+      setForm(f => ({...f, project: val})); setShowNewProject(false)
+    }
+  }
+
   async function save() {
+    if (!form.project) { setSaveError('Please select a project before saving.'); return }
     setSaving(true); setSaveError('')
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -102,14 +137,21 @@ export default function TimeEntries() {
     load()
   }
 
-  function openEdit(e) { setEditEntry(e); setSaveError(''); setForm({ date:e.date, hours:e.hours, description:e.description, project:e.project||'', billable:e.billable||'yes' }); setShowAdd(true) }
-  function openAdd() { setEditEntry(null); setSaveError(''); setForm({ date:new Date().toISOString().split('T')[0], hours:'', description:'', project:'', billable:'yes' }); setShowAdd(true) }
-  function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError('') }
+  function openEdit(e) {
+    setEditEntry(e); setSaveError('')
+    setForm({ date:e.date, hours:e.hours, description:e.description, project:e.project||'', billable:e.billable||'yes' })
+    setShowAdd(true); setShowNewProject(false)
+  }
+  function openAdd() {
+    setEditEntry(null); setSaveError('')
+    setForm({ date:new Date().toISOString().split('T')[0], hours:'', description:'', project:'', billable:'yes' })
+    setShowAdd(true); setShowNewProject(false)
+  }
+  function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError(''); setShowNewProject(false); setNewProjectName('') }
   function openDatePicker() { if (dateRef.current) { try { dateRef.current.showPicker() } catch { dateRef.current.click() } } }
 
   const isAdmin = currentUser.role === 'admin'
   const visibleEntries = isAdmin ? entries : entries.filter(e => e.email === currentUser.email)
-
   const filtered = visibleEntries.filter(e => {
     if (billableFilter && e.billable !== billableFilter) return false
     if (!filter) return true
@@ -117,9 +159,9 @@ export default function TimeEntries() {
       e.description?.toLowerCase().includes(filter.toLowerCase()) ||
       e.date?.includes(filter) || e.project?.toLowerCase().includes(filter.toLowerCase())
   })
-
-  const totalHours = filtered.reduce((s,e) => s+(parseFloat(e.hours)||0), 0)
-  const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e) => s+(parseFloat(e.hours)||0), 0)
+  const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+  const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
+  const canSave = !!form.project && !saving
 
   return (
     <div>
@@ -156,13 +198,7 @@ export default function TimeEntries() {
                 <td style={td}>{e.project?<span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.project}</span>:<span style={{color:'#4b5563',fontSize:'12px'}}>—</span>}</td>
                 <td style={td}>{e.date}</td>
                 <td style={td}><span style={{background:'rgba(141,198,63,0.12)',color:'#8DC63F',padding:'3px 8px',borderRadius:'6px',fontWeight:700,fontSize:'12px'}}>{e.hours}</span></td>
-                <td style={td}>
-                  <span style={{
-                    background: e.billable==='no' ? 'rgba(156,163,175,0.1)' : 'rgba(96,165,250,0.1)',
-                    color: e.billable==='no' ? '#9ca3af' : '#60a5fa',
-                    padding:'2px 8px', borderRadius:'5px', fontSize:'12px', fontWeight:600
-                  }}>{e.billable==='no'?'Non-Billable':'Billable'}</span>
-                </td>
+                <td style={td}><span style={{background:e.billable==='no'?'rgba(156,163,175,0.1)':'rgba(96,165,250,0.1)',color:e.billable==='no'?'#9ca3af':'#60a5fa',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.billable==='no'?'Non-Billable':'Billable'}</span></td>
                 <td style={td}><span style={{color:'#9ca3af'}}>{e.description}</span></td>
                 <td style={td}>
                   <button onClick={()=>openEdit(e)} style={{background:'none',border:'none',color:'#8DC63F',cursor:'pointer',fontSize:'12px',marginRight:'8px',fontWeight:600}}>Edit</button>
@@ -176,24 +212,59 @@ export default function TimeEntries() {
 
       {showAdd && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
-          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px'}}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px',maxHeight:'90vh',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
               <h2 style={{margin:0,fontSize:'18px'}}>{editEntry?'Edit Entry':'Add Time Entry'}</h2>
               <CloseBtn onClick={closeModal}/>
             </div>
 
-            <div style={{marginBottom:'16px'}}>
-              <label style={lbl}>Project</label>
-              <select value={form.project} onChange={e=>setForm({...form,project:e.target.value})} style={{...inp,cursor:'pointer'}}>
-                <option value="">— No project —</option>
+            {/* Project selector */}
+            <div style={{marginBottom:'12px'}}>
+              <label style={lbl}>Project <span style={{color:'#f87171'}}>*</span></label>
+              <select
+                value={showNewProject ? '__new__' : form.project}
+                onChange={handleProjectChange}
+                style={{...inp, cursor:'pointer', borderColor: !form.project && !showNewProject ? '#5a3030' : '#252525'}}
+              >
+                <option value="">— Select a project —</option>
+                <option disabled>────────────────────</option>
                 {projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
+                <option disabled>────────────────────</option>
+                <option value="__new__">+ Add New Project</option>
               </select>
+              {!form.project && !showNewProject && (
+                <p style={{margin:'4px 0 0',fontSize:'11px',color:'#f87171'}}>A project is required to save</p>
+              )}
             </div>
+
+            {/* Inline new project */}
+            {showNewProject && (
+              <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
+                <label style={{...lbl,marginBottom:'8px'}}>New Project Name</label>
+                <div style={{display:'flex',gap:'8px'}}>
+                  <input type="text" autoFocus value={newProjectName}
+                    onChange={e=>setNewProjectName(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&saveNewProject()}
+                    placeholder="e.g. Website Redesign"
+                    style={{...inp,flex:1,fontSize:'14px'}}/>
+                  <button onClick={saveNewProject} disabled={savingProject||!newProjectName.trim()}
+                    style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',fontWeight:700,cursor:savingProject||!newProjectName.trim()?'not-allowed':'pointer',opacity:!newProjectName.trim()?0.5:1,whiteSpace:'nowrap'}}>
+                    {savingProject?'Adding…':'Add'}
+                  </button>
+                  <button onClick={()=>{setShowNewProject(false);setNewProjectName('');setProjectError('')}}
+                    style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'10px 12px',fontSize:'13px',cursor:'pointer'}}>✕</button>
+                </div>
+                {projectError && <p style={{margin:'6px 0 0',fontSize:'12px',color:'#f87171'}}>{projectError}</p>}
+              </div>
+            )}
 
             <div style={{marginBottom:'16px'}}>
               <label style={lbl}>Date</label>
               <div style={{position:'relative'}}>
-                <input ref={dateRef} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} onClick={openDatePicker} style={{...inp,colorScheme:'dark',paddingRight:'40px',cursor:'pointer'}}/>
+                <input ref={dateRef} type="date" value={form.date}
+                  onChange={e=>setForm({...form,date:e.target.value})}
+                  onClick={openDatePicker}
+                  style={{...inp,colorScheme:'dark',paddingRight:'40px',cursor:'pointer'}}/>
                 <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',pointerEvents:'none'}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8DC63F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -217,11 +288,16 @@ export default function TimeEntries() {
               <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical'}}/>
             </div>
 
-            {saveError && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{saveError}</div>}
+            {saveError && (
+              <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>
+                {saveError}
+              </div>
+            )}
 
             <div style={{display:'flex',gap:'12px'}}>
-              <button onClick={save} disabled={saving} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1}}>
-                {saving?'Saving...':editEntry?'Save Changes':'Add Entry'}
+              <button onClick={save} disabled={!canSave}
+                style={{flex:1,background:canSave?'#8DC63F':'#2a2a2a',color:canSave?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:canSave?'pointer':'not-allowed',transition:'all 0.15s'}}>
+                {saving?'Saving…':editEntry?'Save Changes':'Add Entry'}
               </button>
               <button onClick={closeModal} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
             </div>
