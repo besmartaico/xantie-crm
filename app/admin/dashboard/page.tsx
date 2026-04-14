@@ -46,7 +46,7 @@ export default function Dashboard() {
   const [customEnd, setCustomEnd] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
-  const [includeInactive, setIncludeInactive] = useState(false)
+  const [includeInactive, setIncludeInactive] = useState(true)
   const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
@@ -152,7 +152,7 @@ export default function Dashboard() {
         {isAdmin && hasInactiveData && (
           <button onClick={()=>setIncludeInactive(!includeInactive)}
             style={{background: includeInactive?'rgba(245,158,11,0.15)':'#1e1e1e', border: includeInactive?'1px solid rgba(245,158,11,0.4)':'1px solid #2a2a2a', color: includeInactive?'#f59e0b':'#6b7280', borderRadius:'8px', padding:'8px 14px', fontSize:'13px', fontWeight:600, cursor:'pointer'}}>
-            {includeInactive ? 'Excluding inactive users' : 'Include inactive users'}
+            {includeInactive ? 'Including inactive users' : 'Exclude inactive users'}
           </button>
         )}
         {hasFilters && (
