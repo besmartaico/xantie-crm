@@ -20,16 +20,17 @@ export async function POST(req) {
     const sheets = getSheets()
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Users!A2:D5000'
+      range: 'Users!A2:E5000'
     })
     const rows = res.data.values || []
     const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())
     if (!user) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
+    // Block inactive users
+    if (user[4] === 'inactive') return NextResponse.json({ success: false, error: 'This account has been deactivated. Please contact your administrator.' }, { status: 403 })
     const valid = await bcrypt.compare(password, user[2])
     if (!valid) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
-    return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3] || 'user' })
+    return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3]||'user' })
   } catch (err) {
-    console.error('Login error:', err.message)
     return NextResponse.json({ success: false, error: 'Server error: ' + err.message }, { status: 500 })
   }
 }

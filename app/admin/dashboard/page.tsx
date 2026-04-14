@@ -25,7 +25,7 @@ const sel = { background:'#111111', border:'1px solid #252525', borderRadius:'8p
 
 function BillableFilter({ value, onChange }) {
   return (
-    <div style={{display:'flex',gap:'0',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
+    <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
       {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
         <button key={o.v} onClick={()=>onChange(o.v)}
           style={{padding:'8px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
@@ -39,27 +39,40 @@ function BillableFilter({ value, onChange }) {
 export default function Dashboard() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
+  const [allUsers, setAllUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('this_month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
+  const [includeInactive, setIncludeInactive] = useState(false)
   const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     setCurrentUser(u)
-    Promise.all([fetch('/api/time').then(r=>r.json()), fetch('/api/projects').then(r=>r.json())])
-      .then(([e,p]) => { setEntries(e); setProjects(p); setLoading(false) })
+    Promise.all([
+      fetch('/api/time').then(r=>r.json()),
+      fetch('/api/projects').then(r=>r.json()),
+      fetch('/api/users').then(r=>r.json()),
+    ]).then(([e,p,u]) => { setEntries(e); setProjects(p); setAllUsers(u); setLoading(false) })
   }, [])
+
+  const inactiveEmails = new Set(allUsers.filter(u=>u.status==='inactive').map(u=>u.email))
+  const hasInactiveData = entries.some(e => inactiveEmails.has(e.email))
 
   function getAccessibleEntries() {
     const role = currentUser.role; const email = currentUser.email
-    if (role === 'admin') return entries
+    let base = entries
+    // Exclude inactive user data unless toggled on
+    if (!includeInactive && inactiveEmails.size > 0) {
+      base = base.filter(e => !inactiveEmails.has(e.email))
+    }
+    if (role === 'admin') return base
     const ledProjects = projects.filter(p=>p.teamLead===email).map(p=>p.name)
-    if (ledProjects.length > 0) return entries.filter(e=>e.email===email||ledProjects.includes(e.project))
-    return entries.filter(e=>e.email===email)
+    if (ledProjects.length > 0) return base.filter(e=>e.email===email||ledProjects.includes(e.project))
+    return base.filter(e=>e.email===email)
   }
 
   const accessibleEntries = getAccessibleEntries()
@@ -114,6 +127,7 @@ export default function Dashboard() {
         <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
           {isAdmin?'All team data':isTeamLead?'Your hours + projects you lead':'Your hours'}
+          {includeInactive && inactiveEmails.size > 0 && <span style={{color:'#f59e0b'}}> · including inactive users</span>}
         </p>
       </div>
 
@@ -135,6 +149,12 @@ export default function Dashboard() {
           </select>
         )}
         <BillableFilter value={billableFilter} onChange={setBillableFilter}/>
+        {isAdmin && hasInactiveData && (
+          <button onClick={()=>setIncludeInactive(!includeInactive)}
+            style={{background: includeInactive?'rgba(245,158,11,0.15)':'#1e1e1e', border: includeInactive?'1px solid rgba(245,158,11,0.4)':'1px solid #2a2a2a', color: includeInactive?'#f59e0b':'#6b7280', borderRadius:'8px', padding:'8px 14px', fontSize:'13px', fontWeight:600, cursor:'pointer'}}>
+            {includeInactive ? 'Excluding inactive users' : 'Include inactive users'}
+          </button>
+        )}
         {hasFilters && (
           <button onClick={()=>{setDateFilter('');setEmployeeFilter('');setBillableFilter('');setCustomStart('');setCustomEnd('')}}
             style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 12px',fontSize:'13px',cursor:'pointer'}}>
@@ -178,17 +198,22 @@ export default function Dashboard() {
           <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
             <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Employee</h3>
             {byEmployee.length===0&&<div style={{color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
-            {byEmployee.map(([emp,hrs])=>(
-              <div key={emp} style={{marginBottom:'14px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
-                  <span style={{fontSize:'13px',color:'#d1d5db'}}>{emp}</span>
-                  <span style={{fontSize:'13px',color:'#8DC63F',fontWeight:700}}>{hrs.toFixed(1)}h</span>
+            {byEmployee.map(([emp,hrs])=>{
+              const isInactiveEmp = [...inactiveEmails].some(email => {
+                const u = allUsers.find(u=>u.email===email); return u?.name===emp
+              })
+              return (
+                <div key={emp} style={{marginBottom:'14px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
+                    <span style={{fontSize:'13px',color: isInactiveEmp?'#6b7280':'#d1d5db'}}>{emp}{isInactiveEmp&&<span style={{fontSize:'10px',color:'#4b5563',marginLeft:'6px'}}>(inactive)</span>}</span>
+                    <span style={{fontSize:'13px',color:'#8DC63F',fontWeight:700}}>{hrs.toFixed(1)}h</span>
+                  </div>
+                  <div style={{background:'#252525',borderRadius:'4px',height:'5px'}}>
+                    <div style={{background: isInactiveEmp?'#4b5563':'#8DC63F',borderRadius:'4px',height:'5px',width:((hrs/maxE)*100)+'%'}}/>
+                  </div>
                 </div>
-                <div style={{background:'#252525',borderRadius:'4px',height:'5px'}}>
-                  <div style={{background:'#8DC63F',borderRadius:'4px',height:'5px',width:((hrs/maxE)*100)+'%'}}/>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
