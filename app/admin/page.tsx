@@ -109,8 +109,22 @@ export default function TimeEntries() {
   const [customEnd, setCustomEnd] = useState('')
 
   // Sort
-  const [sorts, setSorts] = useState([{ col:'date', dir:'desc' }])
+  const [sorts, setSorts] = useState(() => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      const saved = localStorage.getItem('xantie_sorts_' + (u.email||'default'))
+      return saved ? JSON.parse(saved) : [{ col:'date', dir:'desc' }]
+    } catch { return [{ col:'date', dir:'desc' }] }
+  })
   const [dragIdx, setDragIdx] = useState(null)
+
+  // Persist sorts to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      if (u.email) localStorage.setItem('xantie_sorts_' + u.email, JSON.stringify(sorts))
+    } catch {}
+  }, [sorts])
   const [dragOverIdx, setDragOverIdx] = useState(null)
 
   useEffect(() => {
