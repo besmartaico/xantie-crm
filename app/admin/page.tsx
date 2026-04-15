@@ -4,6 +4,26 @@ import { useEffect, useState, useRef } from 'react'
 
 const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.07em' }
+const sel = { background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'8px 12px', color:'#fff', fontSize:'13px', cursor:'pointer', outline:'none' }
+
+const DATE_OPTIONS = [
+  { value:'', label:'All Time' },
+  { value:'this_month', label:'This Month' },
+  { value:'last_month', label:'Last Month' },
+  { value:'this_quarter', label:'This Quarter' },
+  { value:'this_year', label:'This Year' },
+  { value:'custom', label:'Custom Range' },
+]
+
+function getDateRange(filter, start, end) {
+  const now = new Date(); const y = now.getFullYear(); const m = now.getMonth()
+  if (filter==='this_month') return [new Date(y,m,1), new Date(y,m+1,0)]
+  if (filter==='last_month') return [new Date(y,m-1,1), new Date(y,m,0)]
+  if (filter==='this_quarter') { const q=Math.floor(m/3); return [new Date(y,q*3,1), new Date(y,q*3+3,0)] }
+  if (filter==='this_year') return [new Date(y,0,1), new Date(y,11,31)]
+  if (filter==='custom'&&start&&end) return [new Date(start), new Date(end)]
+  return null
+}
 
 function CloseBtn({ onClick }) {
   return (
@@ -30,19 +50,6 @@ function BillableToggle({ value, onChange }) {
   )
 }
 
-function BillableFilter({ value, onChange }) {
-  return (
-    <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
-      {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o => (
-        <button key={o.v} onClick={()=>onChange(o.v)}
-          style={{padding:'8px 12px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:value===o.v?'#8DC63F':'#111111',color:value===o.v?'#0a0a0a':'#6b7280'}}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function SortIcon({ col, sorts }) {
   const idx = sorts.findIndex(s => s.col === col)
   if (idx === -1) return <span style={{color:'#3a3a3a',marginLeft:'4px',fontSize:'10px'}}>↕</span>
@@ -55,28 +62,15 @@ function SortIcon({ col, sorts }) {
   )
 }
 
-// Draggable sort pill
-function SortPill({ sort, index, total, onRemove, onDragStart, onDragOver, onDrop, isDragging }) {
-  const COLS = { name:'Name', project:'Project', date:'Date', hours:'Hours', billable:'Billable', description:'Description' }
+function SortPill({ sort, index, onRemove, onDragStart, onDragOver, onDrop, isDragging }) {
+  const LABELS = { name:'Name', project:'Project', date:'Date', hours:'Hours', billable:'Billable', description:'Description' }
   return (
-    <div
-      draggable
-      onDragStart={() => onDragStart(index)}
-      onDragOver={e => { e.preventDefault(); onDragOver(index) }}
-      onDrop={() => onDrop(index)}
-      style={{
-        display:'flex', alignItems:'center', gap:'4px',
-        background: isDragging ? 'rgba(141,198,63,0.2)' : 'rgba(141,198,63,0.1)',
-        border:'1px solid rgba(141,198,63,0.3)',
-        borderRadius:'6px', padding:'4px 8px', fontSize:'12px', color:'#8DC63F', fontWeight:600,
-        cursor:'grab', userSelect:'none', transition:'all 0.15s',
-        opacity: isDragging ? 0.5 : 1,
-      }}>
+    <div draggable onDragStart={()=>onDragStart(index)} onDragOver={e=>{e.preventDefault();onDragOver(index)}} onDrop={()=>onDrop(index)}
+      style={{display:'flex',alignItems:'center',gap:'4px',background:isDragging?'rgba(141,198,63,0.2)':'rgba(141,198,63,0.1)',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'6px',padding:'4px 8px',fontSize:'12px',color:'#8DC63F',fontWeight:600,cursor:'grab',userSelect:'none',opacity:isDragging?0.5:1}}>
       <span style={{fontSize:'9px',color:'#6b7280',marginRight:'2px'}}>⠿</span>
       <span style={{fontSize:'10px',color:'#6b7280',marginRight:'1px'}}>#{index+1}</span>
-      {COLS[sort.col]} {sort.dir==='asc'?'↑':'↓'}
-      <button onClick={()=>onRemove(index)}
-        style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'0 0 0 4px',fontSize:'13px',lineHeight:1,marginLeft:'2px'}}>×</button>
+      {LABELS[sort.col]} {sort.dir==='asc'?'↑':'↓'}
+      <button onClick={()=>onRemove(index)} style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'0 0 0 4px',fontSize:'13px',lineHeight:1,marginLeft:'2px'}}>×</button>
     </div>
   )
 }
@@ -105,10 +99,16 @@ export default function TimeEntries() {
   const [newProjectName, setNewProjectName] = useState('')
   const [savingProject, setSavingProject] = useState(false)
   const [projectError, setProjectError] = useState('')
-  const [search, setSearch] = useState('')
+
+  // Filters
+  const [nameFilter, setNameFilter] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
-  const [colFilters, setColFilters] = useState({})
-  const [showColFilter, setShowColFilter] = useState(null)
+  const [dateFilter, setDateFilter] = useState('')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+
+  // Sort
   const [sorts, setSorts] = useState([{ col:'date', dir:'desc' }])
   const [dragIdx, setDragIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
@@ -129,7 +129,7 @@ export default function TimeEntries() {
   }
 
   function getLastProject(user) {
-    const mine = entries.filter(e => e.email === user.email && e.project).sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+    const mine = entries.filter(e=>e.email===user.email&&e.project).sort((a,b)=>(b.date||'').localeCompare(a.date||''))
     return mine[0]?.project || ''
   }
 
@@ -194,17 +194,11 @@ export default function TimeEntries() {
     })
   }
 
-  // Drag reorder
   function handleDragStart(i) { setDragIdx(i) }
   function handleDragOver(i) { setDragOverIdx(i) }
   function handleDrop(i) {
-    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setDragOverIdx(null); return }
-    setSorts(prev => {
-      const next = [...prev]
-      const [moved] = next.splice(dragIdx, 1)
-      next.splice(i, 0, moved)
-      return next
-    })
+    if (dragIdx===null||dragIdx===i) { setDragIdx(null); setDragOverIdx(null); return }
+    setSorts(prev => { const next=[...prev]; const [m]=next.splice(dragIdx,1); next.splice(i,0,m); return next })
     setDragIdx(null); setDragOverIdx(null)
   }
 
@@ -212,46 +206,42 @@ export default function TimeEntries() {
     if (!sorts.length) return data
     return [...data].sort((a,b) => {
       for (const s of sorts) {
-        let av = a[s.col]||'', bv = b[s.col]||''
+        let av=a[s.col]||'', bv=b[s.col]||''
         if (s.col==='hours') { av=parseFloat(av)||0; bv=parseFloat(bv)||0 }
-        let cmp = typeof av==='number' ? av-bv : String(av).localeCompare(String(bv))
+        let cmp = typeof av==='number'?av-bv:String(av).localeCompare(String(bv))
         if (cmp!==0) return s.dir==='asc'?cmp:-cmp
       }
       return 0
     })
   }
 
-  function getColValues(col) {
-    const isAdmin = currentUser.role==='admin'
-    const base = isAdmin ? entries : entries.filter(e=>e.email===currentUser.email)
-    return [...new Set(base.map(e=>e[col]).filter(Boolean))].sort()
-  }
-
   const isAdmin = currentUser.role==='admin'
   const visibleEntries = isAdmin ? entries : entries.filter(e=>e.email===currentUser.email)
+
+  // All unique names/projects for filter dropdowns
+  const allNames = [...new Set(visibleEntries.map(e=>e.name).filter(Boolean))].sort()
+  const allProjects = [...new Set(visibleEntries.map(e=>e.project).filter(Boolean))].sort()
+
+  // Apply all filters
   const filtered = applySort(visibleEntries.filter(e => {
-    if (billableFilter && e.billable!==billableFilter) return false
-    if (search) {
-      const s = search.toLowerCase()
-      if (!e.name?.toLowerCase().includes(s) && !e.description?.toLowerCase().includes(s) && !e.date?.includes(s) && !e.project?.toLowerCase().includes(s)) return false
-    }
-    for (const [col,val] of Object.entries(colFilters)) {
-      if (!val) continue
-      const ev = e[col]||''
-      if (!String(ev).toLowerCase().includes(val.toLowerCase())) return false
-    }
+    if (nameFilter && e.name !== nameFilter) return false
+    if (projectFilter && e.project !== projectFilter) return false
+    if (billableFilter && e.billable !== billableFilter) return false
+    const range = getDateRange(dateFilter, customStart, customEnd)
+    if (range) { const d=new Date(e.date); if (d<range[0]||d>range[1]) return false }
     return true
   }))
 
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const canSave = !!form.project && !saving
+  const hasFilters = nameFilter||projectFilter||billableFilter||dateFilter
 
   const thStyle = { textAlign:'left', padding:'10px 14px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.08em', background:'#111111', borderBottom:'1px solid #1e1e1e', userSelect:'none', whiteSpace:'nowrap', cursor:'pointer' }
   const tdStyle = { padding:'11px 14px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
 
   return (
-    <div onClick={()=>setShowColFilter(null)}>
+    <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
@@ -263,34 +253,86 @@ export default function TimeEntries() {
         <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ Add Entry</button>
       </div>
 
-      <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginBottom:'10px',alignItems:'center'}}>
-        <input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,maxWidth:'220px',fontSize:'13px',padding:'8px 12px'}}/>
-        <BillableFilter value={billableFilter} onChange={setBillableFilter}/>
-        {(search||billableFilter||Object.values(colFilters).some(Boolean)) && (
-          <button onClick={()=>{setSearch('');setBillableFilter('');setColFilters({})}}
-            style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 12px',fontSize:'13px',cursor:'pointer'}}>
-            Clear filters
-          </button>
-        )}
+      {/* Filter bar */}
+      <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'flex-end'}}>
+
+          {/* Date filter */}
+          <div>
+            <label style={{...lbl,marginBottom:'4px'}}>Date</label>
+            <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} style={sel}>
+              {DATE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          {dateFilter==='custom' && (
+            <>
+              <div>
+                <label style={{...lbl,marginBottom:'4px'}}>From</label>
+                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} style={{...sel,colorScheme:'dark'}}/>
+              </div>
+              <div>
+                <label style={{...lbl,marginBottom:'4px'}}>To</label>
+                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} style={{...sel,colorScheme:'dark'}}/>
+              </div>
+            </>
+          )}
+
+          {/* Name filter - only for admin */}
+          {isAdmin && (
+            <div>
+              <label style={{...lbl,marginBottom:'4px'}}>Employee</label>
+              <select value={nameFilter} onChange={e=>setNameFilter(e.target.value)} style={sel}>
+                <option value="">All Employees</option>
+                {allNames.map(n=><option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Project filter */}
+          <div>
+            <label style={{...lbl,marginBottom:'4px'}}>Project</label>
+            <select value={projectFilter} onChange={e=>setProjectFilter(e.target.value)} style={sel}>
+              <option value="">All Projects</option>
+              {allProjects.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          {/* Billable filter */}
+          <div>
+            <label style={{...lbl,marginBottom:'4px'}}>Billing</label>
+            <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
+              {[{v:'',label:'All'},{v:'yes',label:'Billable'},{v:'no',label:'Non-Billable'}].map(o=>(
+                <button key={o.v} onClick={()=>setBillableFilter(o.v)}
+                  style={{padding:'8px 12px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:billableFilter===o.v?'#8DC63F':'#111111',color:billableFilter===o.v?'#0a0a0a':'#6b7280',whiteSpace:'nowrap'}}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Clear */}
+          {hasFilters && (
+            <div style={{alignSelf:'flex-end'}}>
+              <button onClick={()=>{setNameFilter('');setProjectFilter('');setBillableFilter('');setDateFilter('');setCustomStart('');setCustomEnd('')}}
+                style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',cursor:'pointer',whiteSpace:'nowrap'}}>
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Sort pills - draggable */}
-      <div style={{display:'flex',gap:'6px',marginBottom:'10px',alignItems:'center',flexWrap:'wrap',minHeight:'28px'}}>
+      {/* Sort pills */}
+      <div style={{display:'flex',gap:'6px',marginBottom:'10px',alignItems:'center',flexWrap:'wrap',minHeight:'24px'}}>
         {sorts.length > 0 && <span style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em'}}>Sort:</span>}
         {sorts.map((s,i) => (
           <SortPill key={s.col} sort={s} index={i} total={sorts.length}
-            onRemove={i => setSorts(prev=>prev.filter((_,j)=>j!==i))}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+            onRemove={i=>setSorts(prev=>prev.filter((_,j)=>j!==i))}
+            onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop}
             isDragging={dragIdx===i}/>
         ))}
-        {sorts.length > 0 && (
-          <button onClick={()=>setSorts([])} style={{background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>Clear sort</button>
-        )}
-        {sorts.length === 0 && (
-          <span style={{fontSize:'11px',color:'#3a3a3a'}}>Click column headers to sort · Stack multiple · Drag pills to reorder</span>
-        )}
+        {sorts.length > 0 && <button onClick={()=>setSorts([])} style={{background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>Clear sort</button>}
+        {sorts.length === 0 && <span style={{fontSize:'11px',color:'#3a3a3a'}}>Click column headers to sort · Stack multiple · Drag pills to reorder</span>}
       </div>
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
@@ -298,47 +340,9 @@ export default function TimeEntries() {
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:'700px'}}>
             <thead>
               <tr>
-                {COLS.map(col => (
-                  <th key={col.key} style={{...thStyle,position:'relative'}} onClick={e=>{e.stopPropagation();handleSort(col.key,e)}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'4px'}}>
-                      <span>{col.label}<SortIcon col={col.key} sorts={sorts}/></span>
-                      {col.key!=='description' && (
-                        <button onClick={e=>{e.stopPropagation();setShowColFilter(showColFilter===col.key?null:col.key)}}
-                          style={{background:colFilters[col.key]?'rgba(141,198,63,0.2)':'none',border:'none',color:colFilters[col.key]?'#8DC63F':'#3a3a3a',cursor:'pointer',padding:'2px 4px',borderRadius:'4px',fontSize:'11px',lineHeight:1,flexShrink:0}}>
-                          ▼
-                        </button>
-                      )}
-                    </div>
-                    {showColFilter===col.key && (
-                      <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:'100%',left:0,background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'8px',zIndex:100,minWidth:'160px',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
-                        {col.key==='billable' ? (
-                          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                            {['','yes','no'].map(v=>(
-                              <button key={v} onClick={()=>{setColFilters(f=>({...f,[col.key]:v}));setShowColFilter(null)}}
-                                style={{textAlign:'left',background:colFilters[col.key]===v?'rgba(141,198,63,0.1)':'none',border:'none',color:colFilters[col.key]===v?'#8DC63F':'#d1d5db',padding:'6px 10px',borderRadius:'6px',cursor:'pointer',fontSize:'13px'}}>
-                                {v===''?'All':v==='yes'?'Billable':'Non-Billable'}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <>
-                            <input autoFocus placeholder={`Filter ${col.label}...`} value={colFilters[col.key]||''}
-                              onChange={e=>setColFilters(f=>({...f,[col.key]:e.target.value}))}
-                              style={{...inp,fontSize:'13px',padding:'6px 10px',marginBottom:'6px'}}/>
-                            <div style={{maxHeight:'160px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'2px'}}>
-                              <button onClick={()=>{setColFilters(f=>({...f,[col.key]:''}));setShowColFilter(null)}}
-                                style={{textAlign:'left',background:'none',border:'none',color:'#6b7280',padding:'5px 8px',borderRadius:'5px',cursor:'pointer',fontSize:'12px'}}>Show all</button>
-                              {getColValues(col.key).map(v=>(
-                                <button key={v} onClick={()=>{setColFilters(f=>({...f,[col.key]:v}));setShowColFilter(null)}}
-                                  style={{textAlign:'left',background:colFilters[col.key]===v?'rgba(141,198,63,0.1)':'none',border:'none',color:colFilters[col.key]===v?'#8DC63F':'#d1d5db',padding:'5px 8px',borderRadius:'5px',cursor:'pointer',fontSize:'12px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
+                {COLS.map(col=>(
+                  <th key={col.key} style={thStyle} onClick={e=>handleSort(col.key,e)}>
+                    {col.label}<SortIcon col={col.key} sorts={sorts}/>
                   </th>
                 ))}
                 <th style={{...thStyle,cursor:'default',width:'80px'}}></th>
@@ -346,7 +350,7 @@ export default function TimeEntries() {
             </thead>
             <tbody>
               {loading && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
-              {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries found.</td></tr>}
+              {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
               {filtered.map(e=>(
                 <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                   <td style={tdStyle}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
