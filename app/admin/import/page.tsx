@@ -47,7 +47,7 @@ export default function ImportPage() {
     return rawData.slice(0, 5).map(row => ({
       name: row[mapping.name] || '',
       email: row[mapping.email] || '',
-      date: row[mapping.date] || '',
+      date: normalizeDate(row[mapping.date]) || '',
       hours: row[mapping.hours] || '',
       description: row[mapping.description] || '',
     }))
