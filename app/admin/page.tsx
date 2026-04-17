@@ -57,7 +57,7 @@ function SortIcon({ col, sorts }) {
   return (
     <span style={{marginLeft:'4px',color:'#8DC63F',fontSize:'10px',display:'inline-flex',alignItems:'center',gap:'2px'}}>
       {s.dir === 'asc' ? '↑' : '↓'}
-      {sorts.length > 1 && <span style={{fontSize:'9px',background:'rgba(141,198,63,0.2)',borderRadius:'3px',padding:'0 3px',color:'#8DC63F'}}>{idx+1}</span>}
+      {sorts.length > 1 && <span style={{fontSize:'9px',background:'rgba(141,198,63,0.2)',borderRadius:'3px',padding:'0 3px'}}>{idx+1}</span>}
     </span>
   )
 }
@@ -70,19 +70,19 @@ function SortPill({ sort, index, onRemove, onDragStart, onDragOver, onDrop, isDr
       <span style={{fontSize:'9px',color:'#6b7280',marginRight:'2px'}}>⠿</span>
       <span style={{fontSize:'10px',color:'#6b7280',marginRight:'1px'}}>#{index+1}</span>
       {LABELS[sort.col]} {sort.dir==='asc'?'↑':'↓'}
-      <button onClick={()=>onRemove(index)} style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'0 0 0 4px',fontSize:'13px',lineHeight:1,marginLeft:'2px'}}>×</button>
+      <button onClick={()=>onRemove(index)} style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'0 0 0 4px',fontSize:'13px',lineHeight:1}}>×</button>
     </div>
   )
 }
 
 const COLS = [
-  { key:'name', label:'Name' },
-  { key:'project', label:'Project' },
-  { key:'date', label:'Date' },
-  { key:'hours', label:'Hours' },
-  { key:'billable', label:'Billable' },
-  { key:'description', label:'Description' },
+  { key:'name', label:'Name' }, { key:'project', label:'Project' }, { key:'date', label:'Date' },
+  { key:'hours', label:'Hours' }, { key:'billable', label:'Billable' }, { key:'description', label:'Description' },
 ]
+
+function newDay() {
+  return { date: new Date().toISOString().split('T')[0], hours: '', billable: 'yes', id: Math.random() }
+}
 
 export default function TimeEntries() {
   const [entries, setEntries] = useState([])
@@ -90,10 +90,14 @@ export default function TimeEntries() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
-  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], hours: '', description: '', project: '', billable: 'yes' })
+
+  // Shared fields for multi-entry
+  const [project, setProject] = useState('')
+  const [description, setDescription] = useState('')
+  const [days, setDays] = useState([newDay()])
+
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const dateRef = useRef(null)
   const [currentUser, setCurrentUser] = useState({})
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -108,7 +112,7 @@ export default function TimeEntries() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
 
-  // Sort
+  // Sort - persisted per user
   const [sorts, setSorts] = useState(() => {
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -118,19 +122,17 @@ export default function TimeEntries() {
   })
   const [dragIdx, setDragIdx] = useState(null)
 
-  // Persist sorts to localStorage whenever they change
+  useEffect(() => {
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    setCurrentUser(u); load(); loadProjects()
+  }, [])
+
   useEffect(() => {
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
       if (u.email) localStorage.setItem('xantie_sorts_' + u.email, JSON.stringify(sorts))
     } catch {}
   }, [sorts])
-  const [dragOverIdx, setDragOverIdx] = useState(null)
-
-  useEffect(() => {
-    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setCurrentUser(u); load(); loadProjects()
-  }, [])
 
   async function load() {
     setLoading(true)
@@ -154,7 +156,7 @@ export default function TimeEntries() {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
       const res = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', name: newProjectName.trim(), description:'', createdBy: u.name||u.email||'' }) })
       const data = await res.json()
-      if (data.success) { await loadProjects(); setForm(f=>({...f,project:newProjectName.trim()})); setNewProjectName(''); setShowNewProject(false) }
+      if (data.success) { await loadProjects(); setProject(newProjectName.trim()); setNewProjectName(''); setShowNewProject(false) }
       else setProjectError(data.error||'Failed.')
     } catch(e) { setProjectError('Network error.') }
     setSavingProject(false)
@@ -163,22 +165,54 @@ export default function TimeEntries() {
   function handleProjectChange(e) {
     const val = e.target.value
     if (val==='__new__') { setShowNewProject(true); setNewProjectName(''); setProjectError('') }
-    else { setForm(f=>({...f,project:val})); setShowNewProject(false) }
+    else { setProject(val); setShowNewProject(false) }
+  }
+
+  function updateDay(id, field, value) {
+    setDays(prev => prev.map(d => d.id===id ? {...d,[field]:value} : d))
+  }
+
+  function addDay() {
+    const last = days[days.length-1]
+    // Default next day to day after last
+    let nextDate = new Date().toISOString().split('T')[0]
+    if (last?.date) {
+      const d = new Date(last.date); d.setDate(d.getDate()+1)
+      nextDate = d.toISOString().split('T')[0]
+    }
+    setDays(prev => [...prev, { ...newDay(), date: nextDate, billable: last?.billable||'yes' }])
+  }
+
+  function removeDay(id) {
+    setDays(prev => prev.filter(d => d.id!==id))
   }
 
   async function save() {
-    if (!form.project) { setSaveError('Please select a project.'); return }
+    if (!project) { setSaveError('Please select a project.'); return }
+    const validDays = days.filter(d => d.date && d.hours)
+    if (!validDays.length) { setSaveError('Please add at least one day with a date and hours.'); return }
     setSaving(true); setSaveError('')
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-      const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(editEntry
-          ? { action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', ...form, importedFrom:editEntry.importedFrom }
-          : { action:'add', name:u.name||'', email:u.email||'', ...form }
-        )
-      })
-      const data = await res.json()
-      if (data.success) { closeModal(); load() } else setSaveError(data.error||'Failed.')
+      if (editEntry) {
+        // Single entry edit
+        const day = days[0]
+        const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, importedFrom:editEntry.importedFrom })
+        })
+        const data = await res.json()
+        if (!data.success) { setSaveError(data.error||'Failed.'); setSaving(false); return }
+      } else {
+        // Multi-entry save - one API call per day
+        for (const day of validDays) {
+          const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ action:'add', name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project })
+          })
+          const data = await res.json()
+          if (!data.success) { setSaveError(data.error||'Failed to save entry for ' + day.date); setSaving(false); return }
+        }
+      }
+      closeModal(); load()
     } catch(e) { setSaveError('Network error.') }
     setSaving(false)
   }
@@ -188,32 +222,37 @@ export default function TimeEntries() {
     load()
   }
 
-  function openEdit(e) { setEditEntry(e); setSaveError(''); setForm({ date:e.date, hours:e.hours, description:e.description, project:e.project||'', billable:e.billable||'yes' }); setShowAdd(true); setShowNewProject(false) }
+  function openEdit(e) {
+    setEditEntry(e); setSaveError('')
+    setProject(e.project||''); setDescription(e.description||'')
+    setDays([{ date:e.date, hours:e.hours, billable:e.billable||'yes', id:Math.random() }])
+    setShowAdd(true); setShowNewProject(false)
+  }
+
   function openAdd() {
     setEditEntry(null); setSaveError('')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setForm({ date:new Date().toISOString().split('T')[0], hours:'', description:'', project:getLastProject(u), billable:'yes' })
+    setProject(getLastProject(u)); setDescription('')
+    setDays([newDay()])
     setShowAdd(true); setShowNewProject(false)
   }
+
   function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError(''); setShowNewProject(false); setNewProjectName('') }
-  function openDatePicker() { if (dateRef.current) { try { dateRef.current.showPicker() } catch { dateRef.current.click() } } }
 
   function handleSort(col, e) {
     if (e.shiftKey) { setSorts(prev=>prev.filter(s=>s.col!==col)); return }
     setSorts(prev => {
-      const existing = prev.find(s=>s.col===col)
-      if (!existing) return [...prev, {col, dir:'asc'}]
-      if (existing.dir==='asc') return prev.map(s=>s.col===col?{...s,dir:'desc'}:s)
+      const ex = prev.find(s=>s.col===col)
+      if (!ex) return [...prev, {col, dir:'asc'}]
+      if (ex.dir==='asc') return prev.map(s=>s.col===col?{...s,dir:'desc'}:s)
       return prev.filter(s=>s.col!==col)
     })
   }
 
-  function handleDragStart(i) { setDragIdx(i) }
-  function handleDragOver(i) { setDragOverIdx(i) }
   function handleDrop(i) {
-    if (dragIdx===null||dragIdx===i) { setDragIdx(null); setDragOverIdx(null); return }
-    setSorts(prev => { const next=[...prev]; const [m]=next.splice(dragIdx,1); next.splice(i,0,m); return next })
-    setDragIdx(null); setDragOverIdx(null)
+    if (dragIdx===null||dragIdx===i) { setDragIdx(null); return }
+    setSorts(prev => { const n=[...prev]; const [m]=n.splice(dragIdx,1); n.splice(i,0,m); return n })
+    setDragIdx(null)
   }
 
   function applySort(data) {
@@ -231,25 +270,23 @@ export default function TimeEntries() {
 
   const isAdmin = currentUser.role==='admin'
   const visibleEntries = isAdmin ? entries : entries.filter(e=>e.email===currentUser.email)
-
-  // All unique names/projects for filter dropdowns
   const allNames = [...new Set(visibleEntries.map(e=>e.name).filter(Boolean))].sort()
   const allProjects = [...new Set(visibleEntries.map(e=>e.project).filter(Boolean))].sort()
 
-  // Apply all filters
   const filtered = applySort(visibleEntries.filter(e => {
-    if (nameFilter && e.name !== nameFilter) return false
-    if (projectFilter && e.project !== projectFilter) return false
-    if (billableFilter && e.billable !== billableFilter) return false
+    if (nameFilter && e.name!==nameFilter) return false
+    if (projectFilter && e.project!==projectFilter) return false
+    if (billableFilter && e.billable!==billableFilter) return false
     const range = getDateRange(dateFilter, customStart, customEnd)
-    if (range) { const d=new Date(e.date); if (d<range[0]||d>range[1]) return false }
+    if (range) { const d=new Date(e.date); if(d<range[0]||d>range[1]) return false }
     return true
   }))
 
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
-  const canSave = !!form.project && !saving
   const hasFilters = nameFilter||projectFilter||billableFilter||dateFilter
+  const canSave = !!project && !saving
+  const totalDayHours = days.reduce((s,d)=>s+(parseFloat(d.hours)||0),0)
 
   const thStyle = { textAlign:'left', padding:'10px 14px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.08em', background:'#111111', borderBottom:'1px solid #1e1e1e', userSelect:'none', whiteSpace:'nowrap', cursor:'pointer' }
   const tdStyle = { padding:'11px 14px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
@@ -261,17 +298,15 @@ export default function TimeEntries() {
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
             {filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span>
-            {!billableFilter && <span style={{color:'#6b7280'}}> · <span style={{color:'#60a5fa'}}>{billableHours.toFixed(2)} billable</span></span>}
+            {!billableFilter && <span> · <span style={{color:'#60a5fa'}}>{billableHours.toFixed(2)} billable</span></span>}
           </p>
         </div>
         <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ Add Entry</button>
       </div>
 
       {/* Filter bar */}
-      <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
+      <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'14px'}}>
         <div style={{display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'flex-end'}}>
-
-          {/* Date filter */}
           <div>
             <label style={{...lbl,marginBottom:'4px'}}>Date</label>
             <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} style={sel}>
@@ -280,18 +315,10 @@ export default function TimeEntries() {
           </div>
           {dateFilter==='custom' && (
             <>
-              <div>
-                <label style={{...lbl,marginBottom:'4px'}}>From</label>
-                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} style={{...sel,colorScheme:'dark'}}/>
-              </div>
-              <div>
-                <label style={{...lbl,marginBottom:'4px'}}>To</label>
-                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} style={{...sel,colorScheme:'dark'}}/>
-              </div>
+              <div><label style={{...lbl,marginBottom:'4px'}}>From</label><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} style={{...sel,colorScheme:'dark'}}/></div>
+              <div><label style={{...lbl,marginBottom:'4px'}}>To</label><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} style={{...sel,colorScheme:'dark'}}/></div>
             </>
           )}
-
-          {/* Name filter - only for admin */}
           {isAdmin && (
             <div>
               <label style={{...lbl,marginBottom:'4px'}}>Employee</label>
@@ -301,8 +328,6 @@ export default function TimeEntries() {
               </select>
             </div>
           )}
-
-          {/* Project filter */}
           <div>
             <label style={{...lbl,marginBottom:'4px'}}>Project</label>
             <select value={projectFilter} onChange={e=>setProjectFilter(e.target.value)} style={sel}>
@@ -310,8 +335,6 @@ export default function TimeEntries() {
               {allProjects.map(p=><option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-
-          {/* Billable filter */}
           <div>
             <label style={{...lbl,marginBottom:'4px'}}>Billing</label>
             <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
@@ -323,12 +346,10 @@ export default function TimeEntries() {
               ))}
             </div>
           </div>
-
-          {/* Clear */}
           {hasFilters && (
             <div style={{alignSelf:'flex-end'}}>
               <button onClick={()=>{setNameFilter('');setProjectFilter('');setBillableFilter('');setDateFilter('');setCustomStart('');setCustomEnd('')}}
-                style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',cursor:'pointer',whiteSpace:'nowrap'}}>
+                style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',cursor:'pointer'}}>
                 Clear filters
               </button>
             </div>
@@ -338,33 +359,27 @@ export default function TimeEntries() {
 
       {/* Sort pills */}
       <div style={{display:'flex',gap:'6px',marginBottom:'10px',alignItems:'center',flexWrap:'wrap',minHeight:'24px'}}>
-        {sorts.length > 0 && <span style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em'}}>Sort:</span>}
-        {sorts.map((s,i) => (
+        {sorts.length>0 && <span style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em'}}>Sort:</span>}
+        {sorts.map((s,i)=>(
           <SortPill key={s.col} sort={s} index={i} total={sorts.length}
             onRemove={i=>setSorts(prev=>prev.filter((_,j)=>j!==i))}
-            onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop}
-            isDragging={dragIdx===i}/>
+            onDragStart={setDragIdx} onDragOver={()=>{}} onDrop={handleDrop} isDragging={dragIdx===i}/>
         ))}
-        {sorts.length > 0 && <button onClick={()=>setSorts([])} style={{background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>Clear sort</button>}
-        {sorts.length === 0 && <span style={{fontSize:'11px',color:'#3a3a3a'}}>Click column headers to sort · Stack multiple · Drag pills to reorder</span>}
+        {sorts.length>0 && <button onClick={()=>setSorts([])} style={{background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>Clear sort</button>}
+        {sorts.length===0 && <span style={{fontSize:'11px',color:'#3a3a3a'}}>Click column headers to sort · Drag pills to reorder</span>}
       </div>
 
       <div className="tbl-wrap" style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px'}}>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:'700px'}}>
             <thead>
-              <tr>
-                {COLS.map(col=>(
-                  <th key={col.key} style={thStyle} onClick={e=>handleSort(col.key,e)}>
-                    {col.label}<SortIcon col={col.key} sorts={sorts}/>
-                  </th>
-                ))}
+              <tr>{COLS.map(col=><th key={col.key} style={thStyle} onClick={e=>handleSort(col.key,e)}>{col.label}<SortIcon col={col.key} sorts={sorts}/></th>)}
                 <th style={{...thStyle,cursor:'default',width:'80px'}}></th>
               </tr>
             </thead>
             <tbody>
               {loading && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
-              {!loading && filtered.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
+              {!loading&&filtered.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
               {filtered.map(e=>(
                 <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                   <td style={tdStyle}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
@@ -384,32 +399,39 @@ export default function TimeEntries() {
         </div>
       </div>
 
+      {/* Add/Edit modal */}
       {showAdd && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
-          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px',maxHeight:'90vh',overflowY:'auto'}}>
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'560px',maxHeight:'90vh',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
-              <h2 style={{margin:0,fontSize:'18px'}}>{editEntry?'Edit Entry':'Add Time Entry'}</h2>
+              <div>
+                <h2 style={{margin:0,fontSize:'18px'}}>{editEntry?'Edit Entry':'Add Time Entries'}</h2>
+                {!editEntry && <p style={{margin:'3px 0 0',fontSize:'12px',color:'#6b7280'}}>Add hours across multiple days at once</p>}
+              </div>
               <CloseBtn onClick={closeModal}/>
             </div>
+
+            {/* Project - shared across all days */}
             <div style={{marginBottom:'12px'}}>
               <label style={lbl}>Project <span style={{color:'#f87171'}}>*</span></label>
-              <select value={showNewProject?'__new__':form.project} onChange={handleProjectChange}
-                style={{...inp,cursor:'pointer',borderColor:!form.project&&!showNewProject?'#5a3030':'#252525'}}>
+              <select value={showNewProject?'__new__':project} onChange={handleProjectChange}
+                style={{...inp,cursor:'pointer',borderColor:!project&&!showNewProject?'#5a3030':'#252525'}}>
                 <option value="">— Select a project —</option>
                 <option disabled>────────────────────</option>
                 {projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
                 <option disabled>────────────────────</option>
                 <option value="__new__">+ Add New Project</option>
               </select>
-              {!form.project&&!showNewProject&&<p style={{margin:'4px 0 0',fontSize:'11px',color:'#f87171'}}>A project is required</p>}
+              {!project&&!showNewProject&&<p style={{margin:'4px 0 0',fontSize:'11px',color:'#f87171'}}>A project is required</p>}
             </div>
+
             {showNewProject && (
               <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
                 <label style={{...lbl,marginBottom:'8px'}}>New Project Name</label>
                 <div style={{display:'flex',gap:'8px'}}>
-                  <input type="text" autoFocus value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveNewProject()} placeholder="e.g. Website Redesign" style={{...inp,flex:1,fontSize:'14px'}}/>
-                  <button onClick={saveNewProject} disabled={savingProject||!newProjectName.trim()}
-                    style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',fontWeight:700,cursor:!newProjectName.trim()?'not-allowed':'pointer',opacity:!newProjectName.trim()?0.5:1,whiteSpace:'nowrap'}}>
+                  <input autoFocus value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveNewProject()} placeholder="e.g. Website Redesign" style={{...inp,flex:1,fontSize:'14px'}}/>
+                  <button onClick={saveNewProject} disabled={!newProjectName.trim()}
+                    style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',fontWeight:700,cursor:'pointer',opacity:!newProjectName.trim()?0.5:1,whiteSpace:'nowrap'}}>
                     {savingProject?'Adding…':'Add'}
                   </button>
                   <button onClick={()=>{setShowNewProject(false);setNewProjectName('');setProjectError('')}}
@@ -418,34 +440,66 @@ export default function TimeEntries() {
                 {projectError&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#f87171'}}>{projectError}</p>}
               </div>
             )}
-            <div style={{marginBottom:'16px'}}>
-              <label style={lbl}>Date</label>
-              <div style={{position:'relative'}}>
-                <input ref={dateRef} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} onClick={openDatePicker} style={{...inp,colorScheme:'dark',paddingRight:'40px',cursor:'pointer'}}/>
-                <div onClick={openDatePicker} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',pointerEvents:'none'}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8DC63F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div style={{marginBottom:'16px'}}>
-              <label style={lbl}>Hours (decimal)</label>
-              <input type="number" step="0.25" placeholder="e.g. 2.5" value={form.hours} onChange={e=>setForm({...form,hours:e.target.value})} style={inp}/>
-            </div>
-            <div style={{marginBottom:'16px'}}>
-              <label style={lbl}>Billing</label>
-              <BillableToggle value={form.billable} onChange={v=>setForm({...form,billable:v})}/>
-            </div>
-            <div style={{marginBottom:'24px'}}>
+
+            {/* Description - shared */}
+            <div style={{marginBottom:'20px'}}>
               <label style={lbl}>Description</label>
-              <textarea rows={3} value={form.description} onChange={e=>setForm({...form,description:e.target.value})} style={{...inp,resize:'vertical'}}/>
+              <textarea rows={2} value={description} onChange={e=>setDescription(e.target.value)} placeholder="What was worked on?" style={{...inp,resize:'vertical'}}/>
             </div>
-            {saveError&&<div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{saveError}</div>}
-            <div style={{display:'flex',gap:'12px'}}>
+
+            {/* Day rows */}
+            <div style={{marginBottom:'8px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                <label style={{...lbl,margin:0}}>Days & Hours</label>
+                {!editEntry && (
+                  <span style={{fontSize:'12px',color:'#6b7280'}}>
+                    Total: <span style={{color:'#8DC63F',fontWeight:700}}>{totalDayHours.toFixed(2)} hrs</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Header row */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 100px 1fr 32px',gap:'8px',marginBottom:'6px',padding:'0 2px'}}>
+                <span style={{fontSize:'10px',color:'#4b5563',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em'}}>Date</span>
+                <span style={{fontSize:'10px',color:'#4b5563',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours</span>
+                <span style={{fontSize:'10px',color:'#4b5563',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em'}}>Billing</span>
+                <span></span>
+              </div>
+
+              {days.map((day, i) => (
+                <div key={day.id} style={{display:'grid',gridTemplateColumns:'1fr 100px 1fr 32px',gap:'8px',marginBottom:'8px',alignItems:'center'}}>
+                  <input type="date" value={day.date} onChange={e=>updateDay(day.id,'date',e.target.value)}
+                    style={{...inp,fontSize:'14px',padding:'8px 10px',colorScheme:'dark'}}/>
+                  <input type="number" step="0.25" placeholder="0.00" value={day.hours} onChange={e=>updateDay(day.id,'hours',e.target.value)}
+                    style={{...inp,fontSize:'14px',padding:'8px 10px'}}/>
+                  <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525',height:'38px'}}>
+                    {[{v:'yes',label:'Bill.'},{v:'no',label:'Non-Bill.'}].map(o=>(
+                      <button key={o.v} onClick={()=>updateDay(day.id,'billable',o.v)}
+                        style={{flex:1,border:'none',fontSize:'11px',fontWeight:600,cursor:'pointer',background:day.billable===o.v?'#8DC63F':'#111111',color:day.billable===o.v?'#0a0a0a':'#6b7280',padding:'0 4px'}}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  {days.length > 1 ? (
+                    <button onClick={()=>removeDay(day.id)} style={{background:'none',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'16px',padding:0,display:'flex',alignItems:'center',justifyContent:'center',height:'38px'}}>×</button>
+                  ) : <div/>}
+                </div>
+              ))}
+
+              {!editEntry && (
+                <button onClick={addDay}
+                  style={{width:'100%',background:'#1a1a1a',border:'1px dashed #2a2a2a',borderRadius:'8px',color:'#6b7280',padding:'8px',fontSize:'13px',cursor:'pointer',marginTop:'4px'}}>
+                  + Add another day
+                </button>
+              )}
+            </div>
+
+            {saveError&&<div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px',marginTop:'12px'}}>{saveError}</div>}
+
+            <div style={{display:'flex',gap:'12px',marginTop:'20px'}}>
               <button onClick={save} disabled={!canSave}
                 style={{flex:1,background:canSave?'#8DC63F':'#2a2a2a',color:canSave?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:canSave?'pointer':'not-allowed',transition:'all 0.15s'}}>
-                {saving?'Saving…':editEntry?'Save Changes':'Add Entry'}
+                {saving?'Saving…':editEntry?'Save Changes':`Save ${days.filter(d=>d.date&&d.hours).length} ${days.filter(d=>d.date&&d.hours).length===1?'Entry':'Entries'}`}
               </button>
               <button onClick={closeModal} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
             </div>
