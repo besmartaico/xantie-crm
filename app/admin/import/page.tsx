@@ -43,7 +43,25 @@ export default function ImportPage() {
     setStep(2)
   }
 
-  function buildPreview() {
+  function excelDateToISO(serial) {
+    const d = new Date(Date.UTC(1899, 11, 30) + parseFloat(serial) * 86400000)
+    return d.toISOString().split('T')[0]
+  }
+
+  function normalizeDate(value) {
+    if (!value && value !== 0) return ''
+    const str = String(value).trim()
+    // Excel serial number (4-6 digits, possibly with decimals)
+    if (/^\d{4,6}(\.\d+)?$/.test(str)) return excelDateToISO(str)
+    // Already ISO YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+    // Try parsing other formats
+    const parsed = new Date(str)
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0]
+    return str
+  }
+
+    function buildPreview() {
     return rawData.slice(0, 5).map(row => ({
       name: row[mapping.name] || '',
       email: row[mapping.email] || '',
