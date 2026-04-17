@@ -63,7 +63,7 @@ export default function ImportPage() {
     const entries = rawData.map(row => ({
       name: String(row[mapping.name] || ''),
       email: String(row[mapping.email] || ''),
-      date: String(row[mapping.date] || ''),
+      date: normalizeDate(row[mapping.date]),
       hours: String(row[mapping.hours] || ''),
       description: String(row[mapping.description] || ''),
       importedFrom: 'excel-import',
