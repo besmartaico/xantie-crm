@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function XLogo({ size = 40 }) {
@@ -28,7 +28,7 @@ function EyeIcon({ open }) {
   )
 }
 
-export default function ResetPage() {
+function ResetInner() {
   const router = useRouter()
   const params = useSearchParams()
   const token = params.get('token') || ''
@@ -136,5 +136,13 @@ export default function ResetPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ResetPage() {
+  return (
+    <Suspense fallback={<div style={{minHeight:'100vh',background:'#0a0a0a'}}/>}>
+      <ResetInner />
+    </Suspense>
   )
 }
