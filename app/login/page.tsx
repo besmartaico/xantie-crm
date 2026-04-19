@@ -8,7 +8,7 @@ const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600,
 
 function XLogo({ size = 48 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none">
       <polygon points="0,0 14,0 44,44 30,44" fill="#8DC63F"/>
       <polygon points="30,0 44,0 14,44 0,44" fill="#666666"/>
       <polygon points="30,0 44,0 29,19 15,19" fill="#8DC63F"/>
@@ -33,7 +33,8 @@ function EyeIcon({ open }) {
 
 export default function Login() {
   const router = useRouter()
-  const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot'
+  const [mode, setMode] = useState('login')
+  const [screen, setScreen] = useState('form') // 'form' | 'emailExists' | 'checkEmail'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -66,10 +67,17 @@ export default function Login() {
       const res = await fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email: email.trim().toLowerCase(), password }) })
       const data = await res.json()
       if (data.success) {
+        // Auto-login (imported user or jeff@xantie.com)
         sessionStorage.setItem('xantie_auth', data.role)
         sessionStorage.setItem('xantie_user', JSON.stringify({ name: data.name, email: data.email, role: data.role }))
         router.push('/admin')
-      } else setError(data.error || 'Registration failed.')
+      } else if (data.emailExists) {
+        setScreen('emailExists')
+      } else if (data.pendingVerification) {
+        setScreen('checkEmail')
+      } else {
+        setError(data.error || 'Registration failed.')
+      }
     } catch { setError('Network error.') }
     setLoading(false)
   }
@@ -86,14 +94,67 @@ export default function Login() {
   function handleKeyDown(e) {
     if (e.key !== 'Enter' || loading) return
     if (mode === 'login') handleLogin()
-    else if (mode === 'register') handleRegister()
+    else if (mode === 'register' && screen === 'form') handleRegister()
     else if (mode === 'forgot') handleForgot()
   }
 
-  function switchMode(m) { setMode(m); setError(''); setSuccess(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName('') }
+  function reset() { setScreen('form'); setError(''); setSuccess(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName('') }
+  function switchMode(m) { setMode(m); reset() }
 
-  const eyeBtn = { position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', padding:'4px', display:'flex', alignItems:'center', justifyContent:'center' }
+  const eyeBtn = { position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', padding:'4px', display:'flex', alignItems:'center' }
 
+  // ---- Special screens ----
+
+  // Email already exists screen
+  if (screen === 'emailExists') return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
+      <div style={{width:'100%',maxWidth:'390px'}}>
+        <div style={{textAlign:'center',marginBottom:'32px',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px'}}>
+          <XLogo size={44}/><div style={{textAlign:'left'}}><div style={{fontSize:'26px',fontWeight:800,color:'#fff',lineHeight:1}}>Xantie</div><div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase'}}>Management System</div></div>
+        </div>
+        <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'32px',textAlign:'center'}}>
+          <div style={{fontSize:'40px',marginBottom:'16px'}}>📧</div>
+          <h2 style={{margin:'0 0 10px',fontSize:'19px'}}>Account Already Exists</h2>
+          <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 8px'}}>An account already exists for</p>
+          <p style={{color:'#fff',fontWeight:600,fontSize:'14px',margin:'0 0 16px'}}>{email}</p>
+          <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 28px'}}>We've sent a password reset link to that email address. Check your inbox and follow the instructions to access your account.</p>
+          <button onClick={()=>switchMode('login')}
+            style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'15px',fontWeight:800,cursor:'pointer',marginBottom:'10px'}}>
+            Back to Sign In
+          </button>
+          <button onClick={()=>switchMode('forgot')}
+            style={{width:'100%',background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'6px 0'}}>
+            Resend reset email
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // Check email screen (new registration)
+  if (screen === 'checkEmail') return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
+      <div style={{width:'100%',maxWidth:'390px'}}>
+        <div style={{textAlign:'center',marginBottom:'32px',display:'flex',alignItems:'center',justifyContent:'center',gap:'12px'}}>
+          <XLogo size={44}/><div style={{textAlign:'left'}}><div style={{fontSize:'26px',fontWeight:800,color:'#fff',lineHeight:1}}>Xantie</div><div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase'}}>Management System</div></div>
+        </div>
+        <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'32px',textAlign:'center'}}>
+          <div style={{fontSize:'40px',marginBottom:'16px'}}>✉️</div>
+          <h2 style={{margin:'0 0 10px',fontSize:'19px'}}>Check Your Email</h2>
+          <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 8px'}}>We've sent a verification link to</p>
+          <p style={{color:'#fff',fontWeight:600,fontSize:'14px',margin:'0 0 16px'}}>{email}</p>
+          <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 28px'}}>Click the link in the email to verify your address and activate your account. The link expires in 24 hours.</p>
+          <button onClick={()=>switchMode('login')}
+            style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'15px',fontWeight:800,cursor:'pointer'}}>
+            Back to Sign In
+          </button>
+          <p style={{color:'#4b5563',fontSize:'12px',margin:'16px 0 0'}}>Didn't receive it? Check your spam folder.</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ---- Main login/register/forgot form ----
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
       <div style={{width:'100%',maxWidth:'390px'}}>
@@ -108,8 +169,6 @@ export default function Login() {
         </div>
 
         <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px'}}>
-
-          {/* Tab switcher - only for login/register */}
           {mode !== 'forgot' && (
             <div style={{display:'flex',marginBottom:'28px',background:'#0a0a0a',borderRadius:'8px',padding:'4px'}}>
               <button onClick={()=>switchMode('login')} style={{flex:1,padding:'9px',border:'none',borderRadius:'6px',background:mode==='login'?'#8DC63F':'transparent',color:mode==='login'?'#0a0a0a':'#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Sign In</button>
@@ -117,7 +176,6 @@ export default function Login() {
             </div>
           )}
 
-          {/* Forgot password header */}
           {mode === 'forgot' && (
             <div style={{marginBottom:'24px'}}>
               <h2 style={{margin:'0 0 6px',fontSize:'18px'}}>Reset Password</h2>
@@ -125,7 +183,6 @@ export default function Login() {
             </div>
           )}
 
-          {/* Login */}
           {mode === 'login' && (
             <>
               <div style={{marginBottom:'16px'}}>
@@ -143,11 +200,10 @@ export default function Login() {
             </>
           )}
 
-          {/* Register */}
           {mode === 'register' && (
             <>
               <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 14px',marginBottom:'20px'}}>
-                <p style={{margin:0,fontSize:'12px',color:'#8DC63F'}}>Registration is open to <strong>@xantie.com</strong> email addresses only. If you were added via import, use this form to set your password.</p>
+                <p style={{margin:0,fontSize:'12px',color:'#8DC63F'}}>Registration is open to <strong>@xantie.com</strong> email addresses. A verification email will be sent to activate your account.</p>
               </div>
               <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Full Name</label>
@@ -170,7 +226,6 @@ export default function Login() {
             </>
           )}
 
-          {/* Forgot */}
           {mode === 'forgot' && (
             <div style={{marginBottom:'24px'}}>
               <label style={lbl}>Email</label>
@@ -181,26 +236,10 @@ export default function Login() {
           {error && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
           {success && <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',color:'#8DC63F',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{success}</div>}
 
-          {mode === 'login' && (
-            <button onClick={handleLogin} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
-              {loading?'Signing in...':'Sign In'}
-            </button>
-          )}
-          {mode === 'register' && (
-            <button onClick={handleRegister} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
-              {loading?'Setting up account...':'Create Account'}
-            </button>
-          )}
-          {mode === 'forgot' && !success && (
-            <button onClick={handleForgot} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
-              {loading?'Sending...':'Send Reset Link'}
-            </button>
-          )}
-          {mode === 'forgot' && (
-            <button onClick={()=>switchMode('login')} style={{width:'100%',background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'10px 0 0',marginTop:'4px'}}>
-              ← Back to Sign In
-            </button>
-          )}
+          {mode === 'login' && <button onClick={handleLogin} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>{loading?'Signing in...':'Sign In'}</button>}
+          {mode === 'register' && <button onClick={handleRegister} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>{loading?'Creating account...':'Create Account'}</button>}
+          {mode === 'forgot' && !success && <button onClick={handleForgot} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>{loading?'Sending...':'Send Reset Link'}</button>}
+          {mode === 'forgot' && <button onClick={()=>switchMode('login')} style={{width:'100%',background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'10px 0 0',marginTop:'4px'}}>← Back to Sign In</button>}
         </div>
       </div>
     </div>

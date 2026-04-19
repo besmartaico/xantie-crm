@@ -25,11 +25,12 @@ export async function POST(req) {
     const rows = res.data.values || []
     const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())
     if (!user) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
-    // Block inactive users
     if (user[4] === 'inactive') return NextResponse.json({ success: false, error: 'This account has been deactivated. Please contact your administrator.' }, { status: 403 })
+    if (user[4] === 'pending') return NextResponse.json({ success: false, error: 'Please verify your email before signing in. Check your inbox for the verification link.', pendingVerification: true }, { status: 403 })
+    if (!user[2]) return NextResponse.json({ success: false, error: 'No password set. Use the Register tab to set your password.' }, { status: 401 })
     const valid = await bcrypt.compare(password, user[2])
     if (!valid) return NextResponse.json({ success: false, error: 'Invalid email or password.' }, { status: 401 })
-    return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3]||'user' })
+    return NextResponse.json({ success: true, name: user[0], email: user[1], role: user[3] || 'viewer' })
   } catch (err) {
     return NextResponse.json({ success: false, error: 'Server error: ' + err.message }, { status: 500 })
   }
