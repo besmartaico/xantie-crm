@@ -27,23 +27,47 @@ export async function POST(req) {
 
     const sheets = getSheets()
     const SID = process.env.GOOGLE_SHEETS_ID
-    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:D5000' })
+    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:E5000' })
     const rows = existing.data.values || []
-    if (rows.some(r => r[1]?.toLowerCase() === normalizedEmail))
-      return NextResponse.json({ success: false, error: 'An account with this email already exists.' }, { status: 409 })
+    const existingIdx = rows.findIndex(r => r[1]?.toLowerCase() === normalizedEmail)
 
-    const role = normalizedEmail === 'jeff@xantie.com' ? 'admin' : 'user'
     const hash = await bcrypt.hash(password, 10)
+
+    if (existingIdx !== -1) {
+      const existingUser = rows[existingIdx]
+      const existingHash = existingUser[2] || ''
+      const existingStatus = existingUser[4] || 'active'
+
+      // Imported user with no password - allow them to complete setup
+      if (!existingHash) {
+        const sheetRow = existingIdx + 2
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: SID,
+          requestBody: {
+            valueInputOption: 'RAW',
+            data: [
+              { range: `Users!A${sheetRow}`, values: [[name]] },
+              { range: `Users!C${sheetRow}`, values: [[hash]] },
+              { range: `Users!E${sheetRow}`, values: [['active']] },
+            ]
+          }
+        })
+        const role = existingUser[3] || 'viewer'
+        return NextResponse.json({ success: true, name, email: normalizedEmail, role, activated: true })
+      }
+
+      return NextResponse.json({ success: false, error: 'An account with this email already exists. Use "Forgot password?" if you need to reset it.' }, { status: 409 })
+    }
+
+    // New user
+    const role = normalizedEmail === 'jeff@xantie.com' ? 'admin' : 'viewer'
     const nextRow = rows.length + 2
     await sheets.spreadsheets.values.update({
-      spreadsheetId: SID,
-      range: `Users!A${nextRow}:D${nextRow}`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [[name, normalizedEmail, hash, role]] }
+      spreadsheetId: SID, range: `Users!A${nextRow}:E${nextRow}`,
+      valueInputOption: 'RAW', requestBody: { values: [[name, normalizedEmail, hash, role, 'active']] }
     })
     return NextResponse.json({ success: true, name, email: normalizedEmail, role })
   } catch (err) {
-    console.error('Register error:', err.message)
     return NextResponse.json({ success: false, error: 'Server error: ' + err.message }, { status: 500 })
   }
 }

@@ -20,8 +20,7 @@ function XLogo({ size = 48 }) {
 function EyeIcon({ open }) {
   return open ? (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
     </svg>
   ) : (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,7 +33,7 @@ function EyeIcon({ open }) {
 
 export default function Login() {
   const router = useRouter()
-  const [mode, setMode] = useState('login')
+  const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,6 +42,7 @@ export default function Login() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   async function handleLogin() {
     setLoading(true); setError('')
@@ -53,8 +53,8 @@ export default function Login() {
         sessionStorage.setItem('xantie_auth', data.role)
         sessionStorage.setItem('xantie_user', JSON.stringify({ name: data.name, email: data.email, role: data.role }))
         router.push('/admin')
-      } else { setError(data.error || 'Invalid email or password.') }
-    } catch { setError('Network error. Please try again.') }
+      } else setError(data.error || 'Invalid email or password.')
+    } catch { setError('Network error.') }
     setLoading(false)
   }
 
@@ -69,15 +69,29 @@ export default function Login() {
         sessionStorage.setItem('xantie_auth', data.role)
         sessionStorage.setItem('xantie_user', JSON.stringify({ name: data.name, email: data.email, role: data.role }))
         router.push('/admin')
-      } else { setError(data.error || 'Registration failed.') }
-    } catch { setError('Network error. Please try again.') }
+      } else setError(data.error || 'Registration failed.')
+    } catch { setError('Network error.') }
     setLoading(false)
   }
 
-  function handleKeyDown(e) { if (e.key === 'Enter' && !loading) mode === 'login' ? handleLogin() : handleRegister() }
-  function switchMode(m) { setMode(m); setError(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName(''); setShowPassword(false); setShowConfirm(false) }
+  async function handleForgot() {
+    setLoading(true); setError(''); setSuccess('')
+    try {
+      await fetch('/api/auth/reset-request', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: email.trim().toLowerCase() }) })
+      setSuccess('If that email exists in our system, a reset link has been sent. Check your inbox.')
+    } catch { setError('Network error.') }
+    setLoading(false)
+  }
 
-  const pwWrap = { position:'relative', marginBottom:'16px' }
+  function handleKeyDown(e) {
+    if (e.key !== 'Enter' || loading) return
+    if (mode === 'login') handleLogin()
+    else if (mode === 'register') handleRegister()
+    else if (mode === 'forgot') handleForgot()
+  }
+
+  function switchMode(m) { setMode(m); setError(''); setSuccess(''); setEmail(''); setPassword(''); setConfirmPassword(''); setName('') }
+
   const eyeBtn = { position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', padding:'4px', display:'flex', alignItems:'center', justifyContent:'center' }
 
   return (
@@ -94,29 +108,46 @@ export default function Login() {
         </div>
 
         <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px'}}>
-          <div style={{display:'flex',marginBottom:'28px',background:'#0a0a0a',borderRadius:'8px',padding:'4px'}}>
-            <button onClick={()=>switchMode('login')} style={{flex:1,padding:'9px',border:'none',borderRadius:'6px',background:mode==='login'?'#8DC63F':'transparent',color:mode==='login'?'#0a0a0a':'#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Sign In</button>
-            <button onClick={()=>switchMode('register')} style={{flex:1,padding:'9px',border:'none',borderRadius:'6px',background:mode==='register'?'#8DC63F':'transparent',color:mode==='register'?'#0a0a0a':'#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Register</button>
-          </div>
 
+          {/* Tab switcher - only for login/register */}
+          {mode !== 'forgot' && (
+            <div style={{display:'flex',marginBottom:'28px',background:'#0a0a0a',borderRadius:'8px',padding:'4px'}}>
+              <button onClick={()=>switchMode('login')} style={{flex:1,padding:'9px',border:'none',borderRadius:'6px',background:mode==='login'?'#8DC63F':'transparent',color:mode==='login'?'#0a0a0a':'#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Sign In</button>
+              <button onClick={()=>switchMode('register')} style={{flex:1,padding:'9px',border:'none',borderRadius:'6px',background:mode==='register'?'#8DC63F':'transparent',color:mode==='register'?'#0a0a0a':'#6b7280',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Register</button>
+            </div>
+          )}
+
+          {/* Forgot password header */}
+          {mode === 'forgot' && (
+            <div style={{marginBottom:'24px'}}>
+              <h2 style={{margin:'0 0 6px',fontSize:'18px'}}>Reset Password</h2>
+              <p style={{color:'#6b7280',fontSize:'13px',margin:0}}>Enter your email and we'll send you a reset link.</p>
+            </div>
+          )}
+
+          {/* Login */}
           {mode === 'login' && (
             <>
               <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Email</label>
                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="you@xantie.com" style={inp} autoComplete="email"/>
               </div>
-              <div style={pwWrap}>
+              <div style={{position:'relative',marginBottom:'8px'}}>
                 <label style={lbl}>Password</label>
                 <input type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="••••••••" style={{...inp,paddingRight:'44px'}} autoComplete="current-password"/>
                 <button type="button" onClick={()=>setShowPassword(!showPassword)} style={eyeBtn}><EyeIcon open={showPassword}/></button>
               </div>
+              <div style={{textAlign:'right',marginBottom:'20px'}}>
+                <button onClick={()=>switchMode('forgot')} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'12px',cursor:'pointer',padding:0}}>Forgot password?</button>
+              </div>
             </>
           )}
 
+          {/* Register */}
           {mode === 'register' && (
             <>
               <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 14px',marginBottom:'20px'}}>
-                <p style={{margin:0,fontSize:'12px',color:'#8DC63F'}}>Registration is open to <strong>@xantie.com</strong> email addresses only.</p>
+                <p style={{margin:0,fontSize:'12px',color:'#8DC63F'}}>Registration is open to <strong>@xantie.com</strong> email addresses only. If you were added via import, use this form to set your password.</p>
               </div>
               <div style={{marginBottom:'16px'}}>
                 <label style={lbl}>Full Name</label>
@@ -126,12 +157,12 @@ export default function Login() {
                 <label style={lbl}>Email</label>
                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="you@xantie.com" style={inp} autoComplete="email"/>
               </div>
-              <div style={pwWrap}>
+              <div style={{position:'relative',marginBottom:'16px'}}>
                 <label style={lbl}>Password</label>
                 <input type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="Min 8 characters" style={{...inp,paddingRight:'44px'}} autoComplete="new-password"/>
                 <button type="button" onClick={()=>setShowPassword(!showPassword)} style={eyeBtn}><EyeIcon open={showPassword}/></button>
               </div>
-              <div style={{...pwWrap,marginBottom:'24px'}}>
+              <div style={{position:'relative',marginBottom:'24px'}}>
                 <label style={lbl}>Confirm Password</label>
                 <input type={showConfirm?'text':'password'} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="Repeat password" style={{...inp,paddingRight:'44px'}} autoComplete="new-password"/>
                 <button type="button" onClick={()=>setShowConfirm(!showConfirm)} style={eyeBtn}><EyeIcon open={showConfirm}/></button>
@@ -139,12 +170,37 @@ export default function Login() {
             </>
           )}
 
-          {error && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
+          {/* Forgot */}
+          {mode === 'forgot' && (
+            <div style={{marginBottom:'24px'}}>
+              <label style={lbl}>Email</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="you@xantie.com" style={inp} autoFocus/>
+            </div>
+          )}
 
-          <button onClick={mode==='login'?handleLogin:handleRegister} disabled={loading}
-            style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
-            {loading?(mode==='login'?'Signing in...':'Creating account...'):(mode==='login'?'Sign In':'Create Account')}
-          </button>
+          {error && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
+          {success && <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',color:'#8DC63F',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{success}</div>}
+
+          {mode === 'login' && (
+            <button onClick={handleLogin} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
+              {loading?'Signing in...':'Sign In'}
+            </button>
+          )}
+          {mode === 'register' && (
+            <button onClick={handleRegister} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
+              {loading?'Setting up account...':'Create Account'}
+            </button>
+          )}
+          {mode === 'forgot' && !success && (
+            <button onClick={handleForgot} disabled={loading} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1}}>
+              {loading?'Sending...':'Send Reset Link'}
+            </button>
+          )}
+          {mode === 'forgot' && (
+            <button onClick={()=>switchMode('login')} style={{width:'100%',background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'10px 0 0',marginTop:'4px'}}>
+              ← Back to Sign In
+            </button>
+          )}
         </div>
       </div>
     </div>
