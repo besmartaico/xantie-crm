@@ -99,8 +99,9 @@ export default function Dashboard() {
 
   // Active in last 30 days (always from unfiltered accessible entries, not affected by current filters)
   const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate()-30)
+  const EXCLUDED_EMAILS = new Set(['jeff@xantie.com','mike@xantie.com','jared@xantie.com'])
   const recentEntries = accessibleEntries.filter(e => e.date && new Date(e.date) >= thirtyDaysAgo)
-  const activeEmployees30 = new Set(recentEntries.map(e=>e.email).filter(Boolean)).size
+  const activeEmployees30 = new Set(recentEntries.map(e=>e.email).filter(e=>e&&!EXCLUDED_EMAILS.has(e.toLowerCase()))).size
   const activeProjects30 = new Set(recentEntries.map(e=>e.project).filter(Boolean)).size
 
   // Group by project with employee breakdown
