@@ -134,11 +134,11 @@ export default function Dashboard() {
     { label:'Total Hours', value: loading?'…':totalHours.toFixed(1), color:'#8DC63F' },
     { label:'Billable', value: loading?'…':billableHours.toFixed(1), color:'#60a5fa' },
     { label:'Non-Billable', value: loading?'…':nonBillableHours.toFixed(1), color:'#9ca3af' },
-    ...(isAdmin||isTeamLead?[{ label:'Active Projects', value: loading?'…':uniqueProjects.length }]:[]),
-    ...(isAdmin||isTeamLead?[{ label:'Employees', value: loading?'…':uniqueEmployees.length }]:[]),
     { label:'Avg Hrs / Day', value: loading?'…':avgPerDay.toFixed(1) },
-    { label:'Active Employees', value: loading?'…':activeEmployees30, sublabel:'last 30 days', color:'#a78bfa' },
-    { label:'Active Projects', value: loading?'…':activeProjects30, sublabel:'last 30 days', color:'#f59e0b' },
+    ...(isAdmin||isTeamLead?[
+      { label:'Active Employees', value: loading?'…':activeEmployees30, color:'#a78bfa' },
+      { label:'Active Projects', value: loading?'…':activeProjects30, color:'#f59e0b' },
+    ]:[]),
   ]
 
   function toggleProject(proj) {
@@ -200,7 +200,7 @@ export default function Dashboard() {
           <div key={c.label} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'18px'}}>
             <div style={{fontSize:'26px',fontWeight:800,color:c.color||'#fff',lineHeight:1,marginBottom:'6px'}}>{c.value}</div>
             <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.07em'}}>{c.label}</div>
-            {c.sublabel && <div style={{fontSize:'10px',color:'#4b5563',marginTop:'3px'}}>{c.sublabel}</div>}
+
           </div>
         ))}
       </div>
