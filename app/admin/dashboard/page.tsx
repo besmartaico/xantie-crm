@@ -117,7 +117,10 @@ export default function Dashboard() {
 
   // By employee
   const byEmployee = Object.entries(
-    filtered.reduce((acc,e)=>{ if(e.name) acc[e.name]=(acc[e.name]||0)+(parseFloat(e.hours)||0); return acc },{})
+    filtered.reduce((acc,e)=>{
+      if(e.name && !inactiveEmails.has(e.email)) acc[e.name]=(acc[e.name]||0)+(parseFloat(e.hours)||0)
+      return acc
+    },{})
   ).sort((a,b)=>b[1]-a[1])
 
   const byMonth = {}
@@ -236,7 +239,7 @@ export default function Dashboard() {
               const pct = totalHours>0?(data.total/totalHours*100):0
               // Employee breakdown for this project
               const empBreakdown = Object.entries(
-                data.entries.reduce((acc,e)=>{ if(e.name) { if(!acc[e.name]) acc[e.name]={total:0,billable:0}; acc[e.name].total+=parseFloat(e.hours)||0; if(e.billable!=='no') acc[e.name].billable+=parseFloat(e.hours)||0; } return acc },{})
+                data.entries.reduce((acc,e)=>{ if(e.name && !inactiveEmails.has(e.email)) { if(!acc[e.name]) acc[e.name]={total:0,billable:0}; acc[e.name].total+=parseFloat(e.hours)||0; if(e.billable!=='no') acc[e.name].billable+=parseFloat(e.hours)||0; } return acc },{})
               ).sort((a,b)=>b[1].total-a[1].total)
               return (
                 <>
