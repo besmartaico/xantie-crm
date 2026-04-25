@@ -76,7 +76,22 @@ export default function ImportPage() {
 
   async function loadDups() {
     setLoadingDups(true); setDupMsg(''); setSelected(new Set())
-    try { setAllEntries(await (await fetch('/api/time')).json()) } catch(e) {}
+    try {
+      const data = await (await fetch('/api/time')).json()
+      setAllEntries(Array.isArray(data) ? data : [])
+      // Auto-select all duplicates except the first in each group
+      const map = {}
+      ;(Array.isArray(data) ? data : []).forEach(e => {
+        const k = [e.email||'', e.date||'', String(parseFloat(e.hours)||0), e.project||''].join('|')
+        if (!map[k]) map[k] = []
+        map[k].push(e)
+      })
+      const autoSelected = new Set()
+      Object.values(map).filter(g => g.length > 1).forEach(g => {
+        g.slice(1).forEach(e => autoSelected.add(e.id))
+      })
+      setSelected(autoSelected)
+    } catch(e) {}
     setLoadingDups(false)
   }
 
