@@ -82,72 +82,7 @@ export default function UsersPage() {
   const thS = { textAlign:'left', padding:'10px 16px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.07em', background:'#111111', borderBottom:'1px solid #1e1e1e', whiteSpace:'nowrap' }
   const tdS = { padding:'12px 16px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
 
-  function InlineConfirm({ userId, type, onConfirm }) {
-    if (confirmAction?.id !== userId || confirmAction?.type !== type) return null
-    const label = type === 'inactivate' ? 'Inactivate this user?' : 'Remove this user?'
-    const color = type === 'inactivate' ? '#f59e0b' : '#f87171'
-    return (
-      <div style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(0,0,0,0.3)',border:'1px solid '+color+'44',borderRadius:'8px',padding:'5px 10px',marginTop:'6px'}}>
-        <span style={{fontSize:'12px',color,fontWeight:600}}>{label}</span>
-        <button onClick={onConfirm} disabled={saving===userId}
-          style={{background:color,color:'#fff',border:'none',borderRadius:'5px',padding:'3px 10px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
-          Yes
-        </button>
-        <button onClick={()=>setConfirmAction(null)}
-          style={{background:'none',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>
-          Cancel
-        </button>
-      </div>
-    )
-  }
 
-  function UserRow({ u }) {
-    const self = isSelf(u)
-    const pending = saving === u.id
-    return (
-      <tr onMouseEnter={e=>e.currentTarget.style.background='#181818'} onMouseLeave={e=>e.currentTarget.style.background=''}>
-        <td style={tdS}>
-          <div style={{fontWeight:500,color:'#fff'}}>{u.name} {self&&<span style={{fontSize:'10px',background:'rgba(141,198,63,0.15)',color:'#8DC63F',padding:'1px 6px',borderRadius:'4px',marginLeft:'4px'}}>You</span>}</div>
-          <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{u.email}</div>
-        </td>
-        <td style={tdS}>
-          <select value={u.role||'viewer'} onChange={e=>updateRole(u, e.target.value)} disabled={self||pending}
-            style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'6px',padding:'5px 10px',color:'#d1d5db',fontSize:'13px',cursor:self?'not-allowed':'pointer',outline:'none',opacity:self?0.5:1}}>
-            <option value="viewer">Viewer</option>
-            <option value="editor">Editor</option>
-            <option value="admin">Admin</option>
-          </select>
-        </td>
-        <td style={tdS}>
-          <span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>Active</span>
-        </td>
-        <td style={{...tdS,minWidth:'260px'}}>
-          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center'}}>
-            {!self && (
-              <button onClick={()=>viewAs(u)}
-                style={{background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.2)',color:'#60a5fa',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
-                View As
-              </button>
-            )}
-            {!self && (
-              <button onClick={()=>setConfirmAction({id:u.id, type:'inactivate'})} disabled={pending}
-                style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
-                Inactivate
-              </button>
-            )}
-            {!self && (
-              <button onClick={()=>setConfirmAction({id:u.id, type:'remove'})} disabled={pending}
-                style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',color:'#f87171',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
-                Remove
-              </button>
-            )}
-          </div>
-          <InlineConfirm userId={u.id} type="inactivate" onConfirm={()=>inactivate(u)}/>
-          <InlineConfirm userId={u.id} type="remove" onConfirm={()=>remove(u)}/>
-        </td>
-      </tr>
-    )
-  }
 
   return (
     <div>
@@ -178,7 +113,50 @@ export default function UsersPage() {
                 </thead>
                 <tbody>
                   {activeUsers.length===0 && <tr><td colSpan={4} style={{...tdS,textAlign:'center',color:'#4b5563'}}>No active users</td></tr>}
-                  {activeUsers.map(u => <UserRow key={u.id} u={u}/>)}
+                  {activeUsers.map(u => {
+                  const self = isSelf(u)
+                  const pending = saving === u.id
+                  return (
+                    <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background='#181818'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                      <td style={tdS}>
+                        <div style={{fontWeight:500,color:'#fff'}}>{u.name}{self&&<span style={{fontSize:'10px',background:'rgba(141,198,63,0.15)',color:'#8DC63F',padding:'1px 6px',borderRadius:'4px',marginLeft:'6px'}}>You</span>}</div>
+                        <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{u.email}</div>
+                      </td>
+                      <td style={tdS}>
+                        <select value={u.role||'viewer'} onChange={e=>updateRole(u,e.target.value)} disabled={self||pending}
+                          style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'6px',padding:'5px 10px',color:'#d1d5db',fontSize:'13px',cursor:self?'not-allowed':'pointer',outline:'none',opacity:self?0.5:1}}>
+                          <option value="viewer">Viewer</option>
+                          <option value="editor">Editor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </td>
+                      <td style={tdS}><span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>Active</span></td>
+                      <td style={{...tdS,minWidth:'300px'}}>
+                        {confirmAction?.id===u.id ? (
+                          <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'12px',color:confirmAction.type==='inactivate'?'#f59e0b':'#f87171',fontWeight:600}}>
+                              {confirmAction.type==='inactivate'?'Inactivate this user?':'Remove this user?'}
+                            </span>
+                            <button onClick={()=>confirmAction.type==='inactivate'?inactivate(u):remove(u)} disabled={pending}
+                              style={{background:confirmAction.type==='inactivate'?'#f59e0b':'#f87171',color:'#fff',border:'none',borderRadius:'5px',padding:'4px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+                              Yes
+                            </button>
+                            <button onClick={e=>{e.preventDefault();setConfirmAction(null)}}
+                              style={{background:'none',border:'1px solid #2a2a2a',color:'#6b7280',borderRadius:'5px',padding:'4px 10px',fontSize:'12px',cursor:'pointer'}}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            {!self&&<button onClick={e=>{e.preventDefault();viewAs(u)}} style={{background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.2)',color:'#60a5fa',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>View As</button>}
+                            {!self&&<button onClick={e=>{e.preventDefault();setConfirmAction({id:u.id,type:'inactivate'})}} disabled={pending} style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>Inactivate</button>}
+                            {!self&&<button onClick={e=>{e.preventDefault();setConfirmAction({id:u.id,type:'remove'})}} disabled={pending} style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',color:'#f87171',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>Remove</button>}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
                 </tbody>
               </table>
             </div>
