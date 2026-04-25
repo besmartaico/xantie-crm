@@ -1,13 +1,14 @@
 // @ts-nocheck
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
   const [currentUser, setCurrentUser] = useState({})
-  const [confirmAction, setConfirmAction] = useState(null) // {id, type: 'inactivate'|'remove'}
+  const [confirmAction, setConfirmAction] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -32,37 +33,14 @@ export default function UsersPage() {
   }
 
   async function inactivate(user) {
-    setSaving(user.id)
+    setSaving(user.id); setConfirmAction(null)
     try {
       const res = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'deactivate', email: user.email }) })
+        body: JSON.stringify({ action:'deactivate', id: user.id, email: user.email }) })
       const data = await res.json()
       if (data.success) setUsers(prev => prev.map(u => u.id===user.id ? {...u, status:'inactive'} : u))
     } catch(e) {}
     setSaving(null)
-    setConfirmAction(null)
-  }
-
-  async function reactivate(user) {
-    setSaving(user.id)
-    try {
-      const res = await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'reactivate', email: user.email }) })
-      const data = await res.json()
-      if (data.success) setUsers(prev => prev.map(u => u.id===user.id ? {...u, status:'active'} : u))
-    } catch(e) {}
-    setSaving(null)
-  }
-
-  async function remove(user) {
-    setSaving(user.id)
-    try {
-      await fetch('/api/users', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'deactivate', email: user.email }) })
-      setUsers(prev => prev.filter(u => u.id !== user.id))
-    } catch(e) {}
-    setSaving(null)
-    setConfirmAction(null)
   }
 
   function viewAs(user) {
@@ -75,47 +53,49 @@ export default function UsersPage() {
     window.location.href = '/admin'
   }
 
-  const activeUsers = users.filter(u => u.status !== 'inactive')
-  const inactiveUsers = users.filter(u => u.status === 'inactive')
   const isSelf = (u) => u.email?.toLowerCase() === currentUser.email?.toLowerCase()
+  const activeUsers = users.filter(u => u.status !== 'inactive')
+  const inactiveCount = users.filter(u => u.status === 'inactive').length
 
   const thS = { textAlign:'left', padding:'10px 16px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.07em', background:'#111111', borderBottom:'1px solid #1e1e1e', whiteSpace:'nowrap' }
   const tdS = { padding:'12px 16px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
 
-
-
   return (
     <div>
-      <div style={{marginBottom:'24px'}}>
-        <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>User Management</h1>
-        <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{activeUsers.length} active · {inactiveUsers.length} inactive</p>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
+        <div>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>User Management</h1>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{activeUsers.length} active users</p>
+        </div>
+        {inactiveCount > 0 && (
+          <Link href="/admin/users/inactive"
+            style={{background:'#1e1e1e',border:'1px solid #2a2a2a',color:'#9ca3af',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:'6px'}}>
+            View Inactive Users
+            <span style={{background:'rgba(156,163,175,0.2)',color:'#9ca3af',fontSize:'11px',fontWeight:700,padding:'1px 7px',borderRadius:'10px'}}>{inactiveCount}</span>
+          </Link>
+        )}
       </div>
 
       {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
 
       {!loading && (
-        <>
-          {/* Active users */}
-          <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden',marginBottom:'24px'}}>
-            <div style={{padding:'14px 16px',borderBottom:'1px solid #1e1e1e',display:'flex',alignItems:'center',gap:'8px'}}>
-              <h3 style={{margin:0,fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Active Users</h3>
-              <span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',fontSize:'11px',fontWeight:700,padding:'1px 7px',borderRadius:'5px'}}>{activeUsers.length}</span>
-            </div>
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
-                <thead>
-                  <tr>
-                    <th style={thS}>Name / Email</th>
-                    <th style={thS}>Role</th>
-                    <th style={thS}>Status</th>
-                    <th style={thS}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeUsers.length===0 && <tr><td colSpan={4} style={{...tdS,textAlign:'center',color:'#4b5563'}}>No active users</td></tr>}
-                  {activeUsers.map(u => {
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
+              <thead>
+                <tr>
+                  <th style={thS}>Name / Email</th>
+                  <th style={thS}>Role</th>
+                  <th style={thS}>Status</th>
+                  <th style={thS}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeUsers.length===0 && <tr><td colSpan={4} style={{...tdS,textAlign:'center',color:'#4b5563'}}>No active users</td></tr>}
+                {activeUsers.map(u => {
                   const self = isSelf(u)
                   const pending = saving === u.id
+                  const confirming = confirmAction?.id === u.id
                   return (
                     <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background='#181818'} onMouseLeave={e=>e.currentTarget.style.background=''}>
                       <td style={tdS}>
@@ -130,78 +110,42 @@ export default function UsersPage() {
                           <option value="admin">Admin</option>
                         </select>
                       </td>
-                      <td style={tdS}><span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>Active</span></td>
-                      <td style={{...tdS,minWidth:'300px'}}>
-                        {confirmAction?.id===u.id ? (
-                          <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
-                            <span style={{fontSize:'12px',color:confirmAction.type==='inactivate'?'#f59e0b':'#f87171',fontWeight:600}}>
-                              {confirmAction.type==='inactivate'?'Inactivate this user?':'Remove this user?'}
-                            </span>
-                            <button onClick={()=>confirmAction.type==='inactivate'?inactivate(u):remove(u)} disabled={pending}
-                              style={{background:confirmAction.type==='inactivate'?'#f59e0b':'#f87171',color:'#fff',border:'none',borderRadius:'5px',padding:'4px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
-                              Yes
+                      <td style={tdS}>
+                        <span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>Active</span>
+                      </td>
+                      <td style={{...tdS,minWidth:'280px'}}>
+                        {confirming ? (
+                          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <span style={{fontSize:'12px',color:'#f59e0b',fontWeight:600}}>Inactivate {u.name}?</span>
+                            <button onClick={e=>{e.preventDefault();inactivate(u)}} disabled={pending}
+                              style={{background:'#f59e0b',color:'#000',border:'none',borderRadius:'5px',padding:'4px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+                              {pending?'Saving…':'Yes'}
                             </button>
                             <button onClick={e=>{e.preventDefault();setConfirmAction(null)}}
-                              style={{background:'none',border:'1px solid #2a2a2a',color:'#6b7280',borderRadius:'5px',padding:'4px 10px',fontSize:'12px',cursor:'pointer'}}>
+                              style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'5px',padding:'4px 10px',fontSize:'12px',cursor:'pointer'}}>
                               Cancel
                             </button>
                           </div>
                         ) : (
-                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                            {!self&&<button onClick={e=>{e.preventDefault();viewAs(u)}} style={{background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.2)',color:'#60a5fa',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>View As</button>}
-                            {!self&&<button onClick={e=>{e.preventDefault();setConfirmAction({id:u.id,type:'inactivate'})}} disabled={pending} style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>Inactivate</button>}
-                            {!self&&<button onClick={e=>{e.preventDefault();setConfirmAction({id:u.id,type:'remove'})}} disabled={pending} style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',color:'#f87171',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>Remove</button>}
+                          <div style={{display:'flex',gap:'6px'}}>
+                            {!self && <button onClick={e=>{e.preventDefault();viewAs(u)}}
+                              style={{background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.2)',color:'#60a5fa',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+                              View As
+                            </button>}
+                            {!self && <button onClick={e=>{e.preventDefault();setConfirmAction({id:u.id})}} disabled={pending}
+                              style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+                              Inactivate
+                            </button>}
                           </div>
                         )}
                       </td>
                     </tr>
                   )
                 })}
-                </tbody>
-              </table>
-            </div>
+              </tbody>
+            </table>
           </div>
-
-          {/* Inactive users */}
-          {inactiveUsers.length > 0 && (
-            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
-              <div style={{padding:'14px 16px',borderBottom:'1px solid #1e1e1e',display:'flex',alignItems:'center',gap:'8px'}}>
-                <h3 style={{margin:0,fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Inactive Users</h3>
-                <span style={{background:'rgba(156,163,175,0.1)',color:'#9ca3af',fontSize:'11px',fontWeight:700,padding:'1px 7px',borderRadius:'5px'}}>{inactiveUsers.length}</span>
-              </div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
-                  <thead>
-                    <tr>
-                      <th style={thS}>Name / Email</th>
-                      <th style={thS}>Role</th>
-                      <th style={thS}>Status</th>
-                      <th style={thS}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inactiveUsers.map(u => (
-                      <tr key={u.id} style={{opacity:0.7}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.7'}>
-                        <td style={tdS}>
-                          <div style={{fontWeight:500,color:'#9ca3af'}}>{u.name}</div>
-                          <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{u.email}</div>
-                        </td>
-                        <td style={tdS}><span style={{color:'#4b5563',fontSize:'13px'}}>{u.role||'viewer'}</span></td>
-                        <td style={tdS}><span style={{background:'rgba(156,163,175,0.1)',color:'#9ca3af',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>Inactive</span></td>
-                        <td style={tdS}>
-                          <button onClick={()=>reactivate(u)} disabled={saving===u.id}
-                            style={{background:'rgba(141,198,63,0.1)',border:'1px solid rgba(141,198,63,0.25)',color:'#8DC63F',borderRadius:'6px',padding:'5px 14px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
-                            {saving===u.id ? 'Reactivating…' : 'Reactivate'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   )
