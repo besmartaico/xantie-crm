@@ -13,6 +13,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
+  const [confirmInactivate, setConfirmInactivate] = useState(null) // user id pending confirmation
   const [confirmRemove, setConfirmRemove] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
   const [currentUser, setCurrentUser] = useState({})
@@ -168,10 +169,24 @@ export default function UsersPage() {
                     {!isMe && isConfirming && (
                       <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
                         <span style={{fontSize:'12px',color:'#f87171',whiteSpace:'nowrap'}}>Remove {u.name}?</span>
-                        <button onClick={()=>deactivate(u)} disabled={saving===u.id}
-                          style={{background:'#f87171',color:'#fff',border:'none',borderRadius:'6px',padding:'5px 10px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
-                          Yes, Remove
-                        </button>
+                        {confirmInactivate === u.id ? (
+                    <div style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.25)',borderRadius:'8px',padding:'5px 10px'}}>
+                      <span style={{fontSize:'12px',color:'#f87171',fontWeight:600}}>Inactivate?</span>
+                      <button onClick={()=>{setConfirmInactivate(null);deactivate(u)}} disabled={saving===u.id}
+                        style={{background:'#f87171',color:'#fff',border:'none',borderRadius:'5px',padding:'3px 10px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+                        Yes
+                      </button>
+                      <button onClick={()=>setConfirmInactivate(null)}
+                        style={{background:'none',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer',padding:'3px 6px'}}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>setConfirmInactivate(u.id)}
+                      style={{background:'none',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+                      Inactivate
+                    </button>
+                  )}
                         <button onClick={()=>setConfirmRemove(null)}
                           style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'6px',padding:'5px 10px',fontSize:'12px',cursor:'pointer'}}>
                           Cancel
