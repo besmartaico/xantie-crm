@@ -49,19 +49,33 @@ export async function POST(req) {
     }
 
     if (action === 'deactivate') {
-      // Soft delete - set col E to 'inactive', blocks login but keeps data
-      const { id } = body
+      let rowNum = body.id
+      if (!rowNum && body.email) {
+        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E5000' })
+        const rows = lookup.data.values || []
+        const idx = rows.findIndex(r => r[1]?.toLowerCase() === body.email.toLowerCase())
+        if (idx === -1) return NextResponse.json({ success: false, error: 'User not found' })
+        rowNum = idx + 2
+      }
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `Users!E${id}`,
+        spreadsheetId: SID(), range: `Users!E${rowNum}`,
         valueInputOption: 'RAW', requestBody: { values: [['inactive']] }
       })
       return NextResponse.json({ success: true })
     }
 
     if (action === 'reactivate') {
-      const { id } = body
+      // support email lookup
+      let rowNum = body.id
+      if (!rowNum && body.email) {
+        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E5000' })
+        const rows = lookup.data.values || []
+        const idx = rows.findIndex(r => r[1]?.toLowerCase() === body.email.toLowerCase())
+        if (idx === -1) return NextResponse.json({ success: false, error: 'User not found' })
+        rowNum = idx + 2
+      }
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `Users!E${id}`,
+        spreadsheetId: SID(), range: `Users!E${rowNum}`,
         valueInputOption: 'RAW', requestBody: { values: [['active']] }
       })
       return NextResponse.json({ success: true })
