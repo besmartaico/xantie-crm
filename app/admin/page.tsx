@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { useGlobalStyles } from 'react'
 
 const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.07em' }
@@ -293,6 +294,7 @@ export default function TimeEntries() {
 
   return (
     <div>
+      <style>{`input[type="date"].hide-cal-icon::-webkit-calendar-picker-indicator { opacity: 0; width: 100%; position: absolute; right: 0; cursor: pointer; }`}</style>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
@@ -468,8 +470,7 @@ export default function TimeEntries() {
 
               {days.map((day, i) => (
                 <div key={day.id} style={{display:'grid',gridTemplateColumns:'1fr 100px 1fr 32px',gap:'8px',marginBottom:'8px',alignItems:'center'}}>
-                  <input type="date" value={day.date} onChange={e=>updateDay(day.id,'date',e.target.value)}
-                    style={{...inp,fontSize:'14px',padding:'8px 10px',colorScheme:'dark'}}/>
+                  <input type="date" value={day.date} onChange={e=>updateDay(day.id,'date',e.target.value)} style={{...inp,fontSize:'14px',padding:'8px 10px',colorScheme:'dark'}} className="hide-cal-icon"/>
                   <input type="number" step="0.25" placeholder="0.00" value={day.hours} onChange={e=>updateDay(day.id,'hours',e.target.value)}
                     style={{...inp,fontSize:'14px',padding:'8px 10px'}}/>
                   <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525',height:'38px'}}>
