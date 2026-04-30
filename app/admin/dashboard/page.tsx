@@ -39,41 +39,124 @@ function BillableFilter({ value, onChange }) {
   )
 }
 
-function MonthLineChart({ byMonth }) {
+// Project colors palette
+const PROJECT_COLORS = [
+  '#8DC63F','#60a5fa','#f59e0b','#a78bfa','#f87171',
+  '#34d399','#fb923c','#e879f9','#38bdf8','#4ade80',
+]
+
+function MonthLineChart({ byMonth, filtered }) {
   const entries = Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0]))
   if (!entries.length) return null
-  const vals = entries.map(([,v])=>v)
-  const maxVal = Math.max(...vals, 1)
-  const W=600, H=160, padL=44, padR=16, padT=16, padB=36
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  function monthLabel(key) {
+    const [yr,mo] = key.split('-')
+    return MONTH_NAMES[parseInt(mo)-1]+' '+yr
+  }
+
+  // Get all unique projects in the filtered data
+  const allProjects = [...new Set(filtered.map(e=>e.project).filter(Boolean))].sort()
+  const projectColorMap = {}
+  allProjects.forEach((p,i) => { projectColorMap[p] = PROJECT_COLORS[i % PROJECT_COLORS.length] })
+
+  // Build byMonth per project
+  const byProjectMonth = {}
+  filtered.forEach(e => {
+    if (!e.date || !e.project) return
+    const d = new Date(e.date)
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+    if (!byProjectMonth[e.project]) byProjectMonth[e.project] = {}
+    byProjectMonth[e.project][key] = (byProjectMonth[e.project][key]||0) + (parseFloat(e.hours)||0)
+  })
+
+  const months = entries.map(([k])=>k)
+  const maxVal = Math.max(...entries.map(([,v])=>v), 1)
+  const W=600, H=180, padL=44, padR=16, padT=16, padB=36
   const chartW = W-padL-padR, chartH = H-padT-padB
-  const pts = entries.map(([k,v],i) => ({
-    x: padL + (entries.length===1 ? chartW/2 : i/(entries.length-1)*chartW),
-    y: padT + chartH - (v/maxVal)*chartH,
-    v, label: MONTH_NAMES[parseInt(k.split('-')[1])-1]+' '+k.split('-')[0]
-  }))
+
+  function xPos(i) {
+    return padL + (months.length===1 ? chartW/2 : i/(months.length-1)*chartW)
+  }
+  function yPos(val) {
+    return padT + chartH - (val/maxVal)*chartH
+  }
+
+  // Build stacked areas — stack projects
+  const stackedData = months.map((mo,i) => {
+    let cumulative = 0
+    const layers = allProjects.map(proj => {
+      const val = byProjectMonth[proj]?.[mo] || 0
+      const base = cumulative
+      cumulative += val
+      return { proj, val, base, top: cumulative }
+    })
+    return { mo, i, total: cumulative, layers }
+  })
+
   const grids = Array.from({length:5},(_,i)=>({ y:padT+(i/4)*chartH, val:maxVal*(1-i/4) }))
+
+  // Build polygon for each project layer
+  function buildPolygon(proj) {
+    // Top line left to right, then bottom line right to left
+    const topPts = stackedData.map(d => {
+      const layer = d.layers.find(l=>l.proj===proj)
+      return [xPos(d.i), yPos(layer ? layer.top : 0)]
+    })
+    const bottomPts = [...stackedData].reverse().map(d => {
+      const layer = d.layers.find(l=>l.proj===proj)
+      return [xPos(d.i), yPos(layer ? layer.base : 0)]
+    })
+    return [...topPts, ...bottomPts].map(([x,y])=>x+','+y).join(' ')
+  }
+
+  // Total line points
+  const totalPts = stackedData.map(d=>[xPos(d.i), yPos(d.total)])
+
   return (
-    <div style={{overflowX:'auto'}}>
-      <svg viewBox={'0 0 '+W+' '+H} style={{width:'100%',minWidth:'300px',display:'block'}}>
-        {grids.map((g,i)=>(
-          <g key={i}>
-            <line x1={padL} y1={g.y} x2={W-padR} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
-            <text x={padL-6} y={g.y+4} textAnchor="end" fontSize="9" fill="#4b5563">{g.val>0?g.val.toFixed(0):''}</text>
-          </g>
-        ))}
-        <polygon points={[pts[0].x+','+(padT+chartH), ...pts.map(p=>p.x+','+p.y), pts[pts.length-1].x+','+(padT+chartH)].join(' ')} fill="rgba(141,198,63,0.08)"/>
-        <polyline points={pts.map(p=>p.x+','+p.y).join(' ')} fill="none" stroke="#8DC63F" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-        {pts.map((p,i)=>(
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r="4" fill="#8DC63F" stroke="#141414" strokeWidth="2"/>
-            <text x={p.x} y={p.y-10} textAnchor="middle" fontSize="9" fill="#8DC63F" fontWeight="700">{p.v.toFixed(1)}</text>
-            <text x={p.x} y={H-8} textAnchor="middle" fontSize="9" fill="#6b7280">{p.label}</text>
-          </g>
-        ))}
-      </svg>
+    <div>
+      <div style={{overflowX:'auto'}}>
+        <svg viewBox={'0 0 '+W+' '+H} style={{width:'100%',minWidth:'300px',display:'block'}}>
+          {/* Grid lines */}
+          {grids.map((g,i)=>(
+            <g key={i}>
+              <line x1={padL} y1={g.y} x2={W-padR} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
+              <text x={padL-6} y={g.y+4} textAnchor="end" fontSize="9" fill="#4b5563">{g.val>0?g.val.toFixed(0):''}</text>
+            </g>
+          ))}
+          {/* Stacked area polygons per project */}
+          {allProjects.map(proj => (
+            <polygon key={proj} points={buildPolygon(proj)}
+              fill={projectColorMap[proj]} opacity="0.7"/>
+          ))}
+          {/* Total line on top */}
+          <polyline points={totalPts.map(([x,y])=>x+','+y).join(' ')}
+            fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+          {/* Dots + labels */}
+          {stackedData.map((d,i)=>(
+            <g key={i}>
+              <circle cx={xPos(i)} cy={yPos(d.total)} r="3.5" fill="#fff" stroke="#141414" strokeWidth="1.5"/>
+              <text x={xPos(i)} y={yPos(d.total)-9} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="700">{d.total.toFixed(1)}</text>
+              <text x={xPos(i)} y={H-8} textAnchor="middle" fontSize="9" fill="#6b7280">{monthLabel(d.mo)}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      {/* Legend */}
+      {allProjects.length > 0 && (
+        <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginTop:'14px'}}>
+          {allProjects.map(proj=>(
+            <div key={proj} style={{display:'flex',alignItems:'center',gap:'5px'}}>
+              <div style={{width:'10px',height:'10px',borderRadius:'2px',background:projectColorMap[proj],flexShrink:0}}/>
+              <span style={{fontSize:'11px',color:'#9ca3af'}}>{proj}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
+
 
 export default function Dashboard() {
   const [entries, setEntries] = useState([])
@@ -367,7 +450,7 @@ export default function Dashboard() {
       {Object.keys(byMonth).length>0&&(
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
           <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Month</h3>
-          <MonthLineChart byMonth={byMonth}/>
+          <MonthLineChart byMonth={byMonth} filtered={filtered}/>
         </div>
       )}
     </div>
