@@ -39,13 +39,26 @@ function BillableFilter({ value, onChange }) {
   )
 }
 
-// Project colors palette
+// Maximally distinct color palette
 const PROJECT_COLORS = [
-  '#8DC63F','#60a5fa','#f59e0b','#a78bfa','#f87171',
-  '#34d399','#fb923c','#e879f9','#38bdf8','#4ade80',
+  '#8DC63F', // lime green
+  '#e05c5c', // red
+  '#60a5fa', // blue
+  '#f59e0b', // amber
+  '#a78bfa', // purple
+  '#34d399', // emerald
+  '#f97316', // orange
+  '#06b6d4', // cyan
+  '#ec4899', // pink
+  '#84cc16', // yellow-green (distinct from lime)
+  '#6366f1', // indigo
+  '#14b8a6', // teal
 ]
 
 function MonthLineChart({ byMonth, filtered }) {
+  const [hoveredProject, setHoveredProject] = React.useState(null)
+  const [tooltip, setTooltip] = React.useState(null) // {x, y, proj, hours}
+
   const entries = Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0]))
   if (!entries.length) return null
 
@@ -55,12 +68,10 @@ function MonthLineChart({ byMonth, filtered }) {
     return MONTH_NAMES[parseInt(mo)-1]+' '+yr
   }
 
-  // Get all unique projects in the filtered data
   const allProjects = [...new Set(filtered.map(e=>e.project).filter(Boolean))].sort()
   const projectColorMap = {}
   allProjects.forEach((p,i) => { projectColorMap[p] = PROJECT_COLORS[i % PROJECT_COLORS.length] })
 
-  // Build byMonth per project
   const byProjectMonth = {}
   filtered.forEach(e => {
     if (!e.date || !e.project) return
@@ -75,82 +86,121 @@ function MonthLineChart({ byMonth, filtered }) {
   const W=600, H=180, padL=44, padR=16, padT=16, padB=36
   const chartW = W-padL-padR, chartH = H-padT-padB
 
-  function xPos(i) {
-    return padL + (months.length===1 ? chartW/2 : i/(months.length-1)*chartW)
-  }
-  function yPos(val) {
-    return padT + chartH - (val/maxVal)*chartH
-  }
+  function xPos(i) { return padL + (months.length===1 ? chartW/2 : i/(months.length-1)*chartW) }
+  function yPos(val) { return padT + chartH - (val/maxVal)*chartH }
 
-  // Build stacked areas — stack projects
   const stackedData = months.map((mo,i) => {
-    let cumulative = 0
+    let cum = 0
     const layers = allProjects.map(proj => {
       const val = byProjectMonth[proj]?.[mo] || 0
-      const base = cumulative
-      cumulative += val
-      return { proj, val, base, top: cumulative }
+      const base = cum; cum += val
+      return { proj, val, base, top: cum }
     })
-    return { mo, i, total: cumulative, layers }
+    return { mo, i, total: cum, layers }
   })
 
   const grids = Array.from({length:5},(_,i)=>({ y:padT+(i/4)*chartH, val:maxVal*(1-i/4) }))
 
-  // Build polygon for each project layer
   function buildPolygon(proj) {
-    // Top line left to right, then bottom line right to left
-    const topPts = stackedData.map(d => {
-      const layer = d.layers.find(l=>l.proj===proj)
-      return [xPos(d.i), yPos(layer ? layer.top : 0)]
-    })
-    const bottomPts = [...stackedData].reverse().map(d => {
-      const layer = d.layers.find(l=>l.proj===proj)
-      return [xPos(d.i), yPos(layer ? layer.base : 0)]
-    })
-    return [...topPts, ...bottomPts].map(([x,y])=>x+','+y).join(' ')
+    const top = stackedData.map(d => { const l=d.layers.find(l=>l.proj===proj); return [xPos(d.i), yPos(l?l.top:0)] })
+    const bot = [...stackedData].reverse().map(d => { const l=d.layers.find(l=>l.proj===proj); return [xPos(d.i), yPos(l?l.base:0)] })
+    return [...top,...bot].map(([x,y])=>x+','+y).join(' ')
   }
 
-  // Total line points
   const totalPts = stackedData.map(d=>[xPos(d.i), yPos(d.total)])
+
+  // SVG coordinate conversion for mouse events
+  function svgCoords(e, svgEl) {
+    const rect = svgEl.getBoundingClientRect()
+    const scaleX = 600 / rect.width
+    const scaleY = 180 / rect.height
+    return [(e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY]
+  }
+
+  function handleSvgMouseMove(e) {
+    const svg = e.currentTarget
+    const [mx, my] = svgCoords(e, svg)
+    // Find which month column we're closest to
+    let closestI = 0, closestDist = Infinity
+    months.forEach((mo,i) => { const d=Math.abs(xPos(i)-mx); if(d<closestDist){closestDist=d;closestI=i} })
+    if (closestDist > 30) { setTooltip(null); return }
+    // Find which project layer we're in at this x
+    const sd = stackedData[closestI]
+    let foundProj = null, foundHours = 0
+    for (const layer of [...sd.layers].reverse()) {
+      if (my >= yPos(layer.top) && my <= yPos(layer.base) && layer.val > 0) {
+        foundProj = layer.proj; foundHours = layer.val; break
+      }
+    }
+    if (foundProj) {
+      setTooltip({ x: xPos(closestI), y: yPos(sd.layers.find(l=>l.proj===foundProj)?.top||0) - 8, proj: foundProj, hours: foundHours, month: monthLabel(sd.mo) })
+    } else {
+      setTooltip(null)
+    }
+  }
 
   return (
     <div>
-      <div style={{overflowX:'auto'}}>
-        <svg viewBox={'0 0 '+W+' '+H} style={{width:'100%',minWidth:'300px',display:'block'}}>
-          {/* Grid lines */}
+      <div style={{overflowX:'auto',position:'relative'}}>
+        <svg viewBox="0 0 600 180" style={{width:'100%',minWidth:'300px',display:'block',cursor:'crosshair'}}
+          onMouseMove={handleSvgMouseMove} onMouseLeave={()=>setTooltip(null)}>
           {grids.map((g,i)=>(
             <g key={i}>
               <line x1={padL} y1={g.y} x2={W-padR} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
               <text x={padL-6} y={g.y+4} textAnchor="end" fontSize="9" fill="#4b5563">{g.val>0?g.val.toFixed(0):''}</text>
             </g>
           ))}
-          {/* Stacked area polygons per project */}
-          {allProjects.map(proj => (
-            <polygon key={proj} points={buildPolygon(proj)}
-              fill={projectColorMap[proj]} opacity="0.7"/>
-          ))}
-          {/* Total line on top */}
+          {allProjects.map(proj => {
+            const isHovered = hoveredProject === proj
+            const isDimmed = hoveredProject && hoveredProject !== proj
+            return (
+              <polygon key={proj} points={buildPolygon(proj)}
+                fill={projectColorMap[proj]}
+                opacity={isDimmed ? 0.1 : isHovered ? 0.95 : 0.75}
+                style={{transition:'opacity 0.15s', cursor:'pointer'}}/>
+            )
+          })}
           <polyline points={totalPts.map(([x,y])=>x+','+y).join(' ')}
-            fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
-          {/* Dots + labels */}
+            fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
           {stackedData.map((d,i)=>(
             <g key={i}>
-              <circle cx={xPos(i)} cy={yPos(d.total)} r="3.5" fill="#fff" stroke="#141414" strokeWidth="1.5"/>
-              <text x={xPos(i)} y={yPos(d.total)-9} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="700">{d.total.toFixed(1)}</text>
+              <circle cx={xPos(i)} cy={yPos(d.total)} r="3" fill="#fff" stroke="#141414" strokeWidth="1.5"/>
+              <text x={xPos(i)} y={yPos(d.total)-8} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="700">{d.total.toFixed(1)}</text>
               <text x={xPos(i)} y={H-8} textAnchor="middle" fontSize="9" fill="#6b7280">{monthLabel(d.mo)}</text>
             </g>
           ))}
+          {/* Tooltip */}
+          {tooltip && (
+            <g>
+              <rect x={tooltip.x-50} y={tooltip.y-28} width="100" height="26" rx="5"
+                fill="#1a1a1a" stroke="#2a2a2a" strokeWidth="1"/>
+              <text x={tooltip.x} y={tooltip.y-16} textAnchor="middle" fontSize="9" fill="#8DC63F" fontWeight="700">{tooltip.proj}</text>
+              <text x={tooltip.x} y={tooltip.y-7} textAnchor="middle" fontSize="8" fill="#9ca3af">{tooltip.hours.toFixed(1)}h · {tooltip.month}</text>
+            </g>
+          )}
         </svg>
       </div>
-      {/* Legend */}
+      {/* Legend with hover interaction */}
       {allProjects.length > 0 && (
-        <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginTop:'14px'}}>
-          {allProjects.map(proj=>(
-            <div key={proj} style={{display:'flex',alignItems:'center',gap:'5px'}}>
-              <div style={{width:'10px',height:'10px',borderRadius:'2px',background:projectColorMap[proj],flexShrink:0}}/>
-              <span style={{fontSize:'11px',color:'#9ca3af'}}>{proj}</span>
-            </div>
-          ))}
+        <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginTop:'14px'}}>
+          {allProjects.map(proj=>{
+            const isDimmed = hoveredProject && hoveredProject !== proj
+            const isActive = hoveredProject === proj
+            return (
+              <div key={proj}
+                onMouseEnter={()=>setHoveredProject(proj)}
+                onMouseLeave={()=>setHoveredProject(null)}
+                style={{display:'flex',alignItems:'center',gap:'5px',cursor:'pointer',
+                  opacity: isDimmed ? 0.25 : 1,
+                  background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
+                  borderRadius:'5px', padding:'3px 7px',
+                  border: isActive ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
+                  transition:'all 0.15s'}}>
+                <div style={{width:'10px',height:'10px',borderRadius:'2px',background:projectColorMap[proj],flexShrink:0}}/>
+                <span style={{fontSize:'11px',color: isDimmed?'#4b5563':'#9ca3af'}}>{proj}</span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
