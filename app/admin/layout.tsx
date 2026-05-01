@@ -8,17 +8,9 @@
       { label: 'Users', href: '/admin/users' },
       { label: 'Import', href: '/admin/import' },
     ] : []),
-  ] : [
-    { label: 'Dashboard', href: '/admin/dashboard' },
-    { label: 'Time Entries', href: '/admin' },
-    { label: 'Projects', href: '/admin/projects' },
-    ...(user.role==='admin' ? [
-      { label: 'Users', href: '/admin/users' },
-      { label: 'Import', href: '/admin/import' },
-    ] : []),
-    { label: 'Time Off', href: '/admin/time-off' },
-    { label: 'Feedback', href: '/admin/feedback' },
+
   ]
+
 
   const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
 
