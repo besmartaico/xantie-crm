@@ -113,6 +113,7 @@ export default function TimeEntries() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
   const [subProjects, setSubProjects] = useState([])
+  const [subProject, setSubProject] = useState('N/A')
   const [selectedClient, setSelectedClient] = useState('')
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -194,6 +195,7 @@ export default function TimeEntries() {
   }
 
   function handleProjectChange(e) {
+    setSubProject('N/A')
     setSubProject('N/A')
     const val = e.target.value
     if (val==='__new__') { setShowNewProject(true); setNewProjectName(''); setProjectError('') }
