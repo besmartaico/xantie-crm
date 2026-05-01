@@ -194,6 +194,7 @@ export default function TimeEntries() {
   }
 
   function handleProjectChange(e) {
+    setSubProject('N/A')
     const val = e.target.value
     if (val==='__new__') { setShowNewProject(true); setNewProjectName(''); setProjectError('') }
     else { setProject(val); setShowNewProject(false) }
@@ -462,18 +463,30 @@ export default function TimeEntries() {
             </div>
 
             {/* Project - shared across all days */}
-            <div style={{marginBottom:'12px'}}>
-              <label style={lbl}>Project <span style={{color:'#f87171'}}>*</span></label>
-              <select value={showNewProject?'__new__':project} onChange={handleProjectChange}
-                style={{...inp,cursor:'pointer',borderColor:!project&&!showNewProject?'#5a3030':'#252525'}}>
-                <option value="">— Select a project —</option>
-                <option disabled>────────────────────</option>
-                {projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
-                <option disabled>────────────────────</option>
-                <option value="__new__">+ Add New Project</option>
-              </select>
-              {!project&&!showNewProject&&<p style={{margin:'4px 0 0',fontSize:'11px',color:'#f87171'}}>A project is required</p>}
-            </div>
+            <div style={{marginBottom:'16px'}}>
+                <label style={lbl}>CLIENT <span style={{color:'#f87171'}}>*</span></label>
+                <select value={project} onChange={handleProjectChange}
+                  style={{...inp, cursor:'pointer', borderColor: !project && !showNewProject ? '#f87171' : undefined}}
+                  className="hide-cal-icon">
+                  <option value="">Select a client...</option>
+                  {projects.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
+                  <option value="__new__">+ New Client</option>
+                </select>
+              </div>
+              {/* Sub-project selector */}
+              {project && project !== '__new__' && (
+                <div style={{marginBottom:'16px'}}>
+                  <label style={lbl}>PROJECT</label>
+                  <select value={subProject} onChange={e=>setSubProject(e.target.value)}
+                    style={{...inp, cursor:'pointer', background:'#0f0f0f'}}>
+                    {subProjects.filter(p=>p.clientName===project).map(p=>(
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                    {!subProjects.some(p=>p.clientName===project) && <option value="N/A">N/A</option>}
+                  </select>
+                </div>
+              )
+              }
 
             {showNewProject && (
               <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
