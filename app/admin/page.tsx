@@ -112,6 +112,8 @@ const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 export default function TimeEntries() {
   const [entries, setEntries] = useState([])
   const [projects, setProjects] = useState([])
+  const [subProjects, setSubProjects] = useState([])
+  const [selectedClient, setSelectedClient] = useState('')
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
