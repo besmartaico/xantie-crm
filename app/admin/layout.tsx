@@ -1,4 +1,70 @@
-  const links = [
+// @ts-nocheck
+'use client'
+import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+
+function XLogo({ size = 28 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="0,0 14,0 44,44 30,44" fill="#8DC63F"/>
+      <polygon points="30,0 44,0 14,44 0,44" fill="#666666"/>
+      <polygon points="30,0 44,0 29,19 15,19" fill="#8DC63F"/>
+      <polygon points="0,44 14,44 29,25 15,25" fill="#8DC63F"/>
+    </svg>
+  )
+}
+
+export default function AdminLayout({ children }) {
+  const router = useRouter()
+  const path = usePathname()
+  const [auth, setAuth] = useState(false)
+  const [user, setUser] = useState({name:'',role:''})
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [impersonating, setImpersonating] = useState(false)
+  const [realAdmin, setRealAdmin] = useState(null)
+
+  useEffect(() => {
+    const a = sessionStorage.getItem('xantie_auth')
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    const backup = sessionStorage.getItem('xantie_admin_backup')
+    if (!a) { router.push('/login'); return }
+    if ((path==='/admin/import'||path==='/admin/users') && u.role!=='admin' && !backup) { router.push('/admin'); return }
+    setAuth(true); setUser(u)
+    if (backup) {
+      setImpersonating(true)
+      setRealAdmin(JSON.parse(backup))
+    } else {
+      setImpersonating(false)
+      setRealAdmin(null)
+    }
+  }, [path])
+
+  function signOut() {
+    sessionStorage.removeItem('xantie_auth')
+    sessionStorage.removeItem('xantie_user')
+    sessionStorage.removeItem('xantie_admin_backup')
+    sessionStorage.removeItem('xantie_admin_auth_backup')
+    router.push('/login')
+  }
+
+  function stopImpersonating() {
+    const backup = sessionStorage.getItem('xantie_admin_backup')
+    const authBackup = sessionStorage.getItem('xantie_admin_auth_backup')
+    if (backup) sessionStorage.setItem('xantie_user', backup)
+    if (authBackup) sessionStorage.setItem('xantie_auth', authBackup)
+    sessionStorage.removeItem('xantie_admin_backup')
+    sessionStorage.removeItem('xantie_admin_auth_backup')
+    router.push('/admin/users')
+  }
+
+  if (!auth) return null
+  const isAdmin = user.role === 'admin' || impersonating
+
+  const NAV = impersonating ? [
+    { label: 'Dashboard', href: '/admin/dashboard' },
+    { label: 'Time Entries', href: '/admin' },
+    { label: 'Projects', href: '/admin/projects' },
+  ] : [
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
     { label: 'Projects', href: '/admin/projects' },
@@ -8,9 +74,7 @@
       { label: 'Users', href: '/admin/users' },
       { label: 'Import', href: '/admin/import' },
     ] : []),
-
   ]
-
 
   const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
 
