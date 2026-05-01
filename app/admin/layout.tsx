@@ -58,13 +58,13 @@ export default function AdminLayout({ children }) {
   const publicLinks = [
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
-    { label: 'Projects', href: '/admin/projects' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
   ]
 
   // Admin-only links (shown with a divider)
   const adminLinks = user.role === 'admin' ? [
+    { label: 'Projects', href: '/admin/projects' },
     { label: 'Users', href: '/admin/users' },
     { label: 'Import', href: '/admin/import' },
   ] : []
