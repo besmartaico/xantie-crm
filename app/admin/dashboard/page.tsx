@@ -6,6 +6,8 @@ const DATE_OPTIONS = [
   { value:'', label:'All Time' },
   { value:'this_month', label:'This Month' },
   { value:'last_month', label:'Last Month' },
+  { value:'this_pay_period', label:'This Pay Period' },
+  { value:'last_pay_period', label:'Last Pay Period' },
   { value:'this_quarter', label:'This Quarter' },
   { value:'this_year', label:'This Year' },
   { value:'custom', label:'Custom Range' },
@@ -20,6 +22,18 @@ function getRange(filter, start, end) {
   if (filter==='last_month') return [new Date(y,m-1,1), new Date(y,m,0)]
   if (filter==='this_quarter') { const q=Math.floor(m/3); return [new Date(y,q*3,1), new Date(y,q*3+3,0)] }
   if (filter==='this_year') return [new Date(y,0,1), new Date(y,11,31)]
+  if (filter==='this_pay_period') {
+    const isFirstHalf = now.getDate() <= 15
+    return isFirstHalf ? [new Date(y,m,1), new Date(y,m,15)] : [new Date(y,m,16), new Date(y,m+1,0)]
+  }
+  if (filter==='last_pay_period') {
+    const isFirstHalf = now.getDate() <= 15
+    if (isFirstHalf) {
+      const lm = m===0?11:m-1; const ly = m===0?y-1:y
+      return [new Date(ly,lm,16), new Date(ly,lm+1,0)]
+    }
+    return [new Date(y,m,1), new Date(y,m,15)]
+  }
   if (filter==='custom'&&start&&end) return [new Date(start), new Date(end)]
   return null
 }
@@ -55,7 +69,7 @@ const PROJECT_COLORS = [
   '#14b8a6', // teal
 ]
 
-function MonthLineChart({ byMonth, filtered }) {
+function MonthLineChart({ byMonth, filtered, granularity }) {
   const [hoveredProject, setHoveredProject] = React.useState(null)
   const [tooltip, setTooltip] = React.useState(null) // {x, y, proj, hours}
 
@@ -64,8 +78,13 @@ function MonthLineChart({ byMonth, filtered }) {
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
   function monthLabel(key) {
-    const [yr,mo] = key.split('-')
-    return MONTH_NAMES[parseInt(mo)-1]+' '+yr
+    const parts = key.split('-')
+    if (parts.length === 3) {
+      // Daily: show "Mon Jan 1"
+      const d = new Date(key + 'T12:00:00')
+      return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+MONTH_NAMES[d.getMonth()]+' '+d.getDate()
+    }
+    return MONTH_NAMES[parseInt(parts[1])-1]+' '+parts[0]
   }
 
   const allProjects = [...new Set(filtered.map(e=>e.project).filter(Boolean))].sort()
@@ -329,14 +348,23 @@ export default function Dashboard() {
   ).sort((a,b)=>b[1]-a[1])
   const maxE = byEmployee[0]?.[1]||1
 
-  // By month — use YYYY-MM key for correct sorting
+  // Smart grouping: daily for short ranges, weekly for month view, monthly for longer
+  const useDaily = ['this_month','last_month','this_pay_period','last_pay_period'].includes(dateFilter)
+  const useWeekly = false // future option
+  
   const byMonth = {}
   filtered.forEach(e => {
     if (!e.date) return
-    const d = new Date(e.date)
-    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+    const d = new Date(e.date + 'T12:00:00')
+    let key
+    if (useDaily) {
+      key = e.date // YYYY-MM-DD
+    } else {
+      key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+    }
     byMonth[key] = (byMonth[key]||0) + (parseFloat(e.hours)||0)
   })
+  const chartGranularity = useDaily ? 'day' : 'month'
 
   const hasFilters = dateFilter||employeeFilter||billableFilter
 
@@ -500,7 +528,7 @@ export default function Dashboard() {
       {Object.keys(byMonth).length>0&&(
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
           <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Month</h3>
-          <MonthLineChart byMonth={byMonth} filtered={filtered}/>
+          <MonthLineChart byMonth={byMonth} filtered={filtered} granularity={chartGranularity}/>
         </div>
       )}
     </div>
