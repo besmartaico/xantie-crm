@@ -1,202 +1,212 @@
 // @ts-nocheck
 'use client'
-import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
-const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
-const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.07em' }
-const sel = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'14px', outline:'none', cursor:'pointer' }
+const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'14px', outline:'none', boxSizing:'border-box' }
+const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'6px', textTransform:'uppercase', letterSpacing:'0.07em' }
 
-function CloseBtn({ onClick }) {
-  return (
-    <button onClick={onClick} style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',justifyContent:'center'}} aria-label="Close">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
-  )
-}
-
-export default function ProjectsPage() {
-  const router = useRouter()
+export default function ClientsPage() {
+  const [clients, setClients] = useState([])
   const [projects, setProjects] = useState([])
-  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
-  const [leadModal, setLeadModal] = useState(null) // project being assigned
-  const [selectedLead, setSelectedLead] = useState('')
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [savingLead, setSavingLead] = useState(false)
-  const [checking, setChecking] = useState(false)
-  const [similarWarning, setSimilarWarning] = useState(null)
-  const [confirmed, setConfirmed] = useState(false)
-  const [apiError, setApiError] = useState('')
-  const checkTimeout = useRef(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [currentUser, setCurrentUser] = useState({})
+  const [expanded, setExpanded] = useState({})
+
+  // New client form
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
+  const [newClientDesc, setNewClientDesc] = useState('')
+  const [savingClient, setSavingClient] = useState(false)
+
+  // New project form (per client)
+  const [addingProject, setAddingProject] = useState(null) // clientName
+  const [newProjName, setNewProjName] = useState('')
+  const [savingProj, setSavingProj] = useState(false)
+
+  // Delete confirm
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   useEffect(() => {
-    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setIsAdmin(u.role === 'admin')
+    const u = JSON.parse(sessionStorage.getItem('xantie_user')||'{}')
+    setCurrentUser(u)
     load()
-    fetch('/api/users').then(r=>r.json()).then(setUsers).catch(()=>{})
   }, [])
 
   async function load() {
     setLoading(true)
-    try { const p = await (await fetch('/api/projects')).json(); setProjects((p||[]).sort((a,b)=>a.name.localeCompare(b.name))) } catch(e) {}
+    try {
+      const [c, p] = await Promise.all([
+        fetch('/api/clients').then(r=>r.json()),
+        fetch('/api/projects').then(r=>r.json()),
+      ])
+      setClients(c||[])
+      setProjects(p||[])
+    } catch(e){}
     setLoading(false)
   }
 
-  useEffect(() => {
-    setSimilarWarning(null); setConfirmed(false)
-    if (!name.trim() || projects.length === 0) { setChecking(false); return }
-    clearTimeout(checkTimeout.current)
-    setChecking(true)
-    checkTimeout.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/projects/check', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ newName: name, existingProjects: projects }) })
-        const data = await res.json()
-        if (data.similar) setSimilarWarning(data.message)
-      } catch(e) {}
-      setChecking(false)
-    }, 600)
-    return () => clearTimeout(checkTimeout.current)
-  }, [name])
-
-  async function handleSave() {
-    setSaving(true); setApiError('')
-    try {
-      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-      const res = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', name: name.trim(), description, createdBy: u.name||u.email||'' }) })
-      const data = await res.json()
-      if (data.success) { setShowAdd(false); setName(''); setDescription(''); setSimilarWarning(null); setConfirmed(false); load() }
-      else setApiError(data.error || 'Failed to create project.')
-    } catch(e) { setApiError('Network error.') }
-    setSaving(false)
-  }
-
-  async function saveLead() {
-    setSavingLead(true)
-    await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'update_lead', id: leadModal.id, teamLead: selectedLead }) })
-    setSavingLead(false); setLeadModal(null); load()
-  }
-
-  function handleClick() {
-    if (!name.trim() || saving) return
-    if (similarWarning && !confirmed) { setConfirmed(true); return }
-    handleSave()
-  }
-
-  async function del(e, id) {
-    e.stopPropagation()
-    if (!confirm('Delete this project?')) return
-    await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', id }) })
+  async function addClient() {
+    if (!newClientName.trim()) return
+    setSavingClient(true)
+    const u = JSON.parse(sessionStorage.getItem('xantie_user')||'{}')
+    await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newClientName.trim(),description:newClientDesc,createdBy:u.email})})
+    setNewClientName(''); setNewClientDesc(''); setShowNewClient(false); setSavingClient(false)
     load()
   }
 
-  const btnBg = similarWarning && !confirmed ? '#f59e0b' : '#8DC63F'
-  const btnLabel = saving ? 'Creating...' : (similarWarning && !confirmed) ? 'Create Anyway →' : 'Create Project'
+  async function addProject(clientName) {
+    if (!newProjName.trim() || newProjName.trim()==='N/A') return
+    setSavingProj(true)
+    const u = JSON.parse(sessionStorage.getItem('xantie_user')||'{}')
+    await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newProjName.trim(),clientName,createdBy:u.email})})
+    setNewProjName(''); setAddingProject(null); setSavingProj(false)
+    load()
+  }
+
+  async function deleteClient(name) {
+    await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})})
+    setDeleteConfirm(null); load()
+  }
+
+  async function deleteProject(name, clientName) {
+    if (name === 'N/A') return
+    await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name,clientName})})
+    load()
+  }
+
+  const isAdmin = currentUser.role === 'admin'
 
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'28px'}}>
         <div>
-          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Projects</h1>
-          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{projects.length} project{projects.length!==1?'s':''}</p>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Clients</h1>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Manage clients and their projects</p>
         </div>
-        <button onClick={() => { setShowAdd(true); setName(''); setDescription(''); setSimilarWarning(null); setConfirmed(false); setApiError('') }}
-          style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
-          + New Project
-        </button>
+        {isAdmin && (
+          <button onClick={()=>setShowNewClient(true)}
+            style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+            + New Client
+          </button>
+        )}
       </div>
 
-      {loading && <div style={{color:'#6b7280'}}>Loading...</div>}
-      {!loading && projects.length === 0 && (
-        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center'}}>
-          <div style={{fontSize:'36px',marginBottom:'12px'}}>📁</div>
-          <p style={{color:'#6b7280',margin:0}}>No projects yet. Create your first one!</p>
+      {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
+
+      {!loading && clients.length===0 && (
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'56px',textAlign:'center'}}>
+          <div style={{fontSize:'36px',marginBottom:'12px'}}>🏢</div>
+          <p style={{color:'#6b7280',margin:0}}>No clients yet. Add your first client above.</p>
         </div>
       )}
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'16px'}}>
-        {projects.map(p => (
-          <div key={p.id} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px',cursor:'pointer',transition:'border-color 0.15s'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
-            onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}
-            onClick={() => router.push('/admin/projects/'+encodeURIComponent(p.name))}>
-            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
-              <div style={{fontSize:'15px',fontWeight:600,color:'#fff'}}>{p.name}</div>
-              <button onClick={e=>del(e,p.id)} style={{background:'none',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'18px',padding:'0',lineHeight:1,flexShrink:0}}>×</button>
-            </div>
-            {p.description && <div style={{fontSize:'13px',color:'#6b7280',marginTop:'8px'}}>{p.description}</div>}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'14px'}}>
-              <span style={{fontSize:'12px',color:'#8DC63F',fontWeight:600}}>View hours →</span>
-              {isAdmin && (
-                <button onClick={e=>{e.stopPropagation();setLeadModal(p);setSelectedLead(p.teamLead||'')}}
-                  style={{background:'none',border:'1px solid #252525',borderRadius:'6px',color: p.teamLead?'#60a5fa':'#4b5563',fontSize:'11px',padding:'3px 8px',cursor:'pointer',fontWeight:600}}>
-                  {p.teamLead ? 'Lead: '+users.find(u=>u.email===p.teamLead)?.name || p.teamLead.split('@')[0] : 'Assign Lead'}
-                </button>
+      <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+        {clients.map(client => {
+          const clientProjects = projects.filter(p=>p.clientName===client.name)
+          const isExpanded = expanded[client.name]
+          return (
+            <div key={client.name} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
+              {/* Client header row */}
+              <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'16px 20px',cursor:'pointer'}}
+                onClick={()=>setExpanded(e=>({...e,[client.name]:!e[client.name]}))}>
+                <span style={{color:'#4b5563',fontSize:'12px',transform:isExpanded?'rotate(90deg)':'',transition:'transform 0.15s',display:'inline-block'}}>▶</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:'15px',color:'#fff'}}>{client.name}</div>
+                  {client.description&&<div style={{fontSize:'12px',color:'#6b7280',marginTop:'2px'}}>{client.description}</div>}
+                </div>
+                <span style={{fontSize:'12px',color:'#4b5563',fontWeight:600,background:'#1a1a1a',borderRadius:'6px',padding:'3px 10px'}}>
+                  {clientProjects.length} project{clientProjects.length!==1?'s':''}
+                </span>
+                {isAdmin && (
+                  <button onClick={e=>{e.stopPropagation();setDeleteConfirm(client.name)}}
+                    style={{background:'none',border:'none',color:'#4b5563',fontSize:'16px',cursor:'pointer',padding:'4px 8px',borderRadius:'6px'}}
+                    onMouseEnter={e=>e.currentTarget.style.color='#f87171'}
+                    onMouseLeave={e=>e.currentTarget.style.color='#4b5563'}>✕</button>
+                )}
+              </div>
+
+              {/* Projects list (expanded) */}
+              {isExpanded && (
+                <div style={{borderTop:'1px solid #1e1e1e',background:'#0f0f0f',padding:'12px 20px'}}>
+                  {clientProjects.map(proj => (
+                    <div key={proj.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderRadius:'8px',marginBottom:'4px'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='#1a1a1a'}
+                      onMouseLeave={e=>e.currentTarget.style.background=''}>
+                      <div style={{width:'6px',height:'6px',borderRadius:'50%',background:proj.name==='N/A'?'#3a3a3a':'#8DC63F',flexShrink:0}}/>
+                      <span style={{fontSize:'13px',color:proj.name==='N/A'?'#4b5563':'#d1d5db',flex:1,fontStyle:proj.name==='N/A'?'italic':''}}>{proj.name}</span>
+                      {isAdmin && proj.name !== 'N/A' && (
+                        <button onClick={()=>deleteProject(proj.name, proj.clientName)}
+                          style={{background:'none',border:'none',color:'#3a3a3a',fontSize:'13px',cursor:'pointer',padding:'2px 6px'}}
+                          onMouseEnter={e=>e.currentTarget.style.color='#f87171'}
+                          onMouseLeave={e=>e.currentTarget.style.color='#3a3a3a'}>✕</button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Add project inline */}
+                  {isAdmin && (
+                    addingProject===client.name ? (
+                      <div style={{display:'flex',gap:'8px',padding:'8px 12px',marginTop:'8px'}}>
+                        <input autoFocus value={newProjName} onChange={e=>setNewProjName(e.target.value)}
+                          onKeyDown={e=>{if(e.key==='Enter')addProject(client.name);if(e.key==='Escape'){setAddingProject(null);setNewProjName('')}}}
+                          placeholder="Project name..." style={{...inp,padding:'7px 12px',flex:1}}/>
+                        <button onClick={()=>addProject(client.name)} disabled={savingProj||!newProjName.trim()}
+                          style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>
+                          Add
+                        </button>
+                        <button onClick={()=>{setAddingProject(null);setNewProjName('')}}
+                          style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',fontSize:'13px',cursor:'pointer'}}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={()=>setAddingProject(client.name)}
+                        style={{background:'none',border:'1px dashed #252525',borderRadius:'8px',color:'#4b5563',fontSize:'12px',fontWeight:600,padding:'7px 16px',cursor:'pointer',margin:'8px 12px',transition:'all 0.15s'}}
+                        onMouseEnter={e=>{e.currentTarget.style.borderColor='#8DC63F';e.currentTarget.style.color='#8DC63F'}}
+                        onMouseLeave={e=>{e.currentTarget.style.borderColor='#252525';e.currentTarget.style.color='#4b5563'}}>
+                        + Add Project
+                      </button>
+                    )
+                  )}
+                </div>
               )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* New Project modal */}
-      {showAdd && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
-          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'460px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
-              <h2 style={{margin:0,fontSize:'18px'}}>New Project</h2>
-              <CloseBtn onClick={()=>{setShowAdd(false);setSimilarWarning(null);setConfirmed(false);setApiError('')}}/>
-            </div>
+      {/* New Client Modal */}
+      {showNewClient && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowNewClient(false)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'420px',maxWidth:'90vw'}} onClick={e=>e.stopPropagation()}>
+            <h2 style={{margin:'0 0 24px',fontSize:'18px'}}>New Client</h2>
             <div style={{marginBottom:'16px'}}>
-              <label style={lbl}>Project Name</label>
-              <input type="text" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleClick()} placeholder="e.g. Q2 Data Migration" style={inp} autoFocus/>
-              {checking && <div style={{fontSize:'11px',color:'#6b7280',marginTop:'5px'}}>Checking for similar names...</div>}
+              <label style={lbl}>Client Name *</label>
+              <input autoFocus value={newClientName} onChange={e=>setNewClientName(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&addClient()} placeholder="e.g. Acme Corporation" style={inp}/>
             </div>
-            {similarWarning && !confirmed && (
-              <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'8px',padding:'12px 14px',marginBottom:'16px'}}>
-                <p style={{margin:0,fontSize:'13px',color:'#fbbf24'}}>⚠️ {similarWarning}</p>
-              </div>
-            )}
-            {confirmed && <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px'}}><p style={{margin:0,fontSize:'13px',color:'#8DC63F'}}>✓ Got it — will create as a new project.</p></div>}
             <div style={{marginBottom:'24px'}}>
-              <label style={lbl}>Description <span style={{color:'#4b5563',fontWeight:400,textTransform:'none'}}>(optional)</span></label>
-              <textarea rows={2} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Brief description" style={{...inp,resize:'vertical'}}/>
+              <label style={lbl}>Description</label>
+              <input value={newClientDesc} onChange={e=>setNewClientDesc(e.target.value)} placeholder="Optional" style={inp}/>
             </div>
-            {apiError && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{apiError}</div>}
-            <div style={{display:'flex',gap:'12px'}}>
-              <button onClick={handleClick} disabled={saving||!name.trim()} style={{flex:1,background:btnBg,color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:saving||!name.trim()?'not-allowed':'pointer',opacity:saving||!name.trim()?0.6:1}}>{btnLabel}</button>
-              <button onClick={()=>{setShowAdd(false);setSimilarWarning(null);setConfirmed(false)}} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
+            <div style={{display:'flex',gap:'10px'}}>
+              <button onClick={addClient} disabled={savingClient||!newClientName.trim()}
+                style={{flex:1,background:newClientName.trim()?'#8DC63F':'#2a2a2a',color:newClientName.trim()?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:newClientName.trim()?'pointer':'not-allowed'}}>
+                {savingClient?'Creating...':'Create Client'}
+              </button>
+              <button onClick={()=>setShowNewClient(false)} style={{padding:'12px 20px',background:'#252525',border:'none',borderRadius:'8px',color:'#9ca3af',cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Assign Team Lead modal */}
-      {leadModal && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:'20px'}}>
-          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'100%',maxWidth:'400px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
-              <h2 style={{margin:0,fontSize:'18px'}}>Assign Team Lead</h2>
-              <CloseBtn onClick={()=>setLeadModal(null)}/>
-            </div>
-            <p style={{color:'#6b7280',fontSize:'13px',marginBottom:'20px',marginTop:0}}>Project: <span style={{color:'#fff',fontWeight:600}}>{leadModal.name}</span></p>
-            <div style={{marginBottom:'24px'}}>
-              <label style={lbl}>Team Lead</label>
-              <select value={selectedLead} onChange={e=>setSelectedLead(e.target.value)} style={sel}>
-                <option value="">— No team lead —</option>
-                {users.map(u=><option key={u.id} value={u.email}>{u.name} ({u.email})</option>)}
-              </select>
-            </div>
-            <div style={{display:'flex',gap:'12px'}}>
-              <button onClick={saveLead} disabled={savingLead} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
-                {savingLead?'Saving...':'Save'}
-              </button>
-              <button onClick={()=>setLeadModal(null)} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
+      {/* Delete confirm */}
+      {deleteConfirm && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setDeleteConfirm(null)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px',width:'380px',maxWidth:'90vw'}} onClick={e=>e.stopPropagation()}>
+            <h2 style={{margin:'0 0 12px',fontSize:'18px'}}>Delete Client?</h2>
+            <p style={{color:'#9ca3af',margin:'0 0 24px',fontSize:'14px'}}>Delete <strong style={{color:'#fff'}}>{deleteConfirm}</strong> and all its projects? Time entries referencing this client will be unaffected.</p>
+            <div style={{display:'flex',gap:'10px'}}>
+              <button onClick={()=>deleteClient(deleteConfirm)} style={{flex:1,background:'#f87171',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>Delete</button>
+              <button onClick={()=>setDeleteConfirm(null)} style={{padding:'12px 20px',background:'#252525',border:'none',borderRadius:'8px',color:'#9ca3af',cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         </div>
