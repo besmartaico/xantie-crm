@@ -81,9 +81,33 @@ const COLS = [
   { key:'hours', label:'Hours' }, { key:'billable', label:'Billable' }, { key:'description', label:'Description' },
 ]
 
-function newDay() {
-  return { date: new Date().toISOString().split('T')[0], hours: '', billable: 'yes', id: Math.random() }
+function newDay(dateStr) {
+  return { date: dateStr || new Date().toISOString().split('T')[0], hours: '', billable: 'yes', id: Math.random() }
 }
+
+function getMondayOf(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00')
+  const day = d.getDay() // 0=Sun,1=Mon,...6=Sat
+  const diff = day === 0 ? -6 : 1 - day // adjust to Monday
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().split('T')[0]
+}
+
+function getWeekDays(mondayStr) {
+  const base = new Date(mondayStr + 'T12:00:00')
+  return Array.from({length:7},(_,i) => {
+    const d = new Date(base); d.setDate(d.getDate()+i)
+    return d.toISOString().split('T')[0]
+  })
+}
+
+function addWeeks(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + n*7)
+  return d.toISOString().split('T')[0]
+}
+
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
 export default function TimeEntries() {
   const [entries, setEntries] = useState([])
@@ -95,7 +119,11 @@ export default function TimeEntries() {
   // Shared fields for multi-entry
   const [project, setProject] = useState('')
   const [description, setDescription] = useState('')
-  const [days, setDays] = useState([newDay()])
+  const [days, setDays] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const monday = getMondayOf(today)
+    return getWeekDays(monday).map(date => newDay(date))
+  })
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -173,12 +201,30 @@ export default function TimeEntries() {
     setDays(prev => prev.map(d => d.id===id ? {...d,[field]:value} : d))
   }
 
+  function addPrevWeek() {
+    // Find earliest date in current days, go back 7 days to previous Monday
+    const dates = days.map(d=>d.date).filter(Boolean).sort()
+    const earliest = dates[0] || new Date().toISOString().split('T')[0]
+    const currentMonday = getMondayOf(earliest)
+    const prevMonday = addWeeks(currentMonday, -1)
+    const weekDays = getWeekDays(prevMonday)
+    const lastDay = days[days.length-1]
+    const newDays = weekDays.map(date => ({ ...newDay(date), billable: lastDay?.billable||'yes' }))
+    setDays(prev => [...newDays, ...prev])
+  }
+  
+  function handleWeekdayChange(newMonday) {
+    // When user changes the anchor weekday, regenerate all week days
+    const weekDays = getWeekDays(newMonday)
+    const billable = days[0]?.billable || 'yes'
+    setDays(weekDays.map(date => ({ date, hours: '', billable, id: Math.random() })))
+  }
+  
   function addDay() {
     const last = days[days.length-1]
-    // Default next day to day after last
     let nextDate = new Date().toISOString().split('T')[0]
     if (last?.date) {
-      const d = new Date(last.date); d.setDate(d.getDate()+1)
+      const d = new Date(last.date + 'T12:00:00'); d.setDate(d.getDate()+1)
       nextDate = d.toISOString().split('T')[0]
     }
     setDays(prev => [...prev, { ...newDay(), date: nextDate, billable: last?.billable||'yes' }])
@@ -234,7 +280,7 @@ export default function TimeEntries() {
     setEditEntry(null); setSaveError('')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     setProject(getLastProject(u)); setDescription('')
-    setDays([newDay()])
+    const today = new Date().toISOString().split('T')[0]; const monday = getMondayOf(today); setDays(getWeekDays(monday).map(date => newDay(date)))
     setShowAdd(true); setShowNewProject(false)
   }
 
@@ -488,9 +534,9 @@ export default function TimeEntries() {
               ))}
 
               {!editEntry && (
-                <button onClick={addDay}
+                <button onClick={addPrevWeek}
                   style={{width:'100%',background:'#1a1a1a',border:'1px dashed #2a2a2a',borderRadius:'8px',color:'#6b7280',padding:'8px',fontSize:'13px',cursor:'pointer',marginTop:'4px'}}>
-                  + Add another day
+                  + Add previous week
                 </button>
               )}
             </div>
