@@ -172,7 +172,7 @@ export default function TimeEntries() {
   }
 
   async function loadProjects() {
-    try { setProjects(await (await fetch('/api/projects')).json()) } catch(e) {}
+    try { const rawClients = await (await fetch('/api/clients')).json(); setProjects((rawClients||[]).sort((a,b)=>a.name.localeCompare(b.name))); const rawSubs = await (await fetch('/api/projects')).json(); setSubProjects(rawSubs||[]) } catch(e) {}
   }
 
   function getLastProject(user) {
