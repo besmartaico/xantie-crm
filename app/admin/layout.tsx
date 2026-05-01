@@ -71,8 +71,9 @@ export default function AdminLayout({ children }) {
     ...(user.role==='admin' ? [
       { label: 'Users', href: '/admin/users' },
       { label: 'Import', href: '/admin/import' },
-    { label: 'Time Off', href: '/admin/time-off' },
     ] : []),
+    { label: 'Time Off', href: '/admin/time-off' },
+    { label: 'Feedback', href: '/admin/feedback' },
   ]
 
   const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
