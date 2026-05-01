@@ -58,6 +58,7 @@ export default function AdminLayout({ children }) {
   const publicLinks = [
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
+    { label: 'Boards', href: '/admin/boards' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
   ]
