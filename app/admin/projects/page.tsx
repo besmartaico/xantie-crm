@@ -45,7 +45,7 @@ export default function ProjectsPage() {
 
   async function load() {
     setLoading(true)
-    try { setProjects(await (await fetch('/api/projects')).json()) } catch(e) {}
+    try { const p = await (await fetch('/api/projects')).json(); setProjects((p||[]).sort((a,b)=>a.name.localeCompare(b.name))) } catch(e) {}
     setLoading(false)
   }
 
