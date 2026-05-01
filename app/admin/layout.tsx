@@ -18,25 +18,18 @@ export default function AdminLayout({ children }) {
   const router = useRouter()
   const path = usePathname()
   const [auth, setAuth] = useState(false)
-  const [user, setUser] = useState({name:'',role:''})
+  const [user, setUser] = useState({ name:'', role:'', email:'' })
   const [menuOpen, setMenuOpen] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
   const [realAdmin, setRealAdmin] = useState(null)
 
   useEffect(() => {
-    const a = sessionStorage.getItem('xantie_auth')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     const backup = sessionStorage.getItem('xantie_admin_backup')
-    if (!a) { router.push('/login'); return }
-    if ((path==='/admin/import'||path==='/admin/users') && u.role!=='admin' && !backup) { router.push('/admin'); return }
+    if (!u.role) { router.push('/login'); return }
     setAuth(true); setUser(u)
-    if (backup) {
-      setImpersonating(true)
-      setRealAdmin(JSON.parse(backup))
-    } else {
-      setImpersonating(false)
-      setRealAdmin(null)
-    }
+    if (backup) { setImpersonating(true); setRealAdmin(JSON.parse(backup)) }
+    else { setImpersonating(false); setRealAdmin(null) }
   }, [path])
 
   function signOut() {
@@ -50,63 +43,95 @@ export default function AdminLayout({ children }) {
   function stopImpersonating() {
     const backup = sessionStorage.getItem('xantie_admin_backup')
     const authBackup = sessionStorage.getItem('xantie_admin_auth_backup')
-    if (backup) sessionStorage.setItem('xantie_user', backup)
-    if (authBackup) sessionStorage.setItem('xantie_auth', authBackup)
-    sessionStorage.removeItem('xantie_admin_backup')
-    sessionStorage.removeItem('xantie_admin_auth_backup')
+    if (backup) {
+      sessionStorage.setItem('xantie_user', backup)
+      sessionStorage.setItem('xantie_auth', authBackup || 'admin')
+      sessionStorage.removeItem('xantie_admin_backup')
+      sessionStorage.removeItem('xantie_admin_auth_backup')
+    }
     router.push('/admin/users')
   }
 
-  if (!auth) return null
-  const isAdmin = user.role === 'admin' || impersonating
+  const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
 
-  const NAV = impersonating ? [
-    { label: 'Dashboard', href: '/admin/dashboard' },
-    { label: 'Time Entries', href: '/admin' },
-    { label: 'Projects', href: '/admin/projects' },
-  ] : [
+  // All users see these
+  const publicLinks = [
     { label: 'Dashboard', href: '/admin/dashboard' },
     { label: 'Time Entries', href: '/admin' },
     { label: 'Projects', href: '/admin/projects' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
-    ...(user.role==='admin' ? [
-      { label: 'Users', href: '/admin/users' },
-      { label: 'Import', href: '/admin/import' },
-    ] : []),
   ]
 
-  const isActive = (href) => href === '/admin' ? path === '/admin' : path.startsWith(href)
+  // Admin-only links (shown with a divider)
+  const adminLinks = user.role === 'admin' ? [
+    { label: 'Users', href: '/admin/users' },
+    { label: 'Import', href: '/admin/import' },
+  ] : []
+
+  const navLinkStyle = (href) => ({
+    display: 'block',
+    padding: '9px 16px',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    fontSize: '14px',
+    fontWeight: isActive(href) ? 700 : 400,
+    background: isActive(href) ? 'rgba(141,198,63,0.1)' : 'transparent',
+    color: isActive(href) ? '#8DC63F' : '#9ca3af',
+    marginBottom: '2px',
+    cursor: 'pointer',
+    border: 'none',
+    width: '100%',
+    textAlign: 'left',
+    transition: 'all 0.15s',
+  })
 
   const sidebar = (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',padding:'24px 0'}}>
-      <div style={{padding:'0 20px 24px',borderBottom:'1px solid #252525'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-          <XLogo size={32}/>
-          <div>
-            <div style={{fontSize:'17px',fontWeight:800,color:'#fff',letterSpacing:'-0.3px'}}>Xantie</div>
-            <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase'}}>CRM</div>
-          </div>
+    <div style={{display:'flex',flexDirection:'column',height:'100%',padding:'20px 12px'}}>
+      {/* Logo */}
+      <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'4px 6px',marginBottom:'28px'}}>
+        <XLogo size={32}/>
+        <div>
+          <div style={{fontSize:'18px',fontWeight:800,color:'#fff',lineHeight:1}}>Xantie</div>
+          <div style={{fontSize:'9px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase'}}>CRM</div>
         </div>
       </div>
-      <nav style={{flex:1,padding:'16px 12px'}}>
-        {NAV.map(n=>(
-          <a key={n.href} href={n.href} style={{
-            display:'block',padding:'10px 12px',borderRadius:'8px',marginBottom:'4px',
-            fontSize:'14px',fontWeight:500,cursor:'pointer',
-            background: isActive(n.href)?'rgba(141,198,63,0.1)':'transparent',
-            color: isActive(n.href)?'#8DC63F':'#9ca3af',
-            borderLeft: isActive(n.href)?'2px solid #8DC63F':'2px solid transparent',
-          }}>{n.label}</a>
+
+      {/* Public nav links */}
+      <nav style={{flex:1}}>
+        {publicLinks.map(link => (
+          <button key={link.href} onClick={()=>router.push(link.href)} style={navLinkStyle(link.href)}>
+            {link.label}
+          </button>
         ))}
+
+        {/* Admin divider + admin links */}
+        {adminLinks.length > 0 && (
+          <>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'16px 6px 10px'}}>
+              <div style={{flex:1,height:'1px',background:'#252525'}}/>
+              <span style={{fontSize:'10px',color:'#3a3a3a',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap'}}>Admin</span>
+              <div style={{flex:1,height:'1px',background:'#252525'}}/>
+            </div>
+            {adminLinks.map(link => (
+              <button key={link.href} onClick={()=>router.push(link.href)} style={navLinkStyle(link.href)}>
+                {link.label}
+              </button>
+            ))}
+          </>
+        )}
       </nav>
-      <div style={{padding:'16px 20px',borderTop:'1px solid #252525'}}>
-        {user.name && <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>}
-        {!impersonating && user.role==='admin' && <div style={{fontSize:'10px',color:'#8DC63F',fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'8px'}}>Admin</div>}
-        {!impersonating && <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:0}}>Sign Out</button>}
+
+      {/* User info + sign out */}
+      <div style={{borderTop:'1px solid #1e1e1e',paddingTop:'14px',marginTop:'8px'}}>
+        <div style={{fontSize:'13px',color:'#fff',fontWeight:500,marginBottom:'2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name}</div>
+        <div style={{fontSize:'11px',color:'#4b5563',marginBottom:'10px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</div>
+        <button onClick={signOut} style={{background:'none',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer',padding:0}}>Sign out</button>
       </div>
     </div>
   )
+
+  if (!auth) return null
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:'#0a0a0a'}}>
@@ -127,7 +152,6 @@ export default function AdminLayout({ children }) {
       )}
 
       <div className="desktop-only" style={{marginLeft:'220px',flex:1,display:'flex',flexDirection:'column'}}>
-        {/* Impersonation banner */}
         {impersonating && (
           <div style={{background:'rgba(251,191,36,0.1)',borderBottom:'1px solid rgba(251,191,36,0.3)',padding:'10px 32px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <span style={{fontSize:'13px',color:'#fbbf24'}}>
