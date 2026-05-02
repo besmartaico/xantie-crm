@@ -2,6 +2,12 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 
+// Format number with commas and optional decimals
+function fmt(n, decimals=1) {
+  const num = parseFloat(n) || 0
+  return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
 const DATE_OPTIONS = [
   { value:'', label:'All Time' },
   { value:'this_month', label:'This Month' },
@@ -166,7 +172,7 @@ function MonthLineChart({ byMonth, filtered, granularity }) {
           {grids.map((g,i)=>(
             <g key={i}>
               <line x1={padL} y1={g.y} x2={W-padR} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
-              <text x={padL-6} y={g.y+4} textAnchor="end" fontSize="9" fill="#4b5563">{g.val>0?g.val.toFixed(0):''}</text>
+              <text x={padL-6} y={g.y+4} textAnchor="end" fontSize="9" fill="#4b5563">{g.val>0?fmt(g.val, 0):''}</text>
             </g>
           ))}
           {allProjects.map(proj => {
@@ -184,7 +190,7 @@ function MonthLineChart({ byMonth, filtered, granularity }) {
           {stackedData.map((d,i)=>(
             <g key={i}>
               <circle cx={xPos(i)} cy={yPos(d.total)} r="3" fill="#fff" stroke="#141414" strokeWidth="1.5"/>
-              <text x={xPos(i)} y={yPos(d.total)-8} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="700">{d.total.toFixed(1)}</text>
+              <text x={xPos(i)} y={yPos(d.total)-8} textAnchor="middle" fontSize="9" fill="#fff" fontWeight="700">{fmt(d.total, 1)}</text>
               <text x={xPos(i)} y={H-8} textAnchor="middle" fontSize="9" fill="#6b7280">{monthLabel(d.mo)}</text>
             </g>
           ))}
@@ -194,7 +200,7 @@ function MonthLineChart({ byMonth, filtered, granularity }) {
               <rect x={tooltip.x-50} y={tooltip.y-28} width="100" height="26" rx="5"
                 fill="#1a1a1a" stroke="#2a2a2a" strokeWidth="1"/>
               <text x={tooltip.x} y={tooltip.y-16} textAnchor="middle" fontSize="9" fill="#8DC63F" fontWeight="700">{tooltip.proj}</text>
-              <text x={tooltip.x} y={tooltip.y-7} textAnchor="middle" fontSize="8" fill="#9ca3af">{tooltip.hours.toFixed(1)}h · {tooltip.month}</text>
+              <text x={tooltip.x} y={tooltip.y-7} textAnchor="middle" fontSize="8" fill="#9ca3af">{fmt(tooltip.hours, 1)}h · {tooltip.month}</text>
             </g>
           )}
         </svg>
@@ -340,10 +346,10 @@ export default function Dashboard() {
   const activeProjects30 = new Set(recentEntries.map(e=>e.project).filter(Boolean)).size
 
   const kpis = [
-    { label:'Total Hours', value: loading?'…':totalHours.toFixed(1), color:'#8DC63F' },
-    { label:'Billable', value: loading?'…':billableHours.toFixed(1), color:'#60a5fa' },
-    { label:'Non-Billable', value: loading?'…':nonBillableHours.toFixed(1), color:'#9ca3af' },
-    { label:'Avg Hrs / Day', value: loading?'…':avgPerDay.toFixed(1) },
+    { label:'Total Hours', value: loading?'…':fmt(totalHours, 1), color:'#8DC63F' },
+    { label:'Billable', value: loading?'…':fmt(billableHours, 1), color:'#60a5fa' },
+    { label:'Non-Billable', value: loading?'…':fmt(nonBillableHours, 1), color:'#9ca3af' },
+    { label:'Avg Hrs / Day', value: loading?'…':fmt(avgPerDay, 1) },
     ...(isAdmin||isTeamLead ? [
       { label:'Active Employees', value: loading?'…':activeEmployees30, color:'#a78bfa' },
       { label:'Active Projects', value: loading?'…':activeProjects30, color:'#f59e0b' },
@@ -498,25 +504,25 @@ export default function Dashboard() {
                           <span style={{fontSize:'11px',color:'#4b5563'}}>{data.entries.length} entr{data.entries.length===1?'y':'ies'}</span>
                         </div>
                       </td>
-                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#8DC63F',fontWeight:700}}>{data.total.toFixed(2)}h</span></td>
-                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#60a5fa',fontSize:'13px'}}>{data.billable.toFixed(2)}h</span></td>
-                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#9ca3af',fontSize:'13px'}}>{(data.total-data.billable).toFixed(2)}h</span></td>
+                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#8DC63F',fontWeight:700}}>{fmt(data.total, 2)}h</span></td>
+                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#60a5fa',fontSize:'13px'}}>{fmt(data.billable, 2)}h</span></td>
+                      <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#9ca3af',fontSize:'13px'}}>{fmt(data.total-data.billable, 2)}h</span></td>
                       <td style={{padding:'12px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'8px'}}>
                           <div style={{width:'60px',background:'#252525',borderRadius:'3px',height:'4px'}}>
                             <div style={{background:'#8DC63F',borderRadius:'3px',height:'4px',width:pct+'%'}}/>
                           </div>
-                          <span style={{fontSize:'12px',color:'#6b7280',minWidth:'36px',textAlign:'right'}}>{pct.toFixed(1)}%</span>
+                          <span style={{fontSize:'12px',color:'#6b7280',minWidth:'36px',textAlign:'right'}}>{fmt(pct, 1)}%</span>
                         </div>
                       </td>
                     </tr>
                     {isExp&&empBreakdown.map(([emp,d])=>(
                       <tr key={proj+emp} style={{background:'#111111'}}>
                         <td style={{padding:'9px 20px 9px 48px',borderBottom:'1px solid #1a1a1a'}}><span style={{fontSize:'13px',color:'#9ca3af'}}>{emp}</span></td>
-                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#6b7280',fontSize:'13px'}}>{d.total.toFixed(2)}h</span></td>
-                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#4b5563',fontSize:'12px'}}>{d.billable.toFixed(2)}h</span></td>
-                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#4b5563',fontSize:'12px'}}>{(d.total-d.billable).toFixed(2)}h</span></td>
-                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{fontSize:'11px',color:'#4b5563'}}>{data.total>0?(d.total/data.total*100).toFixed(1):0}%</span></td>
+                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#6b7280',fontSize:'13px'}}>{fmt(d.total, 2)}h</span></td>
+                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#4b5563',fontSize:'12px'}}>{fmt(d.billable, 2)}h</span></td>
+                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{color:'#4b5563',fontSize:'12px'}}>{fmt(d.total-d.billable, 2)}h</span></td>
+                        <td style={{padding:'9px 16px',textAlign:'right',borderBottom:'1px solid #1a1a1a'}}><span style={{fontSize:'11px',color:'#4b5563'}}>{data.total>0?fmt(d.total/data.total*100, 1):0}%</span></td>
                       </tr>
                     ))}
                   </React.Fragment>
@@ -524,9 +530,9 @@ export default function Dashboard() {
               })}
               <tr style={{background:'#1a1a1a',borderTop:'2px solid #2a2a2a'}}>
                 <td style={{padding:'14px 20px'}}><span style={{fontWeight:700,color:'#fff',fontSize:'14px'}}>Total</span></td>
-                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#8DC63F',fontWeight:800,fontSize:'15px'}}>{totalHours.toFixed(2)}h</span></td>
-                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#60a5fa',fontWeight:700}}>{billableHours.toFixed(2)}h</span></td>
-                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#9ca3af',fontWeight:700}}>{nonBillableHours.toFixed(2)}h</span></td>
+                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#8DC63F',fontWeight:800,fontSize:'15px'}}>{fmt(totalHours, 2)}h</span></td>
+                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#60a5fa',fontWeight:700}}>{fmt(billableHours, 2)}h</span></td>
+                <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#9ca3af',fontWeight:700}}>{fmt(nonBillableHours, 2)}h</span></td>
                 <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#6b7280',fontSize:'13px'}}>100%</span></td>
               </tr>
             </tbody>
@@ -542,7 +548,7 @@ export default function Dashboard() {
             <div key={emp} style={{marginBottom:'14px'}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
                 <span style={{fontSize:'13px',color:'#d1d5db'}}>{emp}</span>
-                <span style={{fontSize:'13px',color:'#8DC63F',fontWeight:700}}>{hrs.toFixed(1)}h</span>
+                <span style={{fontSize:'13px',color:'#8DC63F',fontWeight:700}}>{fmt(hrs, 1)}h</span>
               </div>
               <div style={{background:'#252525',borderRadius:'4px',height:'5px'}}>
                 <div style={{background:'#8DC63F',borderRadius:'4px',height:'5px',width:((hrs/maxE)*100)+'%'}}/>

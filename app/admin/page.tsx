@@ -3,6 +3,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useGlobalStyles } from 'react'
 
+// Format number with commas and optional decimals
+function fmt(n, decimals=1) {
+  const num = parseFloat(n) || 0
+  return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
 const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.07em' }
 const sel = { background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'8px 12px', color:'#fff', fontSize:'13px', cursor:'pointer', outline:'none' }
@@ -350,8 +356,8 @@ export default function TimeEntries() {
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Time Entries</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
-            {filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{totalHours.toFixed(2)} hrs</span>
-            {!billableFilter && <span> · <span style={{color:'#60a5fa'}}>{billableHours.toFixed(2)} billable</span></span>}
+            {filtered.length} entries · <span style={{color:'#8DC63F',fontWeight:600}}>{fmt(totalHours, 2)} hrs</span>
+            {!billableFilter && <span> · <span style={{color:'#60a5fa'}}>{fmt(billableHours, 2)} billable</span></span>}
           </p>
         </div>
         <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ Add Entry</button>
@@ -518,7 +524,7 @@ export default function TimeEntries() {
                 <label style={{...lbl,margin:0}}>Days & Hours</label>
                 {!editEntry && (
                   <span style={{fontSize:'12px',color:'#6b7280'}}>
-                    Total: <span style={{color:'#8DC63F',fontWeight:700}}>{totalDayHours.toFixed(2)} hrs</span>
+                    Total: <span style={{color:'#8DC63F',fontWeight:700}}>{fmt(totalDayHours, 2)} hrs</span>
                   </span>
                 )}
               </div>
