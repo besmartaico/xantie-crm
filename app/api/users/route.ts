@@ -39,6 +39,19 @@ export async function POST(req) {
     const { action } = body
     const sheets = getSheets()
 
+    if (action === 'migrate_viewers') {
+      const rows = await getRows(sheets)
+      let count = 0
+      const updated = rows.map(r => {
+        if (r[3] === 'viewer') { count++; return [r[0],r[1],r[2],'editor',r[4]||'active'] }
+        return r
+      })
+      await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: RANGE })
+      if (updated.length) await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(), range: "'Users'!A2", valueInputOption: 'RAW', requestBody: { values: updated }
+      })
+      return NextResponse.json({ success: true, upgraded: count })
+    }
     if (action === 'update_role') {
       const { id, role } = body
       await sheets.spreadsheets.values.update({

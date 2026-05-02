@@ -287,19 +287,20 @@ export default function Dashboard() {
   const inactiveEmails = new Set(allUsers.filter(u=>u.status==='inactive').map(u=>u.email))
   const hasInactiveData = entries.some(e=>inactiveEmails.has(e.email))
   const isAdmin = currentUser.role==='admin'
+  const isViewer = currentUser.role==='viewer'
   const ledProjects = projects.filter(p=>p.teamLead===currentUser.email).map(p=>p.name)
   const isTeamLead = ledProjects.length>0
 
   function getAccessibleEntries() {
     let base = entries
     if (!includeInactive) base = base.filter(e=>!inactiveEmails.has(e.email))
-    if (isAdmin) return base
+    if (isAdmin || isViewer) return base
     if (isTeamLead) return base.filter(e=>e.email===currentUser.email||ledProjects.includes(e.project))
     return base.filter(e=>e.email===currentUser.email)
   }
 
   const accessibleEntries = getAccessibleEntries()
-  const employees = (isAdmin||isTeamLead) ? [...new Set(accessibleEntries.map(e=>e.name).filter(Boolean))].sort() : []
+  const employees = (isAdmin||isViewer||isTeamLead) ? [...new Set(accessibleEntries.map(e=>e.name).filter(Boolean))].sort() : []
 
   function applyFilters(data) {
     let out = data
@@ -402,7 +403,7 @@ export default function Dashboard() {
           <div>
             <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
             <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
-          {isAdmin?'All team data':isTeamLead?'Your hours + projects you lead':'Your hours'}
+          {isAdmin?'All team data':isViewer?'Read-only · All team data':isTeamLead?'Your hours + projects you lead':'Your hours'}
         </p>
           </div>
           <button onClick={exportCSV} disabled={loading||filtered.length===0}
@@ -541,7 +542,7 @@ export default function Dashboard() {
       </div>
 
       {/* Hours by Employee */}
-      {(isAdmin||isTeamLead)&&byEmployee.length>0&&(
+      {(isAdmin||isViewer||isTeamLead)&&byEmployee.length>0&&(
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px',marginBottom:'20px'}}>
           <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Employee</h3>
           {byEmployee.map(([emp,hrs])=>(

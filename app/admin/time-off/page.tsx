@@ -29,7 +29,7 @@ export default function TimeOffPage() {
   const [currentUser, setCurrentUser] = useState({})
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('request') // 'request' | 'history' | 'all' (admin)
+  const [tab, setTab] = useState(currentUser.role==='viewer' ? 'all' : 'request') // 'request' | 'history' | 'all' (admin)
 
   // Form
   const [startDate, setStartDate] = useState('')
@@ -87,6 +87,7 @@ export default function TimeOffPage() {
   }
 
   const isAdmin = currentUser.role === 'admin'
+  const isViewer = currentUser.role === 'viewer'
   const myRequests = requests.filter(r => r.email === currentUser.email)
   const allRequests = [...requests].sort((a,b) => b.submittedAt.localeCompare(a.submittedAt))
   const days = dayCount(startDate, endDate)
@@ -104,12 +105,12 @@ export default function TimeOffPage() {
       {/* Tab switcher */}
       <div style={{display:'flex',gap:'0',marginBottom:'24px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'fit-content',border:'1px solid #1e1e1e'}}>
         <button onClick={()=>setTab('request')} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='request'?'#8DC63F':'transparent',color:tab==='request'?'#0a0a0a':'#6b7280'}}>
-          Request Time Off
+          {!isViewer && 'Request Time Off'}{isViewer && 'Time Off Requests'}
         </button>
         <button onClick={()=>{setTab('history');setSubmitted(false)}} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='history'?'#8DC63F':'transparent',color:tab==='history'?'#0a0a0a':'#6b7280'}}>
           My Requests {myRequests.length>0&&<span style={{marginLeft:'4px',background:'rgba(0,0,0,0.2)',borderRadius:'8px',padding:'1px 6px',fontSize:'11px'}}>{myRequests.length}</span>}
         </button>
-        {isAdmin && (
+        {(isAdmin || isViewer) && (
           <button onClick={()=>setTab('all')} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='all'?'#8DC63F':'transparent',color:tab==='all'?'#0a0a0a':'#6b7280'}}>
             All Requests {allRequests.filter(r=>r.status==='pending').length>0&&<span style={{marginLeft:'4px',background:'rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'8px',padding:'1px 6px',fontSize:'11px'}}>{allRequests.filter(r=>r.status==='pending').length}</span>}
           </button>
@@ -117,7 +118,7 @@ export default function TimeOffPage() {
       </div>
 
       {/* ===== REQUEST FORM ===== */}
-      {tab === 'request' && (
+      {tab === 'request' && !isViewer && (
         <div style={{maxWidth:'520px'}}>
           {submitted ? (
             <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'16px',padding:'40px',textAlign:'center'}}>
