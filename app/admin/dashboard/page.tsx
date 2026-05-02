@@ -305,6 +305,28 @@ export default function Dashboard() {
   }
 
   const filtered = applyFilters(accessibleEntries)
+  function exportCSV() {
+    const headers = ['Name','Email','Date','Hours','Description','Client','Project','Billable']
+    const rows = filtered.map(e => [
+      e.name, e.email, e.date, e.hours, e.description,
+      e.project, e.subProject||'N/A', e.billable==='no'?'Non-Billable':'Billable'
+    ])
+    const csv = [headers, ...rows]
+      .map(row => row.map(val => '"'+(String(val||'').replace(/"/g,'""'))+'"').join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type:'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    // Build filename from active filters
+    const parts = ['xantie-timesheet']
+    if (dateFilter) parts.push(dateFilter.replace(/_/g,'-'))
+    if (employeeFilter) parts.push(employeeFilter.replace(/\s+/g,'-').toLowerCase())
+    a.download = parts.join('_') + '.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const nonBillableHours = totalHours - billableHours
@@ -370,12 +392,18 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div style={{marginBottom:'24px'}}>
-        <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
-        <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
+      <div style={{marginBottom:'24px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+          <div>
+            <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
+            <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
           {isAdmin?'All team data':isTeamLead?'Your hours + projects you lead':'Your hours'}
         </p>
-      </div>
+          </div>
+          <button onClick={exportCSV} disabled={loading||filtered.length===0}
+            style={{background:filtered.length===0?'#1e1e1e':'#1e1e1e',border:'1px solid '+(filtered.length===0?'#252525':'#8DC63F'),color:filtered.length===0?'#3a3a3a':'#8DC63F',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:filtered.length===0?'not-allowed':'pointer',display:'flex',alignItems:'center',gap:'6px',flexShrink:0,transition:'all 0.15s'}}>
+            ↓ Export CSV {filtered.length>0&&<span style={{fontSize:'11px',color:'inherit',opacity:0.7}}>({filtered.length} rows)</span>}
+          </button>
+        </div>
 
       {/* Filters */}
       <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginBottom:'28px',alignItems:'center'}}>
