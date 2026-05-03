@@ -111,7 +111,7 @@ export default function FeedbackPage() {
       <div style={{display:'flex',gap:'0',marginBottom:'24px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'fit-content',border:'1px solid #1e1e1e'}}>
         <button onClick={()=>{setTab('submit');setSubmitted(false)}} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='submit'?'#8DC63F':'transparent',color:tab==='submit'?'#0a0a0a':'#6b7280'}}>
           Submit
-        </button>
+        </button>}{ !isViewer && <span/>
         <button onClick={()=>setTab('list')} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='list'?'#8DC63F':'transparent',color:tab==='list'?'#0a0a0a':'#6b7280'}}>
           {isViewer ? 'All Submissions' : 'All Items'}
           {items.filter(i=>i.status==='open').length>0&&<span style={{marginLeft:'6px',background:'rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'8px',padding:'1px 6px',fontSize:'11px'}}>{items.filter(i=>i.status==='open').length}</span>}
