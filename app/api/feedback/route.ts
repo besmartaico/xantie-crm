@@ -57,6 +57,17 @@ export async function POST(req) {
     const sheets = getSheets()
     await ensureSheet(sheets)
 
+        if (body.action === 'update') {
+      const { id, title, description, priority, type } = body
+      const range = `'Feedback'!A${id}:H${id}`
+      const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range })
+      const r = (cur.data.values||[[]])[0] || []
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(), range, valueInputOption: 'RAW',
+        requestBody: { values: [[type??r[0], title??r[1], description??r[2], priority??r[3], r[4]||'', r[5]||'', r[6]||'open', r[7]||'']] }
+      })
+      return NextResponse.json({ success: true })
+    }
     if (body.action === 'update_status') {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(), range: `'Feedback'!G${body.id}`,

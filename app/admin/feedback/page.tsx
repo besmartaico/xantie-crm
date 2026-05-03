@@ -2,265 +2,353 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-const inp = { width:'100%', background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'14px', outline:'none', boxSizing:'border-box' }
+const inp = { width:'100%', background:'#111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'14px', outline:'none', boxSizing:'border-box' }
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'6px', textTransform:'uppercase', letterSpacing:'0.07em' }
-const selSty = { background:'#111111', border:'1px solid #252525', borderRadius:'8px', padding:'10px 13px', color:'#fff', fontSize:'14px', cursor:'pointer', outline:'none', width:'100%' }
 
-function TypeBadge({ type }) {
-  return type === 'bug'
-    ? <span style={{background:'rgba(248,113,113,0.1)',color:'#f87171',padding:'2px 9px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>🐛 Bug</span>
-    : <span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 9px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>✨ Feature</span>
-}
-
-function PriorityBadge({ priority }) {
-  const map = {
-    low: { color:'#6b7280', bg:'rgba(107,114,128,0.1)', label:'Low' },
-    medium: { color:'#f59e0b', bg:'rgba(245,158,11,0.1)', label:'Medium' },
-    high: { color:'#f87171', bg:'rgba(248,113,113,0.1)', label:'High' },
-  }
-  const s = map[priority] || map.medium
-  return <span style={{background:s.bg,color:s.color,padding:'2px 9px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{s.label}</span>
-}
+const PRIORITIES = [
+  { value:'low', label:'Low', color:'#6b7280' },
+  { value:'medium', label:'Medium', color:'#f59e0b' },
+  { value:'high', label:'High', color:'#f87171' },
+]
+const STATUSES = [
+  { value:'open', label:'Open', color:'#60a5fa', bg:'rgba(96,165,250,0.12)' },
+  { value:'in-progress', label:'In Progress', color:'#f59e0b', bg:'rgba(245,158,11,0.12)' },
+  { value:'done', label:'Done', color:'#34d399', bg:'rgba(52,211,153,0.12)' },
+  { value:'closed', label:'Closed', color:'#6b7280', bg:'rgba(107,114,128,0.12)' },
+]
 
 function StatusBadge({ status }) {
-  const map = {
-    open: { color:'#f59e0b', bg:'rgba(245,158,11,0.1)', label:'Open' },
-    'in-progress': { color:'#60a5fa', bg:'rgba(96,165,250,0.1)', label:'In Progress' },
-    done: { color:'#8DC63F', bg:'rgba(141,198,63,0.1)', label:'Done' },
-    closed: { color:'#6b7280', bg:'rgba(107,114,128,0.1)', label:'Closed' },
-  }
-  const s = map[status] || map.open
-  return <span style={{background:s.bg,color:s.color,padding:'2px 9px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{s.label}</span>
+  const s = STATUSES.find(x=>x.value===status) || STATUSES[0]
+  return <span style={{background:s.bg, color:s.color, fontSize:'11px', fontWeight:700, padding:'3px 8px', borderRadius:'5px'}}>{s.label}</span>
+}
+function PriorityBadge({ priority }) {
+  const p = PRIORITIES.find(x=>x.value===priority) || PRIORITIES[1]
+  return <span style={{color:p.color, fontSize:'11px', fontWeight:700}}>{p.label}</span>
+}
+
+function fmtDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
 }
 
 export default function FeedbackPage() {
-  const [currentUser, setCurrentUser] = useState({})
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('submit')
-  const [typeFilter, setTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [currentUser, setCurrentUser] = useState({})
 
-  // Form
+  // Submit form
   const [type, setType] = useState('bug')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('medium')
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState('')
-  const [updating, setUpdating] = useState(null)
+
+  // Detail modal
+  const [activeItem, setActiveItem] = useState(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [comments, setComments] = useState([])
+  const [newComment, setNewComment] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
     setCurrentUser(u)
+    if (u.role === 'viewer') setTab('list')
     load()
   }, [])
 
   async function load() {
     setLoading(true)
-    try { setItems(await (await fetch('/api/feedback')).json()) } catch(e) {}
+    try {
+      const data = await (await fetch('/api/feedback')).json()
+      setItems(data || [])
+    } catch(e){}
     setLoading(false)
   }
 
-  async function submit() {
-    if (!title.trim()) { setError('Please enter a title.'); return }
-    setSubmitting(true); setError('')
+  async function loadComments(id) {
     try {
-      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-      const res = await fetch('/api/feedback', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type, title: title.trim(), description, priority, name: u.name||'', email: u.email||'' })
-      })
-      const data = await res.json()
-      if (data.success) { setSubmitted(true); setTitle(''); setDescription(''); setType('bug'); setPriority('medium'); load() }
-      else setError(data.error || 'Failed to submit.')
-    } catch(e) { setError('Network error.') }
-    setSubmitting(false)
+      const data = await (await fetch('/api/feedback/' + id + '/comments')).json()
+      setComments(data || [])
+    } catch(e){ setComments([]) }
   }
 
-  async function updateStatus(item, status) {
-    setUpdating(item.id)
-    try {
-      await fetch('/api/feedback', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'update_status', id: item.id, status }) })
-      setItems(prev => prev.map(i => i.id===item.id ? {...i, status} : i))
-    } catch(e) {}
-    setUpdating(null)
+  async function submit() {
+    if (!title.trim() || !description.trim()) return
+    setSubmitting(true)
+    const u = currentUser
+    await fetch('/api/feedback', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type, title:title.trim(), description, priority, name:u.name||'', email:u.email||''})})
+    setTitle(''); setDescription(''); setPriority('medium'); setType('bug'); setSubmitting(false)
+    load()
+    setTab('list')
+  }
+
+  async function updateStatus(id, status) {
+    await fetch('/api/feedback', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'update_status', id, status})})
+    load()
+    if (activeItem && activeItem.id === id) setActiveItem({...activeItem, status})
+  }
+
+  async function openDetail(item) {
+    setActiveItem(item)
+    setEditMode(false)
+    setEditForm({title:item.title, description:item.description, priority:item.priority, type:item.type})
+    setComments([])
+    loadComments(item.id)
+  }
+
+  async function saveEdit() {
+    setSavingEdit(true)
+    await fetch('/api/feedback', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'update', id:activeItem.id, ...editForm})})
+    setActiveItem({...activeItem, ...editForm})
+    setEditMode(false)
+    setSavingEdit(false)
+    load()
+  }
+
+  async function postComment() {
+    if (!newComment.trim()) return
+    setPostingComment(true)
+    const u = currentUser
+    await fetch('/api/feedback/' + activeItem.id + '/comments', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({comment:newComment.trim(), name:u.name||'', email:u.email||''})})
+    setNewComment('')
+    setPostingComment(false)
+    loadComments(activeItem.id)
   }
 
   const isAdmin = currentUser.role === 'admin'
-  const filtered = items.filter(i => {
-    if (typeFilter && i.type !== typeFilter) return false
-    if (statusFilter && i.status !== statusFilter) return false
-    return true
-  }).sort((a,b) => b.submittedAt.localeCompare(a.submittedAt))
-
-  const thS = { textAlign:'left', padding:'10px 16px', fontSize:'11px', fontWeight:700, color:'#4b5563', textTransform:'uppercase', letterSpacing:'0.07em', background:'#111111', borderBottom:'1px solid #1e1e1e', whiteSpace:'nowrap' }
-  const tdS = { padding:'12px 16px', fontSize:'13px', color:'#d1d5db', borderBottom:'1px solid #1a1a1a', verticalAlign:'middle' }
+  const isViewer = currentUser.role === 'viewer'
+  const canEdit = (item) => isAdmin || item.email === currentUser.email
 
   return (
-    <div>
+    <div className="page-content-mobile">
       <div style={{marginBottom:'24px'}}>
         <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Bugs & Feature Requests</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Report issues or suggest improvements to the system</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{display:'flex',gap:'0',marginBottom:'24px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'fit-content',border:'1px solid #1e1e1e'}}>
-        <button onClick={()=>{setTab('submit');setSubmitted(false)}} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='submit'?'#8DC63F':'transparent',color:tab==='submit'?'#0a0a0a':'#6b7280'}}>
-          Submit
-        </button>
-        <button onClick={()=>setTab('list')} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='list'?'#8DC63F':'transparent',color:tab==='list'?'#0a0a0a':'#6b7280'}}>
-          All Items
-          {items.filter(i=>i.status==='open').length>0&&<span style={{marginLeft:'6px',background:'rgba(245,158,11,0.25)',color:'#f59e0b',borderRadius:'8px',padding:'1px 6px',fontSize:'11px'}}>{items.filter(i=>i.status==='open').length}</span>}
+      {/* Tab switcher */}
+      <div style={{display:'flex',gap:0,marginBottom:'20px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',border:'1px solid #1e1e1e',width:'fit-content',maxWidth:'100%',overflowX:'auto'}}>
+        {!isViewer && (
+          <button onClick={()=>setTab('submit')}
+            style={{background:tab==='submit'?'#1e1e1e':'transparent',color:tab==='submit'?'#fff':'#6b7280',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+            Submit
+          </button>
+        )}
+        <button onClick={()=>setTab('list')}
+          style={{background:tab==='list'?'#1e1e1e':'transparent',color:tab==='list'?'#fff':'#6b7280',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+          {isViewer ? 'All Submissions' : 'All Items'}
         </button>
       </div>
 
-      {/* Submit tab */}
-      {tab === 'submit' && (
-        <div style={{maxWidth:'520px'}}>
-          {submitted ? (
-            <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'16px',padding:'40px',textAlign:'center'}}>
-              <div style={{fontSize:'44px',marginBottom:'14px'}}>✅</div>
-              <h2 style={{margin:'0 0 10px',fontSize:'20px'}}>Thanks for your feedback!</h2>
-              <p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 24px'}}>Your submission has been logged and will be reviewed.</p>
-              <button onClick={()=>setSubmitted(false)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'11px 24px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
-                Submit Another
-              </button>
-            </div>
-          ) : (
-            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'28px'}}>
-              <h2 style={{margin:'0 0 24px',fontSize:'17px',fontWeight:700}}>New Submission</h2>
-
-              {/* Type selector — big toggle */}
-              <div style={{marginBottom:'20px'}}>
-                <label style={lbl}>Type</label>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-                  {[{v:'bug',icon:'🐛',label:'Bug Report',desc:'Something is broken or not working'},{v:'feature',icon:'✨',label:'Feature Request',desc:'Suggest a new feature or improvement'}].map(o=>(
-                    <div key={o.v} onClick={()=>setType(o.v)}
-                      style={{padding:'14px',borderRadius:'10px',border:'2px solid '+(type===o.v?'#8DC63F':'#252525'),background:type===o.v?'rgba(141,198,63,0.06)':'#111111',cursor:'pointer',transition:'all 0.15s'}}>
-                      <div style={{fontSize:'22px',marginBottom:'6px'}}>{o.icon}</div>
-                      <div style={{fontSize:'14px',fontWeight:600,color:type===o.v?'#fff':'#9ca3af',marginBottom:'3px'}}>{o.label}</div>
-                      <div style={{fontSize:'11px',color:'#4b5563'}}>{o.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{marginBottom:'16px'}}>
-                <label style={lbl}>Title <span style={{color:'#f87171'}}>*</span></label>
-                <input value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()}
-                  placeholder={type==='bug'?'e.g. Import fails with Excel files over 1MB':'e.g. Add CSV export to dashboard'}
-                  style={inp}/>
-              </div>
-
-              <div style={{marginBottom:'16px'}}>
-                <label style={lbl}>Description <span style={{color:'#4b5563'}}>(optional)</span></label>
-                <textarea rows={4} value={description} onChange={e=>setDescription(e.target.value)}
-                  placeholder={type==='bug'?'Steps to reproduce, what you expected vs what happened...':'Describe the feature and why it would be useful...'}
-                  style={{...inp,resize:'vertical'}}/>
-              </div>
-
-              <div style={{marginBottom:'24px'}}>
-                <label style={lbl}>Priority</label>
-                <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
-                  {[{v:'low',label:'Low'},{v:'medium',label:'Medium'},{v:'high',label:'High'}].map(o=>(
-                    <button key={o.v} onClick={()=>setPriority(o.v)}
-                      style={{flex:1,padding:'9px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',
-                        background:priority===o.v?(o.v==='high'?'#f87171':o.v==='medium'?'#f59e0b':'#6b7280'):'#111111',
-                        color:priority===o.v?'#fff':'#6b7280'}}>
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {error && <div style={{background:'#1a0a0a',border:'1px solid #5a1a1a',color:'#f87171',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'16px'}}>{error}</div>}
-
-              <button onClick={submit} disabled={submitting||!title.trim()}
-                style={{width:'100%',background:title.trim()?'#8DC63F':'#2a2a2a',color:title.trim()?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'13px',fontSize:'15px',fontWeight:800,cursor:title.trim()?'pointer':'not-allowed',transition:'all 0.15s'}}>
-                {submitting?'Submitting...':'Submit ' + (type==='bug'?'Bug Report':'Feature Request')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* List tab */}
-      {tab === 'list' && (
-        <div>
-          {/* Filters */}
-          <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap'}}>
-            <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
-              {[{v:'',l:'All'},{v:'bug',l:'🐛 Bugs'},{v:'feature',l:'✨ Features'}].map(o=>(
-                <button key={o.v} onClick={()=>setTypeFilter(o.v)}
-                  style={{padding:'7px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:typeFilter===o.v?'#8DC63F':'#111111',color:typeFilter===o.v?'#0a0a0a':'#6b7280'}}>
-                  {o.l}
-                </button>
-              ))}
-            </div>
-            <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #252525'}}>
-              {[{v:'',l:'All Status'},{v:'open',l:'Open'},{v:'in-progress',l:'In Progress'},{v:'done',l:'Done'}].map(o=>(
-                <button key={o.v} onClick={()=>setStatusFilter(o.v)}
-                  style={{padding:'7px 14px',border:'none',fontSize:'13px',fontWeight:600,cursor:'pointer',background:statusFilter===o.v?'#8DC63F':'#111111',color:statusFilter===o.v?'#0a0a0a':'#6b7280',whiteSpace:'nowrap'}}>
-                  {o.l}
+      {/* SUBMIT TAB */}
+      {tab === 'submit' && !isViewer && (
+        <div style={{maxWidth:'640px',background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'24px'}}>
+          <div style={{marginBottom:'16px'}}>
+            <label style={lbl}>TYPE</label>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}}>
+              {[{v:'bug',l:'🐛 Bug'},{v:'feature',l:'💡 Feature Request'}].map(t=>(
+                <button key={t.v} onClick={()=>setType(t.v)} type="button"
+                  style={{background:type===t.v?'rgba(141,198,63,0.1)':'#0f0f0f',border:'1px solid '+(type===t.v?'#8DC63F':'#252525'),color:type===t.v?'#8DC63F':'#9ca3af',borderRadius:'8px',padding:'12px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+                  {t.l}
                 </button>
               ))}
             </div>
           </div>
+          <div style={{marginBottom:'16px'}}>
+            <label style={lbl}>TITLE *</label>
+            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Short summary" style={inp}/>
+          </div>
+          <div style={{marginBottom:'16px'}}>
+            <label style={lbl}>DESCRIPTION *</label>
+            <textarea rows={5} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe the issue or feature in detail..." style={{...inp,resize:'vertical',fontSize:'14px'}}/>
+          </div>
+          <div style={{marginBottom:'20px'}}>
+            <label style={lbl}>PRIORITY</label>
+            <select value={priority} onChange={e=>setPriority(e.target.value)} style={{...inp,cursor:'pointer'}}>
+              {PRIORITIES.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <button onClick={submit} disabled={submitting||!title.trim()||!description.trim()}
+            style={{background:title.trim()&&description.trim()?'#8DC63F':'#2a2a2a',color:title.trim()&&description.trim()?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'12px 24px',fontSize:'14px',fontWeight:700,cursor:title.trim()&&description.trim()?'pointer':'not-allowed',width:'100%'}}>
+            {submitting?'Submitting...':'Submit'}
+          </button>
+        </div>
+      )}
 
-          {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
-          {!loading && filtered.length===0 && (
-            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'56px',textAlign:'center'}}>
-              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
-              <p style={{color:'#6b7280',margin:0}}>No items yet.</p>
+      {/* LIST TAB - Card layout (works on mobile and desktop) */}
+      {tab === 'list' && (
+        <div>
+          {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
+          {!loading && items.length === 0 && (
+            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center'}}>
+              <p style={{color:'#6b7280',margin:0}}>No items yet</p>
             </div>
           )}
-          {!loading && filtered.length>0 && (
-            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
-                  <thead><tr>
-                    <th style={thS}>Type</th>
-                    <th style={thS}>Title</th>
-                    <th style={thS}>Priority</th>
-                    <th style={thS}>Submitted By</th>
-                    <th style={thS}>Status</th>
-                    {isAdmin&&<th style={thS}>Actions</th>}
-                  </tr></thead>
-                  <tbody>
-                    {filtered.map(item=>(
-                      <tr key={item.id} onMouseEnter={e=>e.currentTarget.style.background='#181818'} onMouseLeave={e=>e.currentTarget.style.background=''}>
-                        <td style={tdS}><TypeBadge type={item.type}/></td>
-                        <td style={{...tdS,maxWidth:'280px'}}>
-                          <div style={{fontWeight:500,color:'#fff'}}>{item.title}</div>
-                          {item.description&&<div style={{fontSize:'12px',color:'#6b7280',marginTop:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.description}</div>}
-                        </td>
-                        <td style={tdS}><PriorityBadge priority={item.priority}/></td>
-                        <td style={tdS}>
-                          <div style={{fontSize:'13px',color:'#d1d5db'}}>{item.name||'—'}</div>
-                          <div style={{fontSize:'11px',color:'#6b7280'}}>{item.submittedAt?new Date(item.submittedAt).toLocaleDateString():'—'}</div>
-                        </td>
-                        <td style={tdS}><StatusBadge status={item.status}/></td>
-                        {isAdmin&&(
-                          <td style={{...tdS,minWidth:'160px'}}>
-                            <select value={item.status} onChange={e=>updateStatus(item,e.target.value)} disabled={updating===item.id}
-                              style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'6px',padding:'5px 10px',color:'#d1d5db',fontSize:'12px',cursor:'pointer',outline:'none'}}>
-                              <option value="open">Open</option>
-                              <option value="in-progress">In Progress</option>
-                              <option value="done">Done</option>
-                              <option value="closed">Closed</option>
-                            </select>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+            {items.map(item => (
+              <div key={item.id} onClick={()=>openDetail(item)}
+                style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',cursor:'pointer',transition:'all 0.15s'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:'10px',marginBottom:'8px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:'16px',flexShrink:0}}>{item.type==='bug'?'🐛':'💡'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:'14px',fontWeight:600,color:'#fff',marginBottom:'2px',wordBreak:'break-word'}}>{item.title}</div>
+                    <div style={{fontSize:'12px',color:'#6b7280'}}>{item.name} · {fmtDate(item.submittedAt)}</div>
+                  </div>
+                  <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0}}>
+                    <PriorityBadge priority={item.priority}/>
+                    <StatusBadge status={item.status}/>
+                  </div>
+                </div>
+                {item.description && (
+                  <div style={{fontSize:'12px',color:'#9ca3af',marginLeft:'26px',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                    {item.description}
+                  </div>
+                )}
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* DETAIL MODAL */}
+      {activeItem && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
+          onClick={()=>{setActiveItem(null);setEditMode(false)}}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'20px',width:'600px',maxWidth:'100%',maxHeight:'92vh',overflowY:'auto'}}
+            onClick={e=>e.stopPropagation()}>
+            
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:'16px'}}>
+              <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontSize:'20px'}}>{activeItem.type==='bug'?'🐛':'💡'}</span>
+                <PriorityBadge priority={activeItem.priority}/>
+                <StatusBadge status={activeItem.status}/>
+              </div>
+              <button onClick={()=>{setActiveItem(null);setEditMode(false)}}
+                style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
             </div>
-          )}
+
+            {/* Title - editable */}
+            {editMode ? (
+              <input value={editForm.title||''} onChange={e=>setEditForm({...editForm,title:e.target.value})}
+                style={{...inp,fontSize:'18px',fontWeight:700,marginBottom:'12px'}}/>
+            ) : (
+              <h2 style={{fontSize:'18px',fontWeight:700,margin:'0 0 8px',color:'#fff',wordBreak:'break-word'}}>{activeItem.title}</h2>
+            )}
+
+            <div style={{fontSize:'12px',color:'#6b7280',marginBottom:'16px'}}>
+              Submitted by <strong style={{color:'#9ca3af'}}>{activeItem.name||'Unknown'}</strong> on {fmtDate(activeItem.submittedAt)}
+            </div>
+
+            {/* Description - editable */}
+            <div style={{marginBottom:'16px'}}>
+              <label style={lbl}>Description</label>
+              {editMode ? (
+                <textarea rows={5} value={editForm.description||''} onChange={e=>setEditForm({...editForm,description:e.target.value})}
+                  style={{...inp,resize:'vertical'}}/>
+              ) : (
+                <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'12px',color:'#d1d5db',fontSize:'13px',lineHeight:1.6,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                  {activeItem.description || <em style={{color:'#4b5563'}}>No description</em>}
+                </div>
+              )}
+            </div>
+
+            {/* Edit controls: priority + type when editing */}
+            {editMode && (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'16px'}}>
+                <div>
+                  <label style={lbl}>Type</label>
+                  <select value={editForm.type||'bug'} onChange={e=>setEditForm({...editForm,type:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                    <option value="bug">🐛 Bug</option>
+                    <option value="feature">💡 Feature</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Priority</label>
+                  <select value={editForm.priority||'medium'} onChange={e=>setEditForm({...editForm,priority:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                    {PRIORITIES.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Status — admin can change anytime, others see read-only */}
+            <div style={{marginBottom:'16px'}}>
+              <label style={lbl}>Status</label>
+              {isAdmin ? (
+                <select value={activeItem.status} onChange={e=>updateStatus(activeItem.id, e.target.value)} style={{...inp,cursor:'pointer'}}>
+                  {STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              ) : (
+                <StatusBadge status={activeItem.status}/>
+              )}
+            </div>
+
+            {/* Edit/Save buttons */}
+            {canEdit(activeItem) && !isViewer && (
+              <div style={{display:'flex',gap:'8px',marginBottom:'24px',flexWrap:'wrap'}}>
+                {editMode ? (
+                  <>
+                    <button onClick={saveEdit} disabled={savingEdit}
+                      style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>
+                      {savingEdit?'Saving...':'Save Changes'}
+                    </button>
+                    <button onClick={()=>setEditMode(false)}
+                      style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',cursor:'pointer'}}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={()=>setEditMode(true)}
+                    style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+                    ✎ Edit
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* COMMENTS SECTION */}
+            <div style={{borderTop:'1px solid #1e1e1e',paddingTop:'18px'}}>
+              <div style={{fontSize:'13px',fontWeight:700,color:'#9ca3af',marginBottom:'12px',textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                Comments {comments.length > 0 && <span style={{color:'#4b5563',fontWeight:500}}>({comments.length})</span>}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+                {comments.length === 0 && (
+                  <div style={{color:'#4b5563',fontSize:'13px',fontStyle:'italic',padding:'8px 0'}}>No comments yet. Be the first to add one.</div>
+                )}
+                {comments.map(c=>(
+                  <div key={c.id} style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'10px 14px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px',gap:'8px',flexWrap:'wrap'}}>
+                      <strong style={{fontSize:'12px',color:'#8DC63F'}}>{c.name||c.email}</strong>
+                      <span style={{fontSize:'11px',color:'#4b5563'}}>{fmtDate(c.createdAt)}</span>
+                    </div>
+                    <div style={{fontSize:'13px',color:'#d1d5db',lineHeight:1.5,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{c.comment}</div>
+                  </div>
+                ))}
+              </div>
+              {!isViewer && (
+                <div>
+                  <textarea rows={3} value={newComment} onChange={e=>setNewComment(e.target.value)}
+                    placeholder="Add a comment..." style={{...inp,resize:'vertical',marginBottom:'8px'}}/>
+                  <button onClick={postComment} disabled={postingComment||!newComment.trim()}
+                    style={{background:newComment.trim()?'#8DC63F':'#2a2a2a',color:newComment.trim()?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'8px 18px',fontSize:'13px',fontWeight:700,cursor:newComment.trim()?'pointer':'not-allowed'}}>
+                    {postingComment?'Posting...':'Post Comment'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

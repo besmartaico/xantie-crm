@@ -177,7 +177,7 @@ export default function AdminLayout({ children }) {
             </button>
           </div>
         )}
-        <div style={{flex:1,padding: impersonating ? '128px 16px 24px' : '72px 16px 24px'}}>{children}</div>
+        <div style={{flex:1,padding: impersonating ? '128px 16px 24px' : '88px 16px 24px'}}>{children}</div>
       </div>
     </div>
   )

@@ -1,4 +1,3 @@
-
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
@@ -8,14 +7,15 @@ html, body {
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-/* ── Scrollbars ── */
+/* Scrollbars */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #111; }
 ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 
-/* ── Responsive layout breakpoints ── */
+/* Responsive layout breakpoints */
 .desktop-only { display: block !important; }
 .mobile-only  { display: none  !important; }
 
@@ -24,8 +24,7 @@ html, body {
   .mobile-only  { display: block !important; }
 }
 
-/* ── Date picker calendar icon ── */
-/* Make entire date input clickable to open calendar — applies to ALL date inputs */
+/* Make entire date input clickable to open calendar */
 input[type="date"] { position: relative; cursor: pointer; }
 input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0;
@@ -34,98 +33,59 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   width: 100%; height: 100%;
   cursor: pointer;
 }
-/* Make sure visible "icon" emoji/glyph next to date still shows on right side */
 input[type="date"]::-webkit-inner-spin-button { display: none; }
 input[type="date"]::-webkit-clear-button { display: none; }
 
-/* ── Mobile-specific overrides ── */
+/* ─── MOBILE OVERRIDES ─── */
 @media (max-width: 768px) {
-
-  /* Tables: horizontal scroll wrapper */
-  .mobile-table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 12px;
-  }
-
-  /* Cards stack vertically */
-  .mobile-stack {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  /* Full-width buttons on mobile */
-  .mobile-full {
-    width: 100% !important;
-  }
-
-  /* Hide non-essential table columns on mobile */
-  .mobile-hide { display: none !important; }
-
-  /* Reduce padding on cards/containers */
-  .mobile-pad {
-    padding: 12px !important;
-  }
-
-  /* Modal full screen on mobile */
-  .mobile-modal {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    border-radius: 0 !important;
-    border-left: none !important;
-    border-right: none !important;
-    overflow-y: auto !important;
-  }
-
-  /* Prevent zoom on input focus (iOS) */
-  input, select, textarea {
-    font-size: 16px !important;
-  }
+  /* Prevent iOS zoom on input focus */
+  input, select, textarea { font-size: 16px !important; }
 
   /* Better tap targets */
   button { min-height: 40px; }
 
-  /* Grid becomes single column */
-  .mobile-1col {
-    grid-template-columns: 1fr !important;
+  /* Tables: convert to card view via JS, but for any leftover tables use horizontal scroll inside container */
+  .mobile-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    max-width: 100%;
+  }
+
+  /* Tables that didn't get converted to cards: smaller padding, keep them readable */
+  table { font-size: 12px; }
+  td, th { padding: 8px 10px !important; }
+
+  /* Reduce default container padding on mobile */
+  .page-content-mobile { padding: 0; }
+
+  /* Make all flex containers wrap by default to prevent horizontal scroll */
+  body * { max-width: 100%; }
+
+  /* Modal full-screen on mobile */
+  [class*="modal"], div[style*="position:fixed"][style*="zIndex:1000"] > div:last-child {
+    max-width: 100% !important;
   }
 
   /* KPI grid 2-col on mobile */
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
 
-  /* Filters wrap nicely */
+  /* Filter bars wrap nicely */
   .filter-bar {
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
   }
 
-  /* Table cells smaller padding */
-  td, th { padding: 8px 10px !important; }
+  /* Hide non-essential columns helper */
+  .mobile-hide { display: none !important; }
 }
 
-/* ── Login page ── */
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-.login-card {
-  width: 100%;
-  max-width: 420px;
-}
-
-/* ── Page content padding ── */
-.page-content {
-  padding: 32px;
-}
+/* Ensure content area never causes horizontal scroll */
 @media (max-width: 768px) {
-  .page-content {
-    padding: 16px;
-  }
+  .page-content { padding: 16px; }
+  
+  /* The admin page padding wrapper - already set in layout */
 }
