@@ -146,7 +146,7 @@ export default function AdminLayout({ children }) {
       </div>
       {menuOpen && (
         <div style={{position:'fixed',inset:0,zIndex:200}} onClick={()=>setMenuOpen(false)}>
-          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e'}} onClick={e=>e.stopPropagation()}>
+          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e',paddingTop:'56px'}} onClick={e=>e.stopPropagation()}>
             {sidebar}
           </div>
         </div>
