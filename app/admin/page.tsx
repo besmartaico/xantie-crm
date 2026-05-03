@@ -221,7 +221,7 @@ export default function FeedbackPage() {
           {!loading && filtered.length>0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
               <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
+                <div className='mobile-table-scroll'><table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
                   <thead><tr>
                     <th style={thS}>Type</th>
                     <th style={thS}>Title</th>

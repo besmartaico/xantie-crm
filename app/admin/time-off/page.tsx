@@ -103,7 +103,7 @@ export default function TimeOffPage() {
       </div>
 
       {/* Tab switcher */}
-      <div style={{display:'flex',gap:'0',marginBottom:'24px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'fit-content',border:'1px solid #1e1e1e'}}>
+      <div style={{display:'flex',gap:'0',marginBottom:'20px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'100%',maxWidth:'fit-content',border:'1px solid #1e1e1e',flexWrap:'wrap'}}>
         <button onClick={()=>setTab('request')} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='request'?'#8DC63F':'transparent',color:tab==='request'?'#0a0a0a':'#6b7280'}}>
           {!isViewer && 'Request Time Off'}{isViewer && 'Time Off Requests'}
         </button>
@@ -133,7 +133,7 @@ export default function TimeOffPage() {
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'28px'}}>
               <h2 style={{margin:'0 0 24px',fontSize:'17px',fontWeight:700}}>New Time Off Request</h2>
 
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',marginBottom:'16px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'16px'}}>
                 <div>
                   <label style={lbl}>Start Date <span style={{color:'#f87171'}}>*</span></label>
                   <input type="date" value={startDate} onChange={e=>{ setStartDate(e.target.value); if(endDate&&e.target.value>endDate) setEndDate(e.target.value) }} style={inp}/>
@@ -184,7 +184,7 @@ export default function TimeOffPage() {
           )}
           {!loading && myRequests.length>0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <div className='mobile-table-scroll'><table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr>
                   {['Dates','Duration','Notes','Status','Submitted'].map(h=><th key={h} style={thS}>{h}</th>)}
                 </tr></thead>

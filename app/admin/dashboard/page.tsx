@@ -399,7 +399,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div style={{marginBottom:'24px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+      <div style={{marginBottom:'24px',display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
           <div>
             <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Dashboard</h1>
             <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
@@ -413,7 +413,7 @@ export default function Dashboard() {
         </div>
 
       {/* Filters */}
-      <div style={{display:'flex',flexWrap:'wrap',gap:'10px',marginBottom:'28px',alignItems:'center'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'20px',alignItems:'center'}}>
         <select value={dateFilter} onChange={e=>setDateFilter(e.target.value)} style={selSty}>
           {DATE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -446,9 +446,9 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'28px'}}>
+      <div className='kpi-grid' style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'10px',marginBottom:'24px'}}>
         {kpis.map(c=>(
-          <div key={c.label} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'18px'}}>
+          <div key={c.label} style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px'}}>
             <div style={{fontSize:'26px',fontWeight:800,color:c.color||'#fff',lineHeight:1,marginBottom:'6px'}}>{c.value}</div>
             <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.07em'}}>{c.label}</div>
           </div>
@@ -470,7 +470,7 @@ export default function Dashboard() {
         </div>
         {projectList.length===0&&<div style={{padding:'20px',color:'#4b5563',fontSize:'13px'}}>No data for this period</div>}
         {projectList.length>0&&(
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <div className='mobile-table-scroll'><table style={{width:'100%',borderCollapse:'collapse'}}>
             <thead>
               <tr style={{background:'#111111'}}>
                 {['Project / Employee','Total','Billable','Non-Bill.','% of Total'].map(h=>(
@@ -537,7 +537,7 @@ export default function Dashboard() {
                 <td style={{padding:'14px 16px',textAlign:'right'}}><span style={{color:'#6b7280',fontSize:'13px'}}>100%</span></td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

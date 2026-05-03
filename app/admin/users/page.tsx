@@ -79,7 +79,7 @@ export default function UsersPage() {
       {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
 
       {!loading && (
-        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}><div className='mobile-table-scroll'>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
               <thead>

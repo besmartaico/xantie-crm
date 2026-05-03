@@ -148,7 +148,7 @@ export default function Login() {
 
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',padding:'20px'}}>
-      <div style={{width:'100%',maxWidth:'400px'}}>
+      <div style={{width:'100%',maxWidth:'400px',margin:'0 auto'}}>
 
         {/* Logo */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'14px',marginBottom:'36px'}}>

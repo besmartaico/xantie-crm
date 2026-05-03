@@ -78,7 +78,7 @@ export default function ClientsPage() {
 
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'28px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Clients</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Manage clients and their projects</p>

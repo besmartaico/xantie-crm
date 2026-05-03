@@ -108,7 +108,7 @@ export default function FeedbackPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{display:'flex',gap:'0',marginBottom:'24px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'fit-content',border:'1px solid #1e1e1e'}}>
+      <div style={{display:'flex',gap:'0',marginBottom:'20px',background:'#0a0a0a',borderRadius:'10px',padding:'4px',width:'100%',maxWidth:'fit-content',border:'1px solid #1e1e1e'}}>
         <button onClick={()=>{setTab('submit');setSubmitted(false)}} style={{padding:'9px 18px',border:'none',borderRadius:'7px',fontSize:'13px',fontWeight:600,cursor:'pointer',background:tab==='submit'?'#8DC63F':'transparent',color:tab==='submit'?'#0a0a0a':'#6b7280'}}>
           Submit
         </button>}{ !isViewer && <span/>
@@ -137,7 +137,7 @@ export default function FeedbackPage() {
               {/* Type selector — big toggle */}
               <div style={{marginBottom:'20px'}}>
                 <label style={lbl}>Type</label>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:'10px'}}>
                   {[{v:'bug',icon:'🐛',label:'Bug Report',desc:'Something is broken or not working'},{v:'feature',icon:'✨',label:'Feature Request',desc:'Suggest a new feature or improvement'}].map(o=>(
                     <div key={o.v} onClick={()=>setType(o.v)}
                       style={{padding:'14px',borderRadius:'10px',border:'2px solid '+(type===o.v?'#8DC63F':'#252525'),background:type===o.v?'rgba(141,198,63,0.06)':'#111111',cursor:'pointer',transition:'all 0.15s'}}>
@@ -220,7 +220,7 @@ export default function FeedbackPage() {
           )}
           {!loading && filtered.length>0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden'}}>
-              <div style={{overflowX:'auto'}}>
+              <div className='mobile-table-scroll'>
                 <table style={{width:'100%',borderCollapse:'collapse',minWidth:'600px'}}>
                   <thead><tr>
                     <th style={thS}>Type</th>
