@@ -84,6 +84,12 @@ function MonthLineChart({ byMonth, filtered, granularity }) {
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
   function monthLabel(key) {
+    if (key.startsWith('W:')) {
+      // Weekly: show "Week of Jan 1"
+      const dateStr = key.substring(2)
+      const d = new Date(dateStr + 'T12:00:00')
+      return 'Wk of '+MONTH_NAMES[d.getMonth()]+' '+d.getDate()
+    }
     const parts = key.split('-')
     if (parts.length === 3) {
       // Daily: show "Mon Jan 1"
@@ -243,6 +249,7 @@ export default function Dashboard() {
 
   // Filters — loaded from localStorage per user
   const [dateFilter, setDateFilter] = useState('this_month')
+  const [chartGran, setChartGran] = useState('auto') // auto | daily | weekly | monthly
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
@@ -378,9 +385,21 @@ export default function Dashboard() {
   const maxE = byEmployee[0]?.[1]||1
 
   // Smart grouping: daily for short ranges, weekly for month view, monthly for longer
-  const useDaily = ['this_month','last_month','this_pay_period','last_pay_period'].includes(dateFilter)
-  const useWeekly = false // future option
-  
+  // Determine chart granularity: 'auto' picks based on filter, otherwise user choice
+  const autoDaily = ['this_month','last_month','this_pay_period','last_pay_period'].includes(dateFilter)
+  const effectiveGran = chartGran === 'auto' ? (autoDaily ? 'daily' : 'monthly') : chartGran
+  const useDaily = effectiveGran === 'daily'
+  const useWeekly = effectiveGran === 'weekly'
+
+  function weekKey(date) {
+    // Returns YYYY-Www where week is the Monday-anchored week
+    const d = new Date(date + 'T12:00:00')
+    const day = d.getDay()
+    const diff = day === 0 ? -6 : 1 - day // back to Monday
+    d.setDate(d.getDate() + diff)
+    return d.getFullYear()+'-W'+d.toISOString().split('T')[0] // week starting Monday
+  }
+
   const byMonth = {}
   filtered.forEach(e => {
     if (!e.date) return
@@ -388,12 +407,19 @@ export default function Dashboard() {
     let key
     if (useDaily) {
       key = e.date // YYYY-MM-DD
+    } else if (useWeekly) {
+      // Use the Monday date of the week
+      const wd = new Date(e.date + 'T12:00:00')
+      const day = wd.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      wd.setDate(wd.getDate() + diff)
+      key = 'W:' + wd.toISOString().split('T')[0]
     } else {
       key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
     }
     byMonth[key] = (byMonth[key]||0) + (parseFloat(e.hours)||0)
   })
-  const chartGranularity = useDaily ? 'day' : 'month'
+  const chartGranularity = effectiveGran
 
   const hasFilters = dateFilter||employeeFilter||billableFilter
 
@@ -562,7 +588,17 @@ export default function Dashboard() {
       {/* Hours by Month — line chart */}
       {Object.keys(byMonth).length>0&&(
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'20px'}}>
-          <h3 style={{margin:'0 0 20px',fontSize:'13px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Month</h3>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',marginBottom:'12px',flexWrap:'wrap'}}>
+                <h3 style={{fontSize:'14px',fontWeight:700,margin:0,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.07em'}}>Hours by Month</h3>
+                <div style={{display:'flex',gap:'4px',background:'#0a0a0a',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'3px'}}>
+                  {[{v:'auto',l:'Auto'},{v:'daily',l:'Day'},{v:'weekly',l:'Week'},{v:'monthly',l:'Month'}].map(o=>(
+                    <button key={o.v} onClick={()=>setChartGran(o.v)} type="button"
+                      style={{background:chartGran===o.v?'#1e1e1e':'transparent',color:chartGran===o.v?'#8DC63F':'#6b7280',border:'none',borderRadius:'6px',padding:'5px 10px',fontSize:'11px',fontWeight:600,cursor:'pointer',minHeight:0}}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
           <MonthLineChart byMonth={byMonth} filtered={filtered} granularity={chartGranularity}/>
         </div>
       )}
