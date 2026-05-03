@@ -145,8 +145,8 @@ export default function AdminLayout({ children }) {
         <button onClick={()=>setMenuOpen(!menuOpen)} style={{background:'none',border:'none',color:'#8DC63F',fontSize:'22px',cursor:'pointer'}}>☰</button>
       </div>
       {menuOpen && (
-        <div style={{position:'fixed',inset:0,zIndex:200}} onClick={()=>setMenuOpen(false)}>
-          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e',paddingTop:'56px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{position:'fixed',top:'56px',left:0,right:0,bottom:0,zIndex:200}} onClick={()=>setMenuOpen(false)}>
+          <div style={{position:'absolute',top:0,left:0,width:'240px',height:'100%',background:'#111111',borderRight:'1px solid #1e1e1e'}} onClick={e=>e.stopPropagation()}>
             {sidebar}
           </div>
         </div>
