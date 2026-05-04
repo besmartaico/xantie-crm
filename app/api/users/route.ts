@@ -53,9 +53,19 @@ export async function POST(req) {
       return NextResponse.json({ success: true, upgraded: count })
     }
     if (action === 'update_role') {
-      const { id, role } = body
+      const { id, email, role } = body
+      let rowIdx = id
+      if (!rowIdx && email) {
+        // Find row by email
+        const all = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Users'!A2:E5000" })
+        const rows = all.data.values || []
+        const found = rows.findIndex(r => (r[1]||'').toLowerCase() === email.toLowerCase())
+        if (found === -1) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
+        rowIdx = found + 2  // sheet rows are 1-indexed and skip header
+      }
+      if (!rowIdx) return NextResponse.json({ success: false, error: 'Missing id or email' }, { status: 400 })
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `Users!D${id}`,
+        spreadsheetId: SID(), range: `'Users'!D${rowIdx}`,
         valueInputOption: 'RAW', requestBody: { values: [[role]] }
       })
       return NextResponse.json({ success: true })
