@@ -39,171 +39,108 @@ export default function HelpPage() {
         <p>Sign in with your <span style={codeChip}>@xantie.com</span> email. If you don't have an account yet, register from the login page — your role defaults to Editor.</p>
         <h3 style={h3}>Your role</h3>
         <ul style={{paddingLeft:'18px'}}>
-          <li><strong style={{color:'#fff'}}>Editor</strong> — Default for employees. Log your own time, submit time off, submit feedback, use boards.</li>
-          <li><strong style={{color:'#fff'}}>Viewer</strong> — Bookkeepers/auditors. Read-only access to <em>all</em> team data — see everyone's hours, but cannot add or edit anything.</li>
-          <li><strong style={{color:'#fff'}}>Admin</strong> — Full access. Manage users, clients, approve time off, set status on feedback, run imports.</li>
+          <li><strong style={{color:'#fff'}}>Editor</strong> — Default for employees. Log your own time, submit time off and feedback, use boards.</li>
+          <li><strong style={{color:'#fff'}}>Viewer</strong> — Bookkeepers/auditors. Read-only access to all team data.</li>
+          <li><strong style={{color:'#fff'}}>Admin</strong> — Full access. Manage users, clients, approvals, imports.</li>
         </ul>
-        <div style={tipBox}>
-          💡 Don't see a section in the sidebar? It's only available to admins. Ask Jeff if you think you should have access.
-        </div>
       </Section>
 
       <Section icon="📊" title="Dashboard">
-        <p>The Dashboard is your overview of hours worked. Editors see only their own data; Viewers and Admins see everyone.</p>
-
+        <p>Your overview of hours worked. Editors see only their own data; Viewers and Admins see everyone.</p>
         <h3 style={h3}>Filters</h3>
-        <p>Use the filter row at the top to narrow what you're looking at:</p>
         <ul style={{paddingLeft:'18px'}}>
-          <li><strong>Date range</strong> — All Time, This Month, Last Month, <strong style={{color:'#8DC63F'}}>This Pay Period</strong> (1st–15th or 16th–end), <strong style={{color:'#8DC63F'}}>Last Pay Period</strong>, This Quarter, This Year, or Custom Range</li>
-          <li><strong>Employee</strong> — only visible to admins/viewers</li>
-          <li><strong>Billable</strong> — show only billable, non-billable, or all</li>
+          <li><strong>Date range</strong> — All Time, This/Last Month, This/Last Pay Period (1st–15th, 16th–end), This Quarter, This Year, Custom Range</li>
+          <li><strong>Employee</strong> filter (admin/viewer only)</li>
+          <li><strong>Billable</strong> — billable, non-billable, or all</li>
         </ul>
-
         <h3 style={h3}>Chart granularity</h3>
-        <p>Above the chart there's a 4-button toggle: <span style={codeChip}>Auto</span> <span style={codeChip}>Day</span> <span style={codeChip}>Week</span> <span style={codeChip}>Month</span></p>
-        <p><strong>Auto</strong> picks daily for short ranges and monthly for longer ones. Override anytime to see the data the way you want.</p>
-
+        <p>Toggle the chart x-axis: <span style={codeChip}>Auto</span> <span style={codeChip}>Day</span> <span style={codeChip}>Week</span> <span style={codeChip}>Month</span></p>
         <h3 style={h3}>Export CSV</h3>
-        <p>Click <span style={codeChip}>↓ Export CSV</span> in the top-right. The export respects every active filter — what you see on the dashboard is what gets exported.</p>
+        <p>Click <span style={codeChip}>↓ Export CSV</span> top-right. Whatever filters you have active is what gets exported.</p>
       </Section>
 
       <Section icon="⏱️" title="Time Entries">
-        <p>Log the hours you've worked across the week.</p>
-
         <h3 style={h3}>Adding time</h3>
         <ol style={{paddingLeft:'18px'}}>
           <li>Click <span style={codeChip}>+ Add Entry</span></li>
-          <li>The modal opens showing the full Mon–Sun week</li>
-          <li>Pick a <strong>Client</strong> from the dropdown</li>
-          <li>If the client has sub-projects, pick a <strong>Project</strong> (otherwise it stays "N/A")</li>
-          <li>Add a <strong>Description</strong> of what you worked on</li>
-          <li>Enter hours per day, choose Billable / Non-Billable</li>
-          <li>Click <span style={codeChip}>Save</span></li>
+          <li>The modal shows the full Mon–Sun week</li>
+          <li>Pick a <strong>Client</strong>, then a <strong>Project</strong> if needed</li>
+          <li>Enter hours per day, mark Billable / Non-Billable, add a description</li>
+          <li>Click Save</li>
         </ol>
-
         <h3 style={h3}>Logging a previous week</h3>
-        <p>Need to enter time for a week you missed? Click <span style={codeChip}>+ Add previous week</span> at the bottom of the modal — it prepends the prior 7 days. Or use the "Week starting" date picker at the top to jump to any week.</p>
-
-        <h3 style={h3}>Editing or deleting</h3>
-        <p>Find the entry in the table and click the pencil icon to edit, or the trash icon to delete. Editors can only edit their own entries.</p>
-
-        <div style={tipBox}>
-          💡 The description applies to every day in that week's batch. If different days need different descriptions, save them in separate batches.
-        </div>
+        <p>Click <span style={codeChip}>+ Add previous week</span> to prepend prior 7 days, or use the "Week starting" date picker.</p>
+        <div style={tipBox}>💡 The description applies to every day in that batch. For different descriptions, save in separate batches.</div>
       </Section>
 
       <Section icon="🌴" title="Time Off">
-        <p>Submit time-off requests and track their status.</p>
-
-        <h3 style={h3}>Requesting time off</h3>
+        <h3 style={h3}>Requesting</h3>
         <ol style={{paddingLeft:'18px'}}>
-          <li>Go to <strong>Time Off</strong> → <strong>Request Time Off</strong> tab</li>
-          <li>Pick a <strong>Start Date</strong> and <strong>End Date</strong> — click anywhere in the date field to open the calendar</li>
-          <li>Add notes about the reason or any context for managers</li>
-          <li>Click <span style={codeChip}>Submit Request</span></li>
+          <li>Go to Time Off → <strong>Request Time Off</strong></li>
+          <li>Pick start/end dates (click anywhere in the field to open calendar)</li>
+          <li>Add notes, click Submit</li>
         </ol>
-        <p>Admins are notified by email. Track your request status under <strong>My Requests</strong>.</p>
-
+        <p>Admins are notified by email. Track status under <strong>My Requests</strong>.</p>
         <h3 style={h3}>For admins</h3>
-        <p>Switch to the <strong>All Requests</strong> tab to see everyone's requests. Use the dropdown next to each request to mark it Pending, Approved, or Denied.</p>
+        <p>Switch to <strong>All Requests</strong> to approve or deny via the dropdown.</p>
       </Section>
 
-      <Section icon="🐛" title="Bugs & Feature Requests (Feedback)">
-        <p>Report issues or suggest improvements. The team uses this to track what needs to change.</p>
-
+      <Section icon="🐛" title="Bugs & Feature Requests">
         <h3 style={h3}>Submitting</h3>
-        <ol style={{paddingLeft:'18px'}}>
-          <li>Pick <strong>🐛 Bug</strong> or <strong>💡 Feature Request</strong></li>
-          <li>Write a clear title and detailed description</li>
-          <li>Set priority: Low / Medium / High</li>
-          <li>Click <span style={codeChip}>Submit</span></li>
-        </ol>
-
+        <p>Pick Bug or Feature, write a clear title and details, set priority, click Submit.</p>
         <h3 style={h3}>Discussion</h3>
-        <p>Click any item in the list to open the full detail view. You can:</p>
-        <ul style={{paddingLeft:'18px'}}>
-          <li>Read the full description (no truncation)</li>
-          <li>Edit your own submissions (admins can edit anyone's)</li>
-          <li>Post comments to discuss with the team</li>
-          <li>See the current status and priority</li>
-        </ul>
-        <p>Admins update the status (Open → In Progress → Done → Closed) from the detail view.</p>
+        <p>Click any item to view full details. You can edit your own (admins can edit anyone's), post comments, and see status updates.</p>
+        <p>Admins move status: Open → In Progress → Done → Closed.</p>
       </Section>
 
-      <Section icon="📋" title="Boards (Project Management)">
-        <p>Trello-style boards for tracking work. Each user can create boards and share them with others.</p>
-
-        <h3 style={h3}>Creating a board</h3>
-        <ol style={{paddingLeft:'18px'}}>
-          <li>Go to <strong>Boards</strong> and click <span style={codeChip}>+ New Board</span></li>
-          <li>Name it, add an optional description, pick a color</li>
-          <li>Click <span style={codeChip}>Create Board</span></li>
-        </ol>
-
+      <Section icon="📋" title="Boards">
+        <p>Trello-style boards for tracking work.</p>
+        <h3 style={h3}>Creating</h3>
+        <p>Boards → <span style={codeChip}>+ New Board</span> → name, description, color → Create.</p>
         <h3 style={h3}>Working a board</h3>
         <ul style={{paddingLeft:'18px'}}>
-          <li><strong>Add columns</strong> with the <span style={codeChip}>+ Add Column</span> button at the right edge</li>
-          <li><strong>Rename a column</strong> by double-clicking its title</li>
-          <li><strong>Add cards</strong> using <span style={codeChip}>+ Add card</span> at the bottom of any column</li>
-          <li><strong>Drag cards</strong> between columns to update their state</li>
-          <li><strong>Click a card</strong> to edit title, description, priority, due date, assignee</li>
+          <li>Add columns with <span style={codeChip}>+ Add Column</span></li>
+          <li>Double-click a column title to rename</li>
+          <li>Add cards with <span style={codeChip}>+ Add card</span></li>
+          <li>Drag cards between columns</li>
+          <li>Click any card to edit details, set priority, due date, assignee</li>
         </ul>
-
         <h3 style={h3}>Sharing</h3>
-        <p>Click the <span style={codeChip}>Share · N</span> button in the board header. As the owner you can add any Xantie user, and they'll see the board under "Shared With You" on their boards page.</p>
+        <p>Click <span style={codeChip}>Share</span> in the board header to add Xantie users. Shared boards appear under "Shared With You" on their boards page.</p>
       </Section>
 
-      <Section icon="🏢" title="Clients & Projects (Admin only)">
-        <p>The hierarchy is: <strong style={{color:'#fff'}}>Client</strong> → <strong style={{color:'#fff'}}>Project</strong>. Time entries reference both.</p>
-
-        <h3 style={h3}>Adding a client</h3>
-        <ol style={{paddingLeft:'18px'}}>
-          <li>Go to <strong>Clients</strong> (admin section)</li>
-          <li>Click <span style={codeChip}>+ New Client</span></li>
-          <li>Every new client automatically gets an <span style={codeChip}>N/A</span> default project — so people can log time without picking a sub-project</li>
-        </ol>
-
-        <h3 style={h3}>Adding sub-projects</h3>
-        <p>Expand a client card and click <span style={codeChip}>+ Add Project</span> to add specific projects under that client. These appear in the time entry dropdown when that client is selected.</p>
-
-        <div style={tipBox}>
-          ⚠️ Deleting a client only removes it from new dropdowns — existing time entries are unaffected.
-        </div>
+      <Section icon="🏢" title="Clients & Projects (Admin)">
+        <p>Hierarchy: <strong style={{color:'#fff'}}>Client</strong> → <strong style={{color:'#fff'}}>Project</strong>.</p>
+        <p>Each new client gets an <span style={codeChip}>N/A</span> default project so people can log time without a sub-project.</p>
+        <p>Expand a client card and click <span style={codeChip}>+ Add Project</span> to add specific projects.</p>
       </Section>
 
-      <Section icon="👥" title="Users (Admin only)">
-        <p>Manage who has access and what they can do.</p>
-
-        <h3 style={h3}>Changing a role</h3>
-        <p>Use the dropdown next to a user's role. Changes save automatically — no save button needed.</p>
-
-        <h3 style={h3}>Deactivating a user</h3>
-        <p>Click <span style={codeChip}>Inactivate</span>. Their account is disabled but their historical time entries are preserved. Reactivate them later by clicking <span style={codeChip}>Reactivate</span>.</p>
-
-        <h3 style={h3}>Impersonation (View As)</h3>
-        <p>Click <span style={codeChip}>View As</span> to see the app exactly as that user does. Helpful for debugging permissions or training. A yellow banner across the top reminds you you're impersonating — click <span style={codeChip}>Exit — Back to Admin</span> to switch back.</p>
+      <Section icon="👥" title="Users (Admin)">
+        <h3 style={h3}>Roles</h3>
+        <p>Use the dropdown next to the user's role. Saves automatically.</p>
+        <h3 style={h3}>Inactivate / Reactivate</h3>
+        <p>Disabling preserves their data. Reactivate later to restore access.</p>
+        <h3 style={h3}>View As (Impersonation)</h3>
+        <p>See the app exactly as another user does — useful for debugging or training. A yellow banner reminds you you're impersonating. Click <span style={codeChip}>Exit — Back to Admin</span> to return.</p>
       </Section>
 
-      <Section icon="📥" title="Import (Admin only)">
-        <p>Bulk-import historical time entries from CSV. The importer expects columns matching the Time Entries sheet headers.</p>
+      <Section icon="📥" title="Import (Admin)">
+        <p>Bulk-import historical time entries from CSV. Columns must match the Time Entries sheet headers.</p>
       </Section>
 
       <Section icon="📱" title="Tips & Tricks">
         <h3 style={h3}>Date inputs</h3>
-        <p>Click anywhere inside a date field — the whole field is clickable to open the calendar.</p>
-
+        <p>Click anywhere in a date field — the whole field opens the calendar.</p>
         <h3 style={h3}>Mobile</h3>
-        <p>Tap the <span style={codeChip}>☰</span> hamburger icon in the top-left to open the navigation drawer.</p>
-
+        <p>Tap <span style={codeChip}>☰</span> in the top-left for the navigation drawer.</p>
         <h3 style={h3}>Numbers</h3>
-        <p>All hour totals are formatted with commas — 4,684.9 not 4684.9.</p>
-
-        <h3 style={h3}>Something broken?</h3>
-        <p>Submit it under <strong>Feedback</strong> as a bug. Include what you clicked, what you expected, and what happened instead. Screenshots help.</p>
+        <p>All hour totals show commas — 4,684.9 not 4684.9.</p>
+        <h3 style={h3}>Found a bug?</h3>
+        <p>Submit it under <strong>Feedback</strong>. Include what you clicked, what you expected, and what happened. Screenshots help.</p>
       </Section>
 
       <div style={{textAlign:'center', color:'#4b5563', fontSize:'12px', margin:'32px 0 16px'}}>
-        Need help that isn't covered here? Drop a feature request in <strong style={{color:'#6b7280'}}>Feedback</strong>.
+        Need something not covered? Drop a feature request in <strong style={{color:'#6b7280'}}>Feedback</strong>.
       </div>
     </div>
   )
