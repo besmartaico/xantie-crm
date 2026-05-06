@@ -61,6 +61,7 @@ export default function AdminLayout({ children }) {
     { label: 'Boards', href: '/admin/boards' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
+    { label: 'Help', href: '/admin/help' },
   ]
 
   // Admin-only links (shown with a divider)
