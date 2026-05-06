@@ -39,6 +39,18 @@ export async function POST(req) {
     const body = await req.json()
     const sheets = getSheets()
 
+    if (body.action === 'add') {
+      const e = body
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: RANGE })
+      const nextRow = (res.data.values||[]).length + 2
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(), range: `'Time Entries'!A${nextRow}:I${nextRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[e.name||'', e.email||'', e.date||'', e.hours||'', e.description||'', '', e.project||'', e.billable||'yes', e.subProject||'N/A']] }
+      })
+      return NextResponse.json({ success: true })
+    }
+
     if (body.action === 'delete') {
       const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: RANGE })
       const rows = res.data.values || []
