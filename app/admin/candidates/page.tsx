@@ -243,6 +243,9 @@ export default function CandidatesPage() {
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Recruiting pipeline · {candidates.length} total</p>
         </div>
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+          <a href="/admin/candidates/dashboard" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
+            📊 Dashboard
+          </a>
           <button onClick={()=>setShowImport(true)} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
             📥 Import
           </button>
