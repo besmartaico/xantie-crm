@@ -16,26 +16,26 @@ function fmtNum(n, decimals = 0) {
   return v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
-function CalcRow({ label, value, blue, big }) {
+function CalcRow({ label, value, blue, big, accent }) {
   return (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #1a1a1a'}}>
       <span style={{color:'#9ca3af',fontSize:'13px'}}>{label}</span>
-      <span style={{color: blue ? '#0066ff' : '#fff', fontSize: big ? '17px' : '14px', fontWeight:700}}>{value}</span>
+      <span style={{color: blue ? '#0066ff' : (accent || '#fff'), fontSize: big ? '17px' : '14px', fontWeight:700}}>{value}</span>
     </div>
   )
 }
 
 export default function ProfitSharePage() {
   const [currentUser, setCurrentUser] = useState({})
-  // Salary Model inputs
-  const [salBase, setSalBase] = useState(115000)
-  const [salRate, setSalRate] = useState(100)
+  // Salary Model inputs (Current Model)
+  const [salBase, setSalBase] = useState(170000)
+  const [salRate, setSalRate] = useState(110)
   const [salHours, setSalHours] = useState(168)
   const [salTaxes, setSalTaxes] = useState(1000)
-  // Profit Share Model inputs
-  const [psBase, setPsBase] = useState(85000)
-  const [psPercent, setPsPercent] = useState(25)  // stored as 25 for 25%
-  const [psRate, setPsRate] = useState(125)
+  // Profit Share Model inputs (New Model)
+  const [psBase, setPsBase] = useState(125000)
+  const [psPercent, setPsPercent] = useState(20)  // stored as 20 for 20%
+  const [psRate, setPsRate] = useState(110)
   const [psHours, setPsHours] = useState(168)
   const [psTaxes, setPsTaxes] = useState(1000)
 
@@ -47,23 +47,37 @@ export default function ProfitSharePage() {
     }
   }, [])
 
-  // Salary Model calculations
+  // ── Salary Model (Current Model) ──
+  // Revenue Generated = Hourly Rate × # Hours
+  // Employee Base = Base Salary / 12
+  // Employee Monthly = Employee Base   (Employee% always 0 in salary model)
+  // Employee Annual = Employee Monthly × 12
+  // Xantie Profit = Revenue Generated − Employee Monthly
   const salRevenue = (parseFloat(salRate)||0) * (parseFloat(salHours)||0)
   const salEmpBase = (parseFloat(salBase)||0) / 12
-  const salEmpMonthly = salEmpBase + salRevenue
+  const salEmpMonthly = salEmpBase
   const salEmpAnnual = salEmpMonthly * 12
+  const salXantieProfit = salRevenue - salEmpMonthly
 
-  // Profit Share calculations
+  // ── Profit Share Model (New Model) ──
+  // Revenue Generated = Hourly Rate × # Hours
+  // Employee Base = Base Salary / 12
+  // Employee Monthly = Employee Base + (Employee% × Hourly Rate × # Hours)
+  // Employee Annual = Employee Monthly × 12
+  // Xantie Profit = Revenue Generated − Employee Monthly
   const psRevenue = (parseFloat(psRate)||0) * (parseFloat(psHours)||0)
   const psEmpBase = (parseFloat(psBase)||0) / 12
   const psPercentDecimal = (parseFloat(psPercent)||0) / 100
-  const psShareAmount = psRevenue * psPercentDecimal
+  const psShareAmount = psPercentDecimal * (parseFloat(psRate)||0) * (parseFloat(psHours)||0)
   const psEmpMonthly = psEmpBase + psShareAmount
   const psEmpAnnual = psEmpMonthly * 12
+  const psXantieProfit = psRevenue - psEmpMonthly
 
   // Comparison
-  const annualDiff = psEmpAnnual - salEmpAnnual
-  const monthlyDiff = psEmpMonthly - salEmpMonthly
+  const empAnnualDiff = psEmpAnnual - salEmpAnnual
+  const empMonthlyDiff = psEmpMonthly - salEmpMonthly
+  const xantieMonthlyDiff = psXantieProfit - salXantieProfit
+  const xantieAnnualDiff = xantieMonthlyDiff * 12
 
   return (
     <div>
@@ -75,11 +89,11 @@ export default function ProfitSharePage() {
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:'16px',marginBottom:'24px'}}>
-        {/* SALARY MODEL */}
+        {/* SALARY / CURRENT MODEL */}
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid #2a2a2a',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>💼 Salary Model</h2>
-            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Base salary + billable hours revenue</p>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>💼 Current Model (Salary)</h2>
+            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Employee paid base salary; company keeps revenue</p>
           </div>
 
           <div style={{marginBottom:'14px'}}>
@@ -103,19 +117,21 @@ export default function ProfitSharePage() {
 
           <div>
             <CalcRow label="Revenue Generated" value={fmt(salRevenue)}/>
-            <CalcRow label="Employee Base" value={fmt(salEmpBase)}/>
+            <CalcRow label="Employee Base (Mo)" value={fmt(salEmpBase)}/>
             <CalcRow label="Taxes / Insurance" value={fmt(salTaxes)} blue/>
             <div style={{height:'4px'}}></div>
             <CalcRow label="Employee Monthly" value={fmt(salEmpMonthly)} big/>
             <CalcRow label="Employee Annual" value={fmt(salEmpAnnual, 0)} big/>
+            <div style={{height:'4px'}}></div>
+            <CalcRow label="Xantie Profit (Mo)" value={fmt(salXantieProfit)} accent="#8DC63F" big/>
           </div>
         </div>
 
-        {/* PROFIT SHARE MODEL */}
+        {/* PROFIT SHARE / NEW MODEL */}
         <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid rgba(141,198,63,0.3)',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>🌱 Profit Share Model</h2>
-            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Lower base + share of revenue</p>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>🌱 New Model (Profit Share)</h2>
+            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Lower base + share of billable revenue</p>
           </div>
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'14px'}}>
@@ -145,35 +161,38 @@ export default function ProfitSharePage() {
 
           <div>
             <CalcRow label="Revenue Generated" value={fmt(psRevenue)}/>
-            <CalcRow label="Employee Base" value={fmt(psEmpBase)}/>
+            <CalcRow label="Employee Base (Mo)" value={fmt(psEmpBase)}/>
             <CalcRow label={`Employee Share (${fmtNum(psPercent,1)}%)`} value={fmt(psShareAmount)}/>
             <CalcRow label="Taxes / Insurance" value={fmt(psTaxes)} blue/>
             <div style={{height:'4px'}}></div>
             <CalcRow label="Employee Monthly" value={fmt(psEmpMonthly)} big/>
             <CalcRow label="Employee Annual" value={fmt(psEmpAnnual, 0)} big/>
+            <div style={{height:'4px'}}></div>
+            <CalcRow label="Xantie Profit (Mo)" value={fmt(psXantieProfit)} accent="#8DC63F" big/>
           </div>
         </div>
       </div>
 
       {/* COMPARISON */}
       <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'20px',marginBottom:'24px'}}>
-        <h3 style={{fontSize:'14px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 14px'}}>Comparison</h3>
+        <h3 style={{fontSize:'14px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 14px'}}>Comparison: New Model vs Current</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'16px'}}>
           <div>
-            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Monthly Difference</div>
-            <div style={{fontSize:'20px',fontWeight:700,color: monthlyDiff >= 0 ? '#8DC63F' : '#f87171'}}>
-              {monthlyDiff >= 0 ? '+' : ''}{fmt(monthlyDiff)}
+            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Employee Annual Diff</div>
+            <div style={{fontSize:'20px',fontWeight:700,color: empAnnualDiff >= 0 ? '#8DC63F' : '#f87171'}}>
+              {empAnnualDiff >= 0 ? '+' : ''}{fmt(empAnnualDiff, 0)}
             </div>
-            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{monthlyDiff >= 0 ? 'Profit Share earns more' : 'Salary earns more'}</div>
+            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{empAnnualDiff >= 0 ? 'Employee earns more in New Model' : 'Employee earns more in Current Model'}</div>
           </div>
           <div>
-            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Annual Difference</div>
-            <div style={{fontSize:'20px',fontWeight:700,color: annualDiff >= 0 ? '#8DC63F' : '#f87171'}}>
-              {annualDiff >= 0 ? '+' : ''}{fmt(annualDiff, 0)}
+            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Xantie Annual Profit Diff</div>
+            <div style={{fontSize:'20px',fontWeight:700,color: xantieAnnualDiff >= 0 ? '#8DC63F' : '#f87171'}}>
+              {xantieAnnualDiff >= 0 ? '+' : ''}{fmt(xantieAnnualDiff, 0)}
             </div>
+            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{xantieAnnualDiff >= 0 ? 'Xantie earns more in New Model' : 'Xantie earns more in Current Model'}</div>
           </div>
           <div>
-            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Break-even Hours</div>
+            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Break-even Hours / Mo</div>
             <div style={{fontSize:'20px',fontWeight:700,color:'#fff'}}>
               {(() => {
                 const baseDiff = (parseFloat(salBase)||0) - (parseFloat(psBase)||0)
@@ -181,17 +200,22 @@ export default function ProfitSharePage() {
                 const monthlyBaseDiff = baseDiff / 12
                 const breakEven = monthlyBaseDiff / (psPercentDecimal * (parseFloat(psRate)||0))
                 if (isNaN(breakEven) || !isFinite(breakEven)) return 'N/A'
-                return fmtNum(breakEven, 0) + ' hrs/mo'
+                return fmtNum(breakEven, 0) + ' hrs'
               })()}
             </div>
-            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>For Profit Share to match Salary</div>
+            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>For employee comp to match Current</div>
           </div>
         </div>
       </div>
 
-      <div style={{background:'rgba(141,198,63,0.06)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'12px',padding:'14px 18px',fontSize:'13px',color:'#9ca3af',lineHeight:1.6}}>
-        <strong style={{color:'#8DC63F'}}>How the math works:</strong> Employee Monthly = Employee Base (Salary ÷ 12) + Profit Share Amount.
-        In the Salary Model, the "share" is 100% of revenue. In the Profit Share Model, it's the entered percentage of revenue. Taxes / Insurance are shown as a reference cost but are not added to compensation.
+      <div style={{background:'rgba(141,198,63,0.06)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'12px',padding:'14px 18px',fontSize:'13px',color:'#9ca3af',lineHeight:1.7}}>
+        <strong style={{color:'#8DC63F'}}>How the math works:</strong>
+        <div style={{marginTop:'6px'}}>
+          <div><strong style={{color:'#fff'}}>Current Model:</strong> Employee Monthly = Base Salary ÷ 12 (employee gets salary; Xantie keeps all billable revenue).</div>
+          <div style={{marginTop:'4px'}}><strong style={{color:'#8DC63F'}}>New Model:</strong> Employee Monthly = (Base Salary ÷ 12) + (Employee % × Hourly Rate × Hours). The employee earns a share of billable revenue on top of a lower base.</div>
+          <div style={{marginTop:'4px'}}><strong style={{color:'#fff'}}>Xantie Profit</strong> = Revenue Generated − Employee Monthly (in both models).</div>
+          <div style={{marginTop:'4px',color:'#6b7280'}}>Taxes / Insurance is shown for reference and is not included in any calculations.</div>
+        </div>
       </div>
     </div>
   )
