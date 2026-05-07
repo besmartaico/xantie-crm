@@ -129,7 +129,11 @@ export default function CandidateDashboard() {
   // Helper: does this candidate's text mention this skill?
   function candidateHasSkill(cand, skill) {
     if (!skill) return true
-    const re = new RegExp('(?:^|[^a-z])' + skill.replace(/[.*+?^${}()|[\]\\]/g,'\\  // Filter
+    const re = new RegExp('(?:^|[^a-z])' + skill.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[^a-z]|$)', 'i')
+    return re.test((cand.skillset||'') + ' ' + (cand.notes||''))
+  }
+
+  // Filter
   const expTest = EXP_BUCKETS.find(b => b.label === expBucket)?.test || (() => true)
   const filtered = candidates.filter(c => {
     if (hireFilter.length > 0 && !hireFilter.includes(c.wouldHire)) return false
