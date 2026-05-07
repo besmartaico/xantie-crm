@@ -57,7 +57,7 @@ export default function ProfitSharePage() {
   const salEmpBase = (parseFloat(salBase)||0) / 12
   const salEmpMonthly = salEmpBase
   const salEmpAnnual = salEmpMonthly * 12
-  const salXantieProfit = salRevenue - salEmpMonthly
+  const salXantieProfit = salRevenue - salEmpMonthly - (parseFloat(salTaxes)||0)
 
   // ── Profit Share Model (New Model) ──
   // Revenue Generated = Hourly Rate × # Hours
@@ -71,7 +71,7 @@ export default function ProfitSharePage() {
   const psShareAmount = psPercentDecimal * (parseFloat(psRate)||0) * (parseFloat(psHours)||0)
   const psEmpMonthly = psEmpBase + psShareAmount
   const psEmpAnnual = psEmpMonthly * 12
-  const psXantieProfit = psRevenue - psEmpMonthly
+  const psXantieProfit = psRevenue - psEmpMonthly - (parseFloat(psTaxes)||0)
 
   // Comparison
   const empAnnualDiff = psEmpAnnual - salEmpAnnual
@@ -198,7 +198,8 @@ export default function ProfitSharePage() {
               {(() => {
                 const r = parseFloat(salRate) || 0
                 if (r === 0) return 'N/A'
-                const hrs = ((parseFloat(salBase)||0) / 12) / r
+                const monthlyCost = ((parseFloat(salBase)||0) / 12) + (parseFloat(salTaxes)||0)
+                const hrs = monthlyCost / r
                 if (isNaN(hrs) || !isFinite(hrs)) return 'N/A'
                 return fmtNum(hrs, 0) + ' hrs/mo'
               })()}
@@ -212,7 +213,8 @@ export default function ProfitSharePage() {
                 const r = parseFloat(psRate) || 0
                 const denom = r * (1 - psPercentDecimal)
                 if (denom === 0) return 'N/A'
-                const hrs = ((parseFloat(psBase)||0) / 12) / denom
+                const monthlyCost = ((parseFloat(psBase)||0) / 12) + (parseFloat(psTaxes)||0)
+                const hrs = monthlyCost / denom
                 if (isNaN(hrs) || !isFinite(hrs)) return 'N/A'
                 return fmtNum(hrs, 0) + ' hrs/mo'
               })()}
@@ -227,8 +229,8 @@ export default function ProfitSharePage() {
         <div style={{marginTop:'6px'}}>
           <div><strong style={{color:'#fff'}}>Current Model:</strong> Employee Monthly = Base Salary ÷ 12 (employee gets salary; Xantie keeps all billable revenue).</div>
           <div style={{marginTop:'4px'}}><strong style={{color:'#8DC63F'}}>New Model:</strong> Employee Monthly = (Base Salary ÷ 12) + (Employee % × Hourly Rate × Hours). The employee earns a share of billable revenue on top of a lower base.</div>
-          <div style={{marginTop:'4px'}}><strong style={{color:'#fff'}}>Xantie Profit</strong> = Revenue Generated − Employee Monthly (in both models).</div>
-          <div style={{marginTop:'4px',color:'#6b7280'}}>Taxes / Insurance is shown for reference and is not included in any calculations.</div>
+          <div style={{marginTop:'4px'}}><strong style={{color:'#fff'}}>Xantie Profit</strong> = Revenue Generated − Employee Monthly − Taxes / Insurance (in both models).</div>
+          <div style={{marginTop:'4px',color:'#6b7280'}}>Break-even hours = the number of billable hours per month required for Xantie Profit to reach $0.</div>
         </div>
       </div>
     </div>
