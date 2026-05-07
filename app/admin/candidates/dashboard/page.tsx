@@ -98,7 +98,7 @@ function MultiSelect({ label, options, selected, onChange, allLabel='All' }) {
 const th = { padding:'12px 14px', textAlign:'left', fontSize:'11px', color:'#6b7280', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap', background:'#0f0f0f' }
 const td = { padding:'10px 14px', fontSize:'13px', color:'#d1d5db', verticalAlign:'top' }
 
-function ScatterChart({ points, salaryMin, salaryMax, yearsMax, selectedId, onClickPoint }) {
+function ScatterChart({ points, salaryMin, salaryMax, yearsMax, selectedId, onClickPoint, dimSet, onPointHover }) {
   const W = 520, H = 280, PADL = 44, PADB = 36, PADT = 12, PADR = 12
   const innerW = W - PADL - PADR, innerH = H - PADT - PADB
   function xPos(s) { return PADL + ((s - salaryMin) / (salaryMax - salaryMin)) * innerW }
@@ -120,11 +120,16 @@ function ScatterChart({ points, salaryMin, salaryMax, yearsMax, selectedId, onCl
       <text x={10} y={PADT+innerH/2} fill="#9ca3af" fontSize="11" textAnchor="middle" transform={`rotate(-90 10 ${PADT+innerH/2})`}>Years Experience</text>
       {points.map((p, i) => {
         const isSel = selectedId === p.id
+        const isDim = dimSet && !dimSet.has(p.id)
         return (
-          <g key={p.id || i} onClick={()=>onClickPoint && onClickPoint(p.id)} style={{cursor:'pointer'}}>
+          <g key={p.id || i}
+            onClick={()=>onClickPoint && onClickPoint(p.id)}
+            onMouseEnter={()=>onPointHover && onPointHover(p.id)}
+            onMouseLeave={()=>onPointHover && onPointHover(null)}
+            style={{cursor:'pointer', transition:'opacity 0.15s'}}>
             <circle cx={xPos(p.salary)} cy={yPos(p.years)} r={isSel?9:6}
-              fill={isSel?'#fff':'#8DC63F'} fillOpacity={isSel?1:0.7}
-              stroke="#8DC63F" strokeWidth={isSel?2.5:1}>
+              fill={isSel?'#fff':(isDim?'#3a3a3a':'#8DC63F')} fillOpacity={isSel?1:(isDim?0.3:0.7)}
+              stroke={isDim?'#3a3a3a':'#8DC63F'} strokeWidth={isSel?2.5:1}>
               <title>{p.name + ' — ' + p.years + ' yrs · ' + fmtMoney(p.salary)}</title>
             </circle>
           </g>
@@ -141,6 +146,8 @@ export default function CandidateDashboard() {
   const [expBucket, setExpBucket] = useState('All')
   const [skillFilter, setSkillFilter] = useState(null)
   const [candidateFilter, setCandidateFilter] = useState(null)
+  const [skillHover, setSkillHover] = useState(null)
+  const [candidateHover, setCandidateHover] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -300,16 +307,19 @@ export default function CandidateDashboard() {
               {skillCounts.length === 0 && <div style={{color:'#6b7280',fontSize:'13px',padding:'24px 0',textAlign:'center'}}>No skills detected in current results</div>}
               {skillCounts.map(s => {
                 const isSel = skillFilter === s.skill
+                const hoveredCand = candidateHover ? candidates.find(x => x.id === candidateHover) : null
+                const isDim = hoveredCand && !candidateHasSkill(hoveredCand, s.skill)
                 return (
-                  <div key={s.skill} onClick={()=>setSkillFilter(isSel ? null : s.skill)}
-                    style={{display:'grid',gridTemplateColumns:'80px 1fr 30px',gap:'10px',alignItems:'center',marginBottom:'8px',fontSize:'12px',cursor:'pointer',padding:'2px 4px',borderRadius:'4px',background:isSel?'rgba(141,198,63,0.10)':'transparent'}}
-                    onMouseEnter={e=>{if(!isSel)e.currentTarget.style.background='rgba(141,198,63,0.05)'}}
-                    onMouseLeave={e=>{if(!isSel)e.currentTarget.style.background='transparent'}}>
-                    <span style={{color: isSel?'#8DC63F':'#9ca3af',textAlign:'right',fontWeight:isSel?700:400}}>{s.skill}</span>
+                  <div key={s.skill}
+                    onClick={()=>setSkillFilter(isSel ? null : s.skill)}
+                    onMouseEnter={()=>setSkillHover(s.skill)}
+                    onMouseLeave={()=>setSkillHover(null)}
+                    style={{display:'grid',gridTemplateColumns:'80px 1fr 30px',gap:'10px',alignItems:'center',marginBottom:'8px',fontSize:'12px',cursor:'pointer',padding:'2px 4px',borderRadius:'4px',background:isSel?'rgba(141,198,63,0.10)':'transparent', opacity: isDim ? 0.25 : 1, transition:'opacity 0.15s, background 0.15s'}}>
+                    <span style={{color: isSel?'#8DC63F':(isDim?'#4b5563':'#9ca3af'),textAlign:'right',fontWeight:isSel?700:400}}>{s.skill}</span>
                     <div style={{height:'18px',background:'#0a0a0a',borderRadius:'3px',overflow:'hidden',border: isSel?'1px solid #8DC63F':'1px solid transparent'}}>
-                      <div style={{height:'100%', width: (s.count / maxSkillCount * 100) + '%', background:'#8DC63F', transition:'width 0.3s'}}/>
+                      <div style={{height:'100%', width: (s.count / maxSkillCount * 100) + '%', background:isDim?'#3a3a3a':'#8DC63F', transition:'width 0.3s, background 0.15s'}}/>
                     </div>
-                    <span style={{color:'#fff',fontWeight:700}}>{s.count}</span>
+                    <span style={{color:isDim?'#4b5563':'#fff',fontWeight:700}}>{s.count}</span>
                   </div>
                 )
               })}
@@ -320,7 +330,7 @@ export default function CandidateDashboard() {
               <h3 style={{fontSize:'14px',fontWeight:700,margin:'0 0 14px',color:'#fff'}}>Years of Experience vs Salary</h3>
               {scatter.length === 0 && <div style={{color:'#6b7280',fontSize:'13px',padding:'40px 0',textAlign:'center'}}>Not enough data with both salary and experience</div>}
               {scatter.length > 0 && (
-                <ScatterChart points={scatter} salaryMin={salaryMin} salaryMax={salaryMax} yearsMax={yearsMax} selectedId={candidateFilter} onClickPoint={id=>setCandidateFilter(candidateFilter===id?null:id)}/>
+                <ScatterChart points={scatter} salaryMin={salaryMin} salaryMax={salaryMax} yearsMax={yearsMax} selectedId={candidateFilter} onClickPoint={id=>setCandidateFilter(candidateFilter===id?null:id)} dimSet={skillHover ? new Set(base.filter(c => candidateHasSkill(c, skillHover)).map(c => c.id)) : null} onPointHover={id=>setCandidateHover(id)}/>
               )}
               <div style={{fontSize:'11px',color:'#6b7280',marginTop:'10px',borderTop:'1px solid #1e1e1e',paddingTop:'8px'}}>Click any dot to filter to that candidate</div>
             </div>
