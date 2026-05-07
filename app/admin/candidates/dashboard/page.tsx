@@ -105,6 +105,8 @@ export default function CandidateDashboard() {
   const [loading, setLoading] = useState(true)
   const [hireFilter, setHireFilter] = useState(['Yes'])  // multi-select; default to "Yes"
   const [expBucket, setExpBucket] = useState('All')
+  const [skillFilter, setSkillFilter] = useState(null)
+  const [candidateFilter, setCandidateFilter] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -124,12 +126,28 @@ export default function CandidateDashboard() {
     setLoading(false)
   }
 
+  // Helper: does this candidate's text mention this skill?
+  function candidateHasSkill(cand, skill) {
+    if (!skill) return true
+    const re = new RegExp('(?:^|[^a-z])' + skill.replace(/[.*+?^${}()|[\]\\]/g,'\\  // Filter
+  const expTest = EXP_BUCKETS.find(b => b.label === expBucket)?.test || (() => true)
+  const filtered = candidates.filter(c => {
+    if (hireFilter.length > 0 && !hireFilter.includes(c.wouldHire)) return false
+    const yrs = parseFloat(c.experienceYears) || 0
+    if (!expTest(yrs)) return false
+    return true
+  })') + '(?:[^a-z]|$)', 'i')
+    return re.test((cand.skillset||'') + ' ' + (cand.notes||''))
+  }
+
   // Filter
   const expTest = EXP_BUCKETS.find(b => b.label === expBucket)?.test || (() => true)
   const filtered = candidates.filter(c => {
     if (hireFilter.length > 0 && !hireFilter.includes(c.wouldHire)) return false
     const yrs = parseFloat(c.experienceYears) || 0
     if (!expTest(yrs)) return false
+    if (skillFilter && !candidateHasSkill(c, skillFilter)) return false
+    if (candidateFilter && c.id !== candidateFilter) return false
     return true
   })
 
@@ -142,7 +160,18 @@ export default function CandidateDashboard() {
   const maxSkillCount = Math.max(1, ...skillCounts.map(s => s.count))
 
   // ── Chart data: scatter ──
-  const scatter = filtered.map(c => ({
+  // Build scatter from candidates that match Hire/Exp filters but ignore skill/candidate
+  // cross-filters so the dot you clicked stays visible. The scatter already filters
+  // by skillFilter visually via highlight; the table is what gets reduced to 1.
+  const scatterSourceCandidates = candidates.filter(c => {
+    if (hireFilter.length > 0 && !hireFilter.includes(c.wouldHire)) return false
+    const yrs = parseFloat(c.experienceYears) || 0
+    if (!expTest(yrs)) return false
+    if (skillFilter && !candidateHasSkill(c, skillFilter)) return false
+    return true
+  })
+  const scatter = scatterSourceCandidates.map(c => ({
+    id: c.id,
     name: c.name,
     salary: parseSalary(c.salaryRequirement),
     years: parseFloat(c.experienceYears) || 0
@@ -177,15 +206,36 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
+      {(skillFilter || candidateFilter) && (
+        <div style={{display:'flex',gap:'8px',alignItems:'center',marginBottom:'14px',flexWrap:'wrap'}}>
+          {skillFilter && (
+            <span style={{display:'inline-flex',alignItems:'center',gap:'6px',background:'rgba(141,198,63,0.10)',border:'1px solid rgba(141,198,63,0.3)',color:'#8DC63F',borderRadius:'8px',padding:'5px 10px',fontSize:'12px',fontWeight:600}}>
+              Skill: {skillFilter}
+              <button onClick={()=>setSkillFilter(null)} style={{background:'none',border:'none',color:'#8DC63F',cursor:'pointer',padding:0,fontSize:'14px',lineHeight:1}}>✕</button>
+            </span>
+          )}
+          {candidateFilter && (
+            <span style={{display:'inline-flex',alignItems:'center',gap:'6px',background:'rgba(141,198,63,0.10)',border:'1px solid rgba(141,198,63,0.3)',color:'#8DC63F',borderRadius:'8px',padding:'5px 10px',fontSize:'12px',fontWeight:600}}>
+              Candidate: {(candidates.find(x=>x.id===candidateFilter)||{}).name||candidateFilter}
+              <button onClick={()=>setCandidateFilter(null)} style={{background:'none',border:'none',color:'#8DC63F',cursor:'pointer',padding:0,fontSize:'14px',lineHeight:1}}>✕</button>
+            </span>
+          )}
+          <button onClick={()=>{setSkillFilter(null);setCandidateFilter(null)}}
+            style={{background:'transparent',border:'1px solid #2a2a2a',color:'#9ca3af',borderRadius:'8px',padding:'5px 10px',fontSize:'12px',cursor:'pointer'}}>
+            Clear chart filters
+          </button>
+        </div>
+      )}
+
       {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
 
       {!loading && (
         <>
           {/* TABLE */}
           <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',overflow:'hidden',marginBottom:'24px'}}>
-            <div style={{overflowX:'auto'}}>
+            <div style={{overflow:'auto', maxHeight:'380px'}}>
               <table style={{width:'100%',borderCollapse:'collapse',minWidth:'960px'}}>
-                <thead>
+                <thead style={{position:'sticky',top:0,zIndex:1}}>
                   <tr style={{borderBottom:'1px solid #1e1e1e',background:'#0f0f0f'}}>
                     <th style={th}>Name</th>
                     <th style={th}>Notes</th>
@@ -227,16 +277,22 @@ export default function CandidateDashboard() {
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'18px'}}>
               <h3 style={{fontSize:'14px',fontWeight:700,margin:'0 0 14px',color:'#fff'}}>Technical Experience</h3>
               {skillCounts.length === 0 && <div style={{color:'#6b7280',fontSize:'13px',padding:'24px 0',textAlign:'center'}}>No skills detected in current results</div>}
-              {skillCounts.map(s => (
-                <div key={s.skill} style={{display:'grid',gridTemplateColumns:'80px 1fr 30px',gap:'10px',alignItems:'center',marginBottom:'8px',fontSize:'12px'}}>
-                  <span style={{color:'#9ca3af',textAlign:'right'}}>{s.skill}</span>
-                  <div style={{height:'18px',background:'#0a0a0a',borderRadius:'3px',overflow:'hidden'}}>
-                    <div style={{height:'100%', width: (s.count / maxSkillCount * 100) + '%', background:'#8DC63F', transition:'width 0.3s'}}/>
+              {skillCounts.map(s => {
+                const isSelected = skillFilter === s.skill
+                return (
+                  <div key={s.skill} onClick={()=>setSkillFilter(isSelected ? null : s.skill)}
+                    style={{display:'grid',gridTemplateColumns:'80px 1fr 30px',gap:'10px',alignItems:'center',marginBottom:'8px',fontSize:'12px',cursor:'pointer',padding:'2px 4px',borderRadius:'4px',background:isSelected?'rgba(141,198,63,0.10)':'transparent'}}
+                    onMouseEnter={e=>{if(!isSelected)e.currentTarget.style.background='rgba(141,198,63,0.05)'}}
+                    onMouseLeave={e=>{if(!isSelected)e.currentTarget.style.background='transparent'}}>
+                    <span style={{color: isSelected?'#8DC63F':'#9ca3af',textAlign:'right',fontWeight:isSelected?700:400}}>{s.skill}</span>
+                    <div style={{height:'18px',background:'#0a0a0a',borderRadius:'3px',overflow:'hidden',border: isSelected?'1px solid #8DC63F':'1px solid transparent'}}>
+                      <div style={{height:'100%', width: (s.count / maxSkillCount * 100) + '%', background:'#8DC63F', transition:'width 0.3s'}}/>
+                    </div>
+                    <span style={{color:'#fff',fontWeight:700}}>{s.count}</span>
                   </div>
-                  <span style={{color:'#fff',fontWeight:700}}>{s.count}</span>
-                </div>
-              ))}
-              <div style={{fontSize:'11px',color:'#6b7280',marginTop:'10px',borderTop:'1px solid #1e1e1e',paddingTop:'8px'}}>Counts of candidates whose Skills or Notes mention each skill</div>
+                )
+              })}
+              <div style={{fontSize:'11px',color:'#6b7280',marginTop:'10px',borderTop:'1px solid #1e1e1e',paddingTop:'8px'}}>Click any skill to filter the table and scatter chart</div>
             </div>
 
             {/* Scatter: Years vs Salary */}
@@ -244,7 +300,7 @@ export default function CandidateDashboard() {
               <h3 style={{fontSize:'14px',fontWeight:700,margin:'0 0 14px',color:'#fff'}}>Years of Experience vs Salary</h3>
               {scatter.length === 0 && <div style={{color:'#6b7280',fontSize:'13px',padding:'40px 0',textAlign:'center'}}>Not enough data with both salary and experience</div>}
               {scatter.length > 0 && (
-                <ScatterChart points={scatter} salaryMin={salaryMin} salaryMax={salaryMax} yearsMax={yearsMax}/>
+                <ScatterChart points={scatter} salaryMin={salaryMin} salaryMax={salaryMax} yearsMax={yearsMax} selectedId={candidateFilter} onClickPoint={id=>setCandidateFilter(candidateFilter===id?null:id)}/>
               )}
             </div>
           </div>
@@ -257,7 +313,7 @@ export default function CandidateDashboard() {
 const th = { padding:'12px 14px', textAlign:'left', fontSize:'11px', color:'#6b7280', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }
 const td = { padding:'10px 14px', fontSize:'13px', color:'#d1d5db', verticalAlign:'top' }
 
-function ScatterChart({ points, salaryMin, salaryMax, yearsMax }) {
+function ScatterChart({ points, salaryMin, salaryMax, yearsMax, selectedId, onClickPoint }) {
   const W = 520, H = 280, PADL = 44, PADB = 36, PADT = 12, PADR = 12
   const innerW = W - PADL - PADR, innerH = H - PADT - PADB
 
@@ -297,13 +353,21 @@ function ScatterChart({ points, salaryMin, salaryMax, yearsMax }) {
       <text x={PADL+innerW/2} y={H-4} fill="#9ca3af" fontSize="11" textAnchor="middle">Salary</text>
       <text x={10} y={PADT+innerH/2} fill="#9ca3af" fontSize="11" textAnchor="middle" transform={`rotate(-90 10 ${PADT+innerH/2})`}>Years Experience</text>
       {/* Points */}
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={xPos(p.salary)} cy={yPos(p.years)} r="6" fill="#8DC63F" fillOpacity="0.7" stroke="#8DC63F" strokeWidth="1">
-            <title>{p.name + ' — ' + p.years + ' yrs · $' + Math.round(p.salary/1000) + 'k'}</title>
-          </circle>
-        </g>
-      ))}
+      {points.map((p, i) => {
+        const isSelected = selectedId === p.id
+        return (
+          <g key={p.id || i} onClick={()=>onClickPoint && onClickPoint(p.id)} style={{cursor:'pointer'}}>
+            <circle cx={xPos(p.salary)} cy={yPos(p.years)} r={isSelected?9:6}
+              fill={isSelected?'#fff':'#8DC63F'} fillOpacity={isSelected?1:0.7}
+              stroke={isSelected?'#8DC63F':'#8DC63F'} strokeWidth={isSelected?2.5:1}>
+              <title>{p.name + ' — ' + p.years + ' yrs · 
+    </svg>
+  )
+} + Math.round(p.salary/1000) + 'k'}</title>
+            </circle>
+          </g>
+        )
+      })}
     </svg>
   )
 }
