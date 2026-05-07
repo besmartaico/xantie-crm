@@ -60,6 +60,24 @@ export async function POST(req) {
     await ensureSheet(sheets)
     const body = await req.json()
 
+    if (body.action === 'bulk_add') {
+      const incoming = body.candidates || []
+      if (!Array.isArray(incoming) || incoming.length === 0) {
+        return NextResponse.json({ success: false, error: 'No candidates to import' }, { status: 400 })
+      }
+      const rows = await getRows(sheets)
+      const startRow = rows.length + 2
+      const now = new Date().toISOString()
+      const newRows = incoming.map(c => objToRow({ ...c, id: uid(), status: c.status||'active', createdAt: now }))
+      const endRow = startRow + newRows.length - 1
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(), range: `'Candidates'!A${startRow}:T${endRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: newRows }
+      })
+      return NextResponse.json({ success: true, count: newRows.length })
+    }
+
     if (body.action === 'add') {
       const rows = await getRows(sheets)
       const nextRow = rows.length + 2
