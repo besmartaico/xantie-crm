@@ -148,6 +148,10 @@ export default function CandidateDashboard() {
   const [candidateFilter, setCandidateFilter] = useState(null)
   const [skillHover, setSkillHover] = useState(null)
   const [candidateHover, setCandidateHover] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -165,6 +169,43 @@ export default function CandidateDashboard() {
       setCandidates(data || [])
     } catch(e) {}
     setLoading(false)
+  }
+
+  function openEdit(cand, e) {
+    if (e) { e.stopPropagation(); e.preventDefault() }
+    setEditingId(cand.id)
+    setEditForm({ ...cand })
+  }
+
+  async function saveEdit() {
+    if (!editForm.name) return
+    setSaving(true)
+    await fetch('/api/candidates', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'update', ...editForm, id: editingId })
+    })
+    setSaving(false)
+    setEditingId(null)
+    setEditForm({})
+    load()
+  }
+
+  async function doDelete(id) {
+    await fetch('/api/candidates', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    setConfirmDelete(null)
+    setEditingId(null)
+    setEditForm({})
+    load()
+  }
+
+  function dateInputVal(iso) {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return d.toISOString().split('T')[0]
   }
 
   function candidateHasSkill(cand, skill) {
@@ -284,15 +325,18 @@ export default function CandidateDashboard() {
                   {filtered.map(c => {
                     const sal = parseSalary(c.salaryRequirement)
                     return (
-                      <tr key={c.id} style={{borderBottom:'1px solid #1a1a1a'}}>
-                        <td style={td}>{c.name}</td>
+                      <tr key={c.id} onClick={()=>openEdit(c)} title="Click to edit"
+                        style={{borderBottom:'1px solid #1a1a1a',cursor:'pointer',transition:'background 0.12s'}}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(141,198,63,0.06)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <td style={{...td,fontWeight:500,color:'#fff'}}>{c.name}</td>
                         <td style={{...td,maxWidth:'420px',whiteSpace:'normal',color:'#9ca3af',fontSize:'12px'}}>{c.notes||''}</td>
                         <td style={{...td,textAlign:'right'}}>{fmtMoney(sal)}</td>
                         <td style={{...td,textAlign:'right'}}>{c.experienceYears||''}</td>
                         <td style={td}>{c.location||''}</td>
                         <td style={td}>{fmtDate(c.dateInterviewed)}</td>
-                        <td style={{...td,textAlign:'center'}}>{c.linkedin?<a href={c.linkedin} target="_blank" rel="noopener" style={{color:'#60a5fa',textDecoration:'none'}}>🔗</a>:''}</td>
-                        <td style={{...td,textAlign:'center'}}>{c.resume?<a href={c.resume} target="_blank" rel="noopener" style={{color:'#60a5fa',textDecoration:'none'}}>📄</a>:''}</td>
+                        <td style={{...td,textAlign:'center'}}>{c.linkedin?<a href={c.linkedin} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}>🔗</a>:''}</td>
+                        <td style={{...td,textAlign:'center'}}>{c.resume?<a href={c.resume} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}>📄</a>:''}</td>
                       </tr>
                     )
                   })}
@@ -337,6 +381,94 @@ export default function CandidateDashboard() {
           </div>
         </>
       )}
+
+      {/* Edit Modal */}
+      {editingId && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1100,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
+          onClick={()=>setEditingId(null)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'640px',maxWidth:'100%',maxHeight:'92vh',overflowY:'auto'}}
+            onClick={e=>e.stopPropagation()}>
+            <h2 style={{fontSize:'18px',fontWeight:700,margin:'0 0 18px'}}>Edit Candidate</h2>
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
+              <div><label style={lbl}>Name *</label><input value={editForm.name||''} onChange={e=>setEditForm({...editForm,name:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Email</label><input value={editForm.email||''} onChange={e=>setEditForm({...editForm,email:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Location</label><input value={editForm.location||''} onChange={e=>setEditForm({...editForm,location:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Source</label><input value={editForm.source||''} onChange={e=>setEditForm({...editForm,source:e.target.value})} style={inp}/></div>
+            </div>
+
+            <div style={{marginBottom:'12px'}}>
+              <label style={lbl}>Skills</label>
+              <textarea rows={2} value={editForm.skillset||''} onChange={e=>setEditForm({...editForm,skillset:e.target.value})} style={{...inp,resize:'vertical'}}/>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
+              <div><label style={lbl}>LinkedIn URL</label><input value={editForm.linkedin||''} onChange={e=>setEditForm({...editForm,linkedin:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Resume URL</label><input value={editForm.resume||''} onChange={e=>setEditForm({...editForm,resume:e.target.value})} style={inp}/></div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
+              <div><label style={lbl}>First Contact Date</label><input type="date" value={dateInputVal(editForm.firstContactDate)} onChange={e=>setEditForm({...editForm,firstContactDate:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>First Contact Method</label><input value={editForm.firstContactMethod||''} onChange={e=>setEditForm({...editForm,firstContactMethod:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Date Interviewed</label><input type="date" value={dateInputVal(editForm.dateInterviewed)} onChange={e=>setEditForm({...editForm,dateInterviewed:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Date Available</label><input type="date" value={dateInputVal(editForm.dateAvailable)} onChange={e=>setEditForm({...editForm,dateAvailable:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Date Hired</label><input type="date" value={dateInputVal(editForm.dateHired)} onChange={e=>setEditForm({...editForm,dateHired:e.target.value})} style={inp}/></div>
+              <div>
+                <label style={lbl}>Would Hire?</label>
+                <select value={editForm.wouldHire||''} onChange={e=>setEditForm({...editForm,wouldHire:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                  <option value="">—</option>
+                  <option value="No">No</option>
+                  <option value="Potential">Potential</option>
+                  <option value="Yes">Yes</option>
+                  <option value="Hired">Hired</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
+              <div><label style={lbl}>Experience (Years)</label><input type="number" value={editForm.experienceYears||''} onChange={e=>setEditForm({...editForm,experienceYears:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Salary Requirement</label><input value={editForm.salaryRequirement||''} onChange={e=>setEditForm({...editForm,salaryRequirement:e.target.value})} placeholder="120000 or 120k-140k" style={inp}/></div>
+            </div>
+
+            <div style={{marginBottom:'12px'}}>
+              <label style={lbl}>Certifications</label>
+              <input value={editForm.certifications||''} onChange={e=>setEditForm({...editForm,certifications:e.target.value})} style={inp}/>
+            </div>
+
+            <div style={{marginBottom:'18px'}}>
+              <label style={lbl}>Notes</label>
+              <textarea rows={4} value={editForm.notes||''} onChange={e=>setEditForm({...editForm,notes:e.target.value})} style={{...inp,resize:'vertical'}}/>
+            </div>
+
+            <div style={{display:'flex',gap:'8px',justifyContent:'space-between',flexWrap:'wrap'}}>
+              <button onClick={()=>setConfirmDelete(editingId)}
+                style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',cursor:'pointer'}}>Delete</button>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                <button onClick={()=>setEditingId(null)} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+                <button onClick={saveEdit} disabled={saving||!editForm.name}
+                  style={{background:editForm.name?'#8DC63F':'#2a2a2a',color:editForm.name?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,cursor:editForm.name?'pointer':'not-allowed'}}>
+                  {saving?'Saving...':'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
+          onClick={()=>setConfirmDelete(null)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'20px',width:'380px',maxWidth:'100%'}} onClick={e=>e.stopPropagation()}>
+            <h3 style={{margin:'0 0 12px',fontSize:'16px'}}>Delete this candidate?</h3>
+            <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 18px'}}>This cannot be undone.</p>
+            <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+              <button onClick={()=>setConfirmDelete(null)} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+              <button onClick={()=>doDelete(confirmDelete)} style={{background:'#dc2626',border:'none',color:'#fff',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
