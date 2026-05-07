@@ -92,8 +92,8 @@ export default function ProfitSharePage() {
         {/* SALARY / CURRENT MODEL */}
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid #2a2a2a',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>💼 Current Model (Salary)</h2>
-            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Employee paid base salary; company keeps revenue</p>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>💼 Salary Model</h2>
+            <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Employee paid base salary; Xantie keeps revenue</p>
           </div>
 
           <div style={{marginBottom:'14px'}}>
@@ -118,6 +118,7 @@ export default function ProfitSharePage() {
           <div>
             <CalcRow label="Revenue Generated" value={fmt(salRevenue)}/>
             <CalcRow label="Employee Base (Mo)" value={fmt(salEmpBase)}/>
+            <CalcRow label="Employee Share (0.0%)" value={fmt(0)}/>
             <CalcRow label="Taxes / Insurance" value={fmt(salTaxes)} blue/>
             <div style={{height:'4px'}}></div>
             <CalcRow label="Employee Monthly" value={fmt(salEmpMonthly)} big/>
@@ -130,7 +131,7 @@ export default function ProfitSharePage() {
         {/* PROFIT SHARE / NEW MODEL */}
         <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid rgba(141,198,63,0.3)',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>🌱 New Model (Profit Share)</h2>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>🌱 Profit Share Model</h2>
             <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Lower base + share of billable revenue</p>
           </div>
 
@@ -192,18 +193,31 @@ export default function ProfitSharePage() {
             <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>{xantieAnnualDiff >= 0 ? 'Xantie earns more in New Model' : 'Xantie earns more in Current Model'}</div>
           </div>
           <div>
-            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Break-even Hours / Mo</div>
+            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Salary Model · Break-even Hrs</div>
             <div style={{fontSize:'20px',fontWeight:700,color:'#fff'}}>
               {(() => {
-                const baseDiff = (parseFloat(salBase)||0) - (parseFloat(psBase)||0)
-                if (psPercentDecimal === 0) return 'N/A'
-                const monthlyBaseDiff = baseDiff / 12
-                const breakEven = monthlyBaseDiff / (psPercentDecimal * (parseFloat(psRate)||0))
-                if (isNaN(breakEven) || !isFinite(breakEven)) return 'N/A'
-                return fmtNum(breakEven, 0) + ' hrs'
+                const r = parseFloat(salRate) || 0
+                if (r === 0) return 'N/A'
+                const hrs = ((parseFloat(salBase)||0) / 12) / r
+                if (isNaN(hrs) || !isFinite(hrs)) return 'N/A'
+                return fmtNum(hrs, 0) + ' hrs/mo'
               })()}
             </div>
-            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>For employee comp to match Current</div>
+            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>For Xantie Profit = $0</div>
+          </div>
+          <div>
+            <div style={{fontSize:'11px',color:'#6b7280',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'6px'}}>Profit Share Model · Break-even Hrs</div>
+            <div style={{fontSize:'20px',fontWeight:700,color:'#fff'}}>
+              {(() => {
+                const r = parseFloat(psRate) || 0
+                const denom = r * (1 - psPercentDecimal)
+                if (denom === 0) return 'N/A'
+                const hrs = ((parseFloat(psBase)||0) / 12) / denom
+                if (isNaN(hrs) || !isFinite(hrs)) return 'N/A'
+                return fmtNum(hrs, 0) + ' hrs/mo'
+              })()}
+            </div>
+            <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>For Xantie Profit = $0</div>
           </div>
         </div>
       </div>
