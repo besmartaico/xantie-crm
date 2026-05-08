@@ -141,6 +141,10 @@ export default function TimeEntries() {
   const [newProjectName, setNewProjectName] = useState('')
   const [savingProject, setSavingProject] = useState(false)
   const [projectError, setProjectError] = useState('')
+  const [showNewSubProject, setShowNewSubProject] = useState(false)
+  const [newSubProjectName, setNewSubProjectName] = useState('')
+  const [savingSubProject, setSavingSubProject] = useState(false)
+  const [subProjectError, setSubProjectError] = useState('')
 
   // Filters
   const [nameFilter, setNameFilter] = useState('')
@@ -198,6 +202,30 @@ export default function TimeEntries() {
       else setProjectError(data.error||'Failed.')
     } catch(e) { setProjectError('Network error.') }
     setSavingProject(false)
+  }
+
+  async function saveNewSubProject() {
+    if (!newSubProjectName.trim() || !project) return
+    setSavingSubProject(true); setSubProjectError('')
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      const res = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', name: newSubProjectName.trim(), clientName: project, description:'', createdBy: u.name||u.email||'' }) })
+      const data = await res.json()
+      if (data.success) {
+        await loadProjects()
+        setSubProject(newSubProjectName.trim())
+        setNewSubProjectName('')
+        setShowNewSubProject(false)
+      }
+      else setSubProjectError(data.error||'Failed.')
+    } catch(e) { setSubProjectError('Network error.') }
+    setSavingSubProject(false)
+  }
+
+  function handleSubProjectChange(e) {
+    const val = e.target.value
+    if (val === '__new__') { setShowNewSubProject(true); setNewSubProjectName(''); setSubProjectError('') }
+    else { setSubProject(val); setShowNewSubProject(false) }
   }
 
   function handleProjectChange(e) {
@@ -485,16 +513,33 @@ export default function TimeEntries() {
               {project && project !== '__new__' && (
                 <div style={{marginBottom:'16px'}}>
                   <label style={lbl}>PROJECT</label>
-                  <select value={subProject} onChange={e=>setSubProject(e.target.value)}
-                    style={{...inp, cursor:'pointer', background:'#0f0f0f'}}>
+                  <select value={subProject} onChange={handleSubProjectChange}
+                    style={{...inp, cursor:'pointer', background:'#0f0f0f', borderColor: showNewSubProject ? '#8DC63F' : undefined}}>
                     {subProjects.filter(p=>p.clientName===project).map(p=>(
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
                     {!subProjects.some(p=>p.clientName===project) && <option value="N/A">N/A</option>}
+                    <option value="__new__">+ New Project</option>
                   </select>
                 </div>
               )
               }
+
+            {showNewSubProject && (
+              <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
+                <label style={{...lbl,marginBottom:'8px'}}>New Project Name (under {project})</label>
+                <div style={{display:'flex',gap:'8px'}}>
+                  <input autoFocus value={newSubProjectName} onChange={e=>setNewSubProjectName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveNewSubProject()} placeholder="e.g. Phase 2 Migration" style={{...inp,flex:1,fontSize:'14px'}}/>
+                  <button onClick={saveNewSubProject} disabled={!newSubProjectName.trim()}
+                    style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',fontWeight:700,cursor:'pointer',opacity:!newSubProjectName.trim()?0.5:1,whiteSpace:'nowrap'}}>
+                    {savingSubProject?'Adding…':'Add'}
+                  </button>
+                  <button onClick={()=>{setShowNewSubProject(false);setNewSubProjectName('');setSubProjectError('')}}
+                    style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'10px 12px',fontSize:'13px',cursor:'pointer'}}>✕</button>
+                </div>
+                {subProjectError&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#f87171'}}>{subProjectError}</p>}
+              </div>
+            )}
 
             {showNewProject && (
               <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>

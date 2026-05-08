@@ -13,7 +13,6 @@ const PRIORITIES = [
 const STATUSES = [
   { value:'open', label:'Open', color:'#60a5fa', bg:'rgba(96,165,250,0.12)' },
   { value:'in-progress', label:'In Progress', color:'#f59e0b', bg:'rgba(245,158,11,0.12)' },
-  { value:'done', label:'Done', color:'#34d399', bg:'rgba(52,211,153,0.12)' },
   { value:'closed', label:'Closed', color:'#6b7280', bg:'rgba(107,114,128,0.12)' },
 ]
 
@@ -131,8 +130,13 @@ export default function FeedbackPage() {
   return (
     <div className="page-content-mobile">
       <div style={{marginBottom:'24px'}}>
-        <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Bugs & Feature Requests</h1>
-        <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Report issues or suggest improvements to the system</p>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'12px',flexWrap:'wrap'}}>
+          <div>
+            <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Bugs & Feature Requests</h1>
+            <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Report issues or suggest improvements to the system</p>
+          </div>
+          <a href="/admin/feedback/closed" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',fontWeight:600,textDecoration:'none',whiteSpace:'nowrap'}}>📋 View Closed</a>
+        </div>
       </div>
 
       {/* Tab switcher */}
@@ -188,13 +192,13 @@ export default function FeedbackPage() {
       {tab === 'list' && (
         <div>
           {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
-          {!loading && items.length === 0 && (
+          {!loading && items.filter(i => i.status !== 'closed' && i.status !== 'done').length === 0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center'}}>
               <p style={{color:'#6b7280',margin:0}}>No items yet</p>
             </div>
           )}
           <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-            {items.map(item => (
+            {items.filter(i => i.status !== 'closed' && i.status !== 'done').map(item => (
               <div key={item.id} onClick={()=>openDetail(item)}
                 style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',cursor:'pointer',transition:'all 0.15s'}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
