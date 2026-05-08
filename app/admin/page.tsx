@@ -150,6 +150,9 @@ export default function TimeEntries() {
   const [nameFilter, setNameFilter] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
   const [subProjectFilter, setSubProjectFilter] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [customStart, setCustomStart] = useState('')
@@ -305,8 +308,22 @@ export default function TimeEntries() {
   }
 
   async function del(id) {
-    await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', id }) })
-    load()
+    setDeletingId(id); setDeleteError('')
+    try {
+      const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', id }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.success === false) {
+        setDeleteError(data.error || ('HTTP ' + res.status))
+        setDeletingId(null)
+        return
+      }
+      setConfirmDelete(null)
+      setDeletingId(null)
+      await load()
+    } catch(e) {
+      setDeleteError('Network error: ' + (e.message||'unknown'))
+      setDeletingId(null)
+    }
   }
 
   function openEdit(e) {
@@ -475,8 +492,8 @@ export default function TimeEntries() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
-              {!loading&&filtered.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
+              {loading && <tr><td colSpan={9} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>Loading...</td></tr>}
+              {!loading&&filtered.length===0 && <tr><td colSpan={9} style={{...tdStyle,textAlign:'center',color:'#6b7280'}}>No entries match these filters.</td></tr>}
               {filtered.map(e=>(
                 <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                   <td style={tdStyle}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
@@ -488,7 +505,7 @@ export default function TimeEntries() {
                   <td style={{...tdStyle,maxWidth:'220px'}}><span style={{color:'#9ca3af',display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.description}</span></td>
                   <td style={tdStyle}>
                     <button onClick={()=>openEdit(e)} style={{background:'none',border:'none',color:'#8DC63F',cursor:'pointer',fontSize:'12px',marginRight:'8px',fontWeight:600}}>Edit</button>
-                    <button onClick={()=>del(e.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px'}}>Del</button>
+                    <button onClick={(ev)=>{ev.stopPropagation();setConfirmDelete(e);setDeleteError('')}} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px'}}>Del</button>
                   </td>
                 </tr>
               ))}
@@ -628,6 +645,33 @@ export default function TimeEntries() {
                 {saving?'Saving…':editEntry?'Save Changes':`Save ${days.filter(d=>d.date&&d.hours).length} ${days.filter(d=>d.date&&d.hours).length===1?'Entry':'Entries'}`}
               </button>
               <button onClick={closeModal} style={{flex:1,background:'#252525',color:'#fff',border:'none',borderRadius:'8px',padding:'12px',fontSize:'14px',cursor:'pointer'}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1300,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
+          onClick={()=>{ if (!deletingId) { setConfirmDelete(null); setDeleteError('') } }}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'22px',width:'420px',maxWidth:'100%'}} onClick={ev=>ev.stopPropagation()}>
+            <h3 style={{margin:'0 0 10px',fontSize:'16px',fontWeight:700,color:'#fff'}}>Delete this time entry?</h3>
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'10px 12px',marginBottom:'14px',fontSize:'13px',color:'#9ca3af'}}>
+              <div><strong style={{color:'#d1d5db'}}>{confirmDelete.name}</strong> · {confirmDelete.date}</div>
+              <div style={{marginTop:'4px'}}>{confirmDelete.hours} hrs · {confirmDelete.project||'no client'}{confirmDelete.subProject && confirmDelete.subProject!=='N/A' ? ' / '+confirmDelete.subProject : ''}</div>
+              {confirmDelete.description && <div style={{marginTop:'4px',fontSize:'12px',color:'#6b7280',whiteSpace:'pre-wrap'}}>{confirmDelete.description}</div>}
+            </div>
+            <p style={{color:'#9ca3af',fontSize:'12px',margin:'0 0 14px'}}>This cannot be undone.</p>
+            {deleteError && (
+              <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'8px 12px',marginBottom:'12px',fontSize:'12px'}}>
+                {deleteError}
+              </div>
+            )}
+            <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+              <button onClick={()=>{setConfirmDelete(null);setDeleteError('')}} disabled={!!deletingId}
+                style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:deletingId?'not-allowed':'pointer',opacity:deletingId?0.5:1}}>Cancel</button>
+              <button onClick={()=>del(confirmDelete.id)} disabled={!!deletingId}
+                style={{background:'#dc2626',border:'none',color:'#fff',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,cursor:deletingId?'wait':'pointer',opacity:deletingId?0.7:1}}>{deletingId?'Deleting…':'Delete'}</button>
             </div>
           </div>
         </div>
