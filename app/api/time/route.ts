@@ -55,7 +55,7 @@ export async function POST(req) {
       const res = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: RANGE })
       const rows = res.data.values || []
       const sheetId = (await sheets.spreadsheets.get({ spreadsheetId: SID() })).data.sheets.find(s=>s.properties.title==='Time Entries')?.properties.sheetId
-      await sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests: [{ deleteDimension: { range: { sheetId, dimension:'ROWS', startIndex: body.id-2, endIndex: body.id-1 } } }] } })
+      await sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests: [{ deleteDimension: { range: { sheetId, dimension:'ROWS', startIndex: body.id-1, endIndex: body.id } } }] } })
       return NextResponse.json({ success: true })
     }
 
