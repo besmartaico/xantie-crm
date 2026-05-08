@@ -285,7 +285,7 @@ export default function TimeEntries() {
         // Single entry edit
         const day = days[0]
         const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, importedFrom:editEntry.importedFrom })
+          body: JSON.stringify({ action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, subProject, importedFrom:editEntry.importedFrom })
         })
         const data = await res.json()
         if (!data.success) { setSaveError(data.error||'Failed.'); setSaving(false); return }
@@ -293,7 +293,7 @@ export default function TimeEntries() {
         // Multi-entry save - one API call per day
         for (const day of validDays) {
           const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ action:'add', name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project })
+            body: JSON.stringify({ action:'add', name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, subProject })
           })
           const data = await res.json()
           if (!data.success) { setSaveError(data.error||'Failed to save entry for ' + day.date); setSaving(false); return }
@@ -311,17 +311,17 @@ export default function TimeEntries() {
 
   function openEdit(e) {
     setEditEntry(e); setSaveError('')
-    setProject(e.project||''); setDescription(e.description||'')
+    setProject(e.project||''); setSubProject(e.subProject||'N/A'); setDescription(e.description||'')
     setDays([{ date:e.date, hours:e.hours, billable:e.billable||'yes', id:Math.random() }])
-    setShowAdd(true); setShowNewProject(false)
+    setShowAdd(true); setShowNewProject(false); setShowNewSubProject(false)
   }
 
   function openAdd() {
     setEditEntry(null); setSaveError('')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setProject(getLastProject(u)); setDescription('')
+    setProject(getLastProject(u)); setSubProject('N/A'); setDescription('')
     const today = new Date().toISOString().split('T')[0]; const monday = getMondayOf(today); setDays(getWeekDays(monday).map(date => newDay(date)))
-    setShowAdd(true); setShowNewProject(false)
+    setShowAdd(true); setShowNewProject(false); setShowNewSubProject(false)
   }
 
   function closeModal() { setShowAdd(false); setEditEntry(null); setSaveError(''); setShowNewProject(false); setNewProjectName('') }
