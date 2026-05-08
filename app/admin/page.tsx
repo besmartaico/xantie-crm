@@ -70,7 +70,7 @@ function SortIcon({ col, sorts }) {
 }
 
 function SortPill({ sort, index, onRemove, onDragStart, onDragOver, onDrop, isDragging }) {
-  const LABELS = { name:'Name', project:'Project', date:'Date', hours:'Hours', billable:'Billable', description:'Description' }
+  const LABELS = { name:'Name', project:'Client', subProject:'Project', date:'Date', hours:'Hours', billable:'Billable', description:'Description' }
   return (
     <div draggable onDragStart={()=>onDragStart(index)} onDragOver={e=>{e.preventDefault();onDragOver(index)}} onDrop={()=>onDrop(index)}
       style={{display:'flex',alignItems:'center',gap:'4px',background:isDragging?'rgba(141,198,63,0.2)':'rgba(141,198,63,0.1)',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'6px',padding:'4px 8px',fontSize:'12px',color:'#8DC63F',fontWeight:600,cursor:'grab',userSelect:'none',opacity:isDragging?0.5:1}}>
@@ -83,7 +83,7 @@ function SortPill({ sort, index, onRemove, onDragStart, onDragOver, onDrop, isDr
 }
 
 const COLS = [
-  { key:'name', label:'Name' }, { key:'project', label:'Project' }, { key:'date', label:'Date' },
+  { key:'name', label:'Name' }, { key:'project', label:'Client' }, { key:'subProject', label:'Project' }, { key:'date', label:'Date' },
   { key:'hours', label:'Hours' }, { key:'billable', label:'Billable' }, { key:'description', label:'Description' },
 ]
 
@@ -149,6 +149,7 @@ export default function TimeEntries() {
   // Filters
   const [nameFilter, setNameFilter] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
+  const [subProjectFilter, setSubProjectFilter] = useState('')
   const [billableFilter, setBillableFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [customStart, setCustomStart] = useState('')
@@ -358,10 +359,12 @@ export default function TimeEntries() {
   const visibleEntries = isAdmin ? entries : entries.filter(e=>e.email===currentUser.email)
   const allNames = [...new Set(visibleEntries.map(e=>e.name).filter(Boolean))].sort()
   const allProjects = [...new Set(visibleEntries.map(e=>e.project).filter(Boolean))].sort()
+  const allSubProjects = [...new Set(visibleEntries.map(e=>e.subProject).filter(s=>s && s!=='N/A'))].sort()
 
   const filtered = applySort(visibleEntries.filter(e => {
     if (nameFilter && e.name!==nameFilter) return false
     if (projectFilter && e.project!==projectFilter) return false
+    if (subProjectFilter && e.subProject!==subProjectFilter) return false
     if (billableFilter && e.billable!==billableFilter) return false
     const range = getDateRange(dateFilter, customStart, customEnd)
     if (range) { const d=new Date(e.date); if(d<range[0]||d>range[1]) return false }
@@ -370,7 +373,7 @@ export default function TimeEntries() {
 
   const totalHours = filtered.reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
   const billableHours = filtered.filter(e=>e.billable!=='no').reduce((s,e)=>s+(parseFloat(e.hours)||0),0)
-  const hasFilters = nameFilter||projectFilter||billableFilter||dateFilter
+  const hasFilters = nameFilter||projectFilter||subProjectFilter||billableFilter||dateFilter
   const canSave = !!project && !saving
   const totalDayHours = days.reduce((s,d)=>s+(parseFloat(d.hours)||0),0)
 
@@ -416,10 +419,17 @@ export default function TimeEntries() {
             </div>
           )}
           <div>
-            <label style={{...lbl,marginBottom:'4px'}}>Project</label>
+            <label style={{...lbl,marginBottom:'4px'}}>Client</label>
             <select value={projectFilter} onChange={e=>setProjectFilter(e.target.value)} style={sel}>
-              <option value="">All Projects</option>
+              <option value="">All Clients</option>
               {allProjects.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{...lbl,marginBottom:'4px'}}>Project</label>
+            <select value={subProjectFilter} onChange={e=>setSubProjectFilter(e.target.value)} style={sel}>
+              <option value="">All Projects</option>
+              {allSubProjects.map(p=><option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div>
@@ -435,7 +445,7 @@ export default function TimeEntries() {
           </div>
           {hasFilters && (
             <div style={{alignSelf:'flex-end'}}>
-              <button onClick={()=>{setNameFilter('');setProjectFilter('');setBillableFilter('');setDateFilter('');setCustomStart('');setCustomEnd('')}}
+              <button onClick={()=>{setNameFilter('');setProjectFilter('');setSubProjectFilter('');setBillableFilter('');setDateFilter('');setCustomStart('');setCustomEnd('')}}
                 style={{background:'#252525',color:'#9ca3af',border:'none',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',cursor:'pointer'}}>
                 Clear filters
               </button>
@@ -471,6 +481,7 @@ export default function TimeEntries() {
                 <tr key={e.id} onMouseEnter={ev=>ev.currentTarget.style.background='#181818'} onMouseLeave={ev=>ev.currentTarget.style.background=''}>
                   <td style={tdStyle}><div style={{fontWeight:500,color:'#fff'}}>{e.name}</div><div style={{fontSize:'11px',color:'#6b7280'}}>{e.email}</div></td>
                   <td style={tdStyle}>{e.project?<span style={{background:'rgba(141,198,63,0.1)',color:'#8DC63F',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.project}</span>:<span style={{color:'#4b5563',fontSize:'12px'}}>—</span>}</td>
+                  <td style={tdStyle}>{e.subProject && e.subProject!=='N/A'?<span style={{background:'rgba(96,165,250,0.10)',color:'#60a5fa',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.subProject}</span>:<span style={{color:'#4b5563',fontSize:'12px'}}>—</span>}</td>
                   <td style={tdStyle}>{e.date}</td>
                   <td style={tdStyle}><span style={{background:'rgba(141,198,63,0.12)',color:'#8DC63F',padding:'3px 8px',borderRadius:'6px',fontWeight:700,fontSize:'12px'}}>{e.hours}</span></td>
                   <td style={tdStyle}><span style={{background:e.billable==='no'?'rgba(156,163,175,0.1)':'rgba(96,165,250,0.1)',color:e.billable==='no'?'#9ca3af':'#60a5fa',padding:'2px 8px',borderRadius:'5px',fontSize:'12px',fontWeight:600}}>{e.billable==='no'?'Non-Billable':'Billable'}</span></td>
