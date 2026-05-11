@@ -70,6 +70,7 @@ export default function AdminLayout({ children }) {
     { label: 'Candidates', href: '/admin/candidates' },
     { label: 'Sales CRM', href: '/admin/sales' },
     { label: 'Comp Calculator', href: '/admin/comp-calc' },
+    { label: 'Documents', href: '/admin/documents' },
     { label: 'Clients', href: '/admin/projects' },
     { label: 'Users', href: '/admin/users' },
     { label: 'Import', href: '/admin/import' },
