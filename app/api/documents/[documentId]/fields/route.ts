@@ -1,26 +1,50 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
+import zlib from 'zlib'
 import { getDriveFileMeta, updateDriveFileMeta, deleteDriveFile } from '@/lib/googleDrive'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Drive appProperties has a 124-char-per-value limit and a 30-property-per-file cap.
-// Using key prefix 'f_' (max 5 chars including index) leaves plenty of room per value.
+// Drive appProperties: max 30 entries per file, ~124 chars per value.
+// We gzip+base64 the field JSON to massively shrink it (typically 70-80% reduction),
+// then chunk the result into 'f_N' keys.
 const KEY_PREFIX = 'f_'
-const CHUNK_SIZE = 100  // 'f_99' (4 chars) + 100 char value = 104 total, well under any per-property limit
-const MAX_CHUNKS = 28   // leave room for a few other appProperties; Drive caps at 30 total
+const CHUNK_SIZE = 100
+const MAX_CHUNKS = 28
+
+// Encode: JSON string -> gzip -> base64 (one compact string)
+function encodePayload(jsonString) {
+  const gz = zlib.gzipSync(jsonString, { level: 9 })
+  return gz.toString('base64')
+}
+
+// Decode: try gzip+base64 first; fall back to raw JSON for legacy data
+function decodePayload(joined) {
+  if (!joined) return ''
+  // Quick heuristic: raw JSON starts with [ or {; base64 doesn't.
+  if (joined.startsWith('[') || joined.startsWith('{')) return joined
+  try {
+    const buf = Buffer.from(joined, 'base64')
+    const out = zlib.gunzipSync(buf).toString()
+    return out
+  } catch {
+    // Not gzip-base64; treat as raw
+    return joined
+  }
+}
 
 function readFieldsFromProps(props) {
   if (!props) return ''
-  // Prefer the new 'f_N' scheme
-  const newKeys = Object.keys(props).filter(k => k.startsWith(KEY_PREFIX) && /^f_\d+$/.test(k))
+  // New scheme: f_0, f_1, ...
+  const newKeys = Object.keys(props).filter(k => /^f_\d+$/.test(k))
   if (newKeys.length > 0) {
     newKeys.sort((a, b) => parseInt(a.substring(2), 10) - parseInt(b.substring(2), 10))
-    return newKeys.map(k => props[k]).join('')
+    return decodePayload(newKeys.map(k => props[k]).join(''))
   }
-  // Legacy schemes (backward compat with files saved before this commit)
+  // Legacy: single 'fields' value
   if (props.fields) return props.fields
+  // Legacy: fields_0, fields_1, ...
   const legacyKeys = Object.keys(props).filter(k => /^fields_\d+$/.test(k))
   if (legacyKeys.length > 0) {
     legacyKeys.sort((a, b) => parseInt(a.substring(7), 10) - parseInt(b.substring(7), 10))
@@ -50,22 +74,20 @@ export async function POST(req, ctx) {
     const { documentId } = await ctx.params
     const body = await req.json()
     const fields = Array.isArray(body.fields) ? body.fields : []
-
     const serialized = JSON.stringify(fields)
+    const encoded = encodePayload(serialized)
 
-    // Chunk the JSON into <= CHUNK_SIZE pieces
     const chunks = []
-    for (let i = 0; i < serialized.length; i += CHUNK_SIZE) {
-      chunks.push(serialized.substring(i, i + CHUNK_SIZE))
+    for (let i = 0; i < encoded.length; i += CHUNK_SIZE) {
+      chunks.push(encoded.substring(i, i + CHUNK_SIZE))
     }
 
     if (chunks.length > MAX_CHUNKS) {
       return NextResponse.json({
-        error: `Too many fields. Data is ${serialized.length} characters, would need ${chunks.length} chunks (max ${MAX_CHUNKS}). Try shortening labels/groups or reducing the number of fields.`,
+        error: `Even after compression, the field data is too large (raw ${serialized.length} chars, compressed ${encoded.length} chars, needs ${chunks.length} chunks, max ${MAX_CHUNKS}). Consider shortening labels/groups or splitting into multiple templates.`,
       }, { status: 400 })
     }
 
-    // Read existing appProperties so we can clear stale keys (Drive's partial update keeps any key we don't mention)
     let existing = {}
     try {
       const meta = await getDriveFileMeta(documentId)
@@ -74,8 +96,8 @@ export async function POST(req, ctx) {
       console.warn('getDriveFileMeta failed before save:', e.message)
     }
 
-    // Build the update payload: clear all old chunk keys + legacy keys, set new chunks
-    const updates = { fields: null }  // clear the very-old single-property scheme
+    // Clear all old chunk keys (any scheme) + legacy 'fields' key, then set new
+    const updates = { fields: null }
     Object.keys(existing).forEach(k => {
       if (k.startsWith(KEY_PREFIX) || /^fields_\d+$/.test(k)) {
         updates[k] = null
@@ -84,7 +106,12 @@ export async function POST(req, ctx) {
     chunks.forEach((c, i) => { updates[KEY_PREFIX + i] = c })
 
     await updateDriveFileMeta(documentId, updates)
-    return NextResponse.json({ success: true, chunks: chunks.length, bytes: serialized.length })
+    return NextResponse.json({
+      success: true,
+      chunks: chunks.length,
+      rawBytes: serialized.length,
+      compressedBytes: encoded.length,
+    })
   } catch(e) {
     console.error('POST fields error:', e)
     const code = e && (e.code || (e.response && e.response.status))
