@@ -95,22 +95,55 @@ export async function updateDriveFileMeta(fileId, appProperties) {
 // Delete a Drive file (used when removing a template)
 export async function deleteDriveFile(fileId) {
   const drive = getDrive()
-  // Try permanent delete first (works if service account is Content Manager / Manager on the Shared Drive).
-  // If that fails with a permission error, fall back to moving the file to trash (works with Contributor).
+  // Strategy:
+  // 1) Verify file exists from service account's perspective via files.get
+  // 2) Try permanent delete (requires Manager role on Shared Drive)
+  // 3) If that fails with permission/not-found, fall back to trash (requires Contributor or higher)
+  // Note: Google Drive sometimes returns 404 instead of 403 for permission errors as a security measure,
+  // so we treat 401/403/404 as "try the trash fallback" rather than re-throwing immediately.
+
+  // Step 1: confirm visibility
+  let meta = null
   try {
-    await drive.files.delete({ fileId, supportsAllDrives: true })
-    return { method: 'deleted' }
+    const got = await drive.files.get({
+      fileId,
+      fields: 'id,name,trashed,driveId',
+      supportsAllDrives: true,
+    })
+    meta = got.data
   } catch(e) {
     const code = e && (e.code || (e.response && e.response.status))
-    if (code === 403 || code === 401) {
-      await drive.files.update({
-        fileId,
-        requestBody: { trashed: true },
-        supportsAllDrives: true,
-        fields: 'id,trashed',
-      })
-      return { method: 'trashed' }
-    }
-    throw e
+    throw new Error('Cannot find file ' + fileId + ' (HTTP ' + code + '). The service account may not have access. ' + (e.message || ''))
+  }
+
+  if (meta.trashed) {
+    return { method: 'already-trashed', name: meta.name }
+  }
+
+  // Step 2: try permanent delete
+  let permanentError = null
+  try {
+    await drive.files.delete({ fileId, supportsAllDrives: true })
+    return { method: 'deleted', name: meta.name }
+  } catch(e) {
+    permanentError = e
+  }
+
+  // Step 3: trash fallback
+  try {
+    await drive.files.update({
+      fileId,
+      requestBody: { trashed: true },
+      supportsAllDrives: true,
+      fields: 'id,trashed',
+    })
+    return { method: 'trashed', name: meta.name }
+  } catch(trashError) {
+    const pCode = permanentError && (permanentError.code || (permanentError.response && permanentError.response.status))
+    const tCode = trashError && (trashError.code || (trashError.response && trashError.response.status))
+    throw new Error(
+      'Both delete (HTTP ' + pCode + ': ' + (permanentError.message || '') + ') and trash (HTTP ' + tCode + ': ' + (trashError.message || '') + ') failed. ' +
+      'The service account likely needs at least "Contributor" role on the Shared Drive.'
+    )
   }
 }
