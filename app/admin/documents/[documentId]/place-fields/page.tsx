@@ -128,6 +128,21 @@ export default function PlaceFieldsPage({ params }) {
     setFields(prev => prev.filter(f => f.id !== id))
   }
 
+  function duplicateField(id) {
+    setFields(prev => {
+      const orig = prev.find(f => f.id === id)
+      if (!orig) return prev
+      // Drop the copy on the currently visible page, slightly offset so it doesn't sit on top.
+      return [...prev, {
+        ...orig,
+        id: uid(),
+        page: visiblePage,
+        x: orig.x + 20,
+        y: orig.y + 20,
+      }]
+    })
+  }
+
   function setFieldLabel(id, label) {
     setFields(prev => prev.map(f => f.id === id ? {...f, label} : f))
   }
@@ -202,7 +217,10 @@ export default function PlaceFieldsPage({ params }) {
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
                     <input value={f.group||''} onChange={e=>setFieldGroup(f.id, e.target.value)} placeholder="Group (optional)" title="Fields with the same group share one value at signing"
                       style={{width:'100%',background:'#111',border:'1px solid '+(f.group?'#8DC63F66':'#252525'),borderRadius:'6px',padding:'6px 8px',color:f.group?'#8DC63F':'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
-                    <button onClick={()=>removeField(f.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'11px',padding:0}}>Remove</button>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}}>
+                      <button onClick={()=>duplicateField(f.id)} title={'Copy this field to page '+visiblePage+' (keeps type, label, group)'} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'11px',padding:0,fontWeight:600}}>+ Duplicate</button>
+                      <button onClick={()=>removeField(f.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'11px',padding:0}}>Remove</button>
+                    </div>
                   </div>
                 )})}
               </div>
