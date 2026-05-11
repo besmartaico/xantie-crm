@@ -93,8 +93,6 @@ function FieldBox({ field, scale, onUpdate, onRemove }) {
       bounds="parent"
       style={{border:'2px solid '+c.border,background:c.bg,zIndex:3,display:'flex',alignItems:'center',justifyContent:'center',color:c.border,fontSize:'11px',fontWeight:700,cursor:'move',borderRadius:'2px'}}>
       <span style={{pointerEvents:'none',userSelect:'none'}}>{field.label || c.label}</span>
-      <button onClick={(e)=>{e.stopPropagation(); onRemove && onRemove(field.id)}}
-        style={{position:'absolute',top:'-10px',right:'-10px',width:'20px',height:'20px',borderRadius:'50%',background:'#dc2626',color:'#fff',border:'none',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,lineHeight:1}}>✕</button>
     </Rnd>
   )
 }

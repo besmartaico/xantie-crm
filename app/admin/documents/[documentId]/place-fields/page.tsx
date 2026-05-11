@@ -151,6 +151,11 @@ export default function PlaceFieldsPage({ params }) {
     setFields(prev => prev.map(f => f.id === id ? {...f, group} : f))
   }
 
+  function setFieldPage(id, page) {
+    const p = Math.max(1, parseInt(page, 10) || 1)
+    setFields(prev => prev.map(f => f.id === id ? {...f, page: p} : f))
+  }
+
   async function save() {
     setSaving(true); setSaveStatus('')
     try {
@@ -159,13 +164,18 @@ export default function PlaceFieldsPage({ params }) {
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ fields })
       })
-      if (res.ok) setSaveStatus('✓ Saved')
-      else setSaveStatus('Save failed')
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) {
+        setSaveStatus('✓ Saved')
+        setTimeout(()=>setSaveStatus(''), 2500)
+      } else {
+        setSaveStatus('✗ ' + (data.error || ('HTTP ' + res.status)))
+        // Leave the error visible until next save attempt
+      }
     } catch(e) {
-      setSaveStatus('Save failed')
+      setSaveStatus('✗ ' + (e.message || 'Network error'))
     }
     setSaving(false)
-    setTimeout(()=>setSaveStatus(''), 2500)
   }
 
   if (!resolvedParams) return null
@@ -178,7 +188,7 @@ export default function PlaceFieldsPage({ params }) {
           <h1 style={{fontSize:'18px',fontWeight:700,margin:'4px 0 0'}}>{doc ? doc.name : 'Loading…'}</h1>
         </div>
         <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          {saveStatus && <span style={{fontSize:'12px',color:saveStatus.startsWith('✓')?'#8DC63F':'#f87171'}}>{saveStatus}</span>}
+          {saveStatus && <span style={{fontSize:'12px',color:saveStatus.startsWith('✓')?'#8DC63F':'#f87171',maxWidth:'420px',wordBreak:'break-word'}}>{saveStatus}</span>}
           <button onClick={save} disabled={saving}
             style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:saving?'wait':'pointer',opacity:saving?0.7:1}}>{saving?'Saving…':'💾 Save'}</button>
         </div>
@@ -211,7 +221,10 @@ export default function PlaceFieldsPage({ params }) {
                   <div key={f.id} style={{background:'#0f0f0f',border:'1px solid '+(f.group?'#8DC63F44':'#1e1e1e'),borderRadius:'8px',padding:'8px 10px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
                       <span style={{fontSize:'11px',color:'#8DC63F',fontWeight:700,textTransform:'uppercase'}}>{f.type}{groupCount > 1 ? ' · 🔗 '+groupCount : ''}</span>
-                      <span style={{fontSize:'11px',color:'#6b7280'}}>Page {f.page}</span>
+                      <label style={{fontSize:'11px',color:'#6b7280',display:'inline-flex',alignItems:'center',gap:'4px'}}>Page
+                        <input type="number" min="1" value={f.page} onChange={e=>setFieldPage(f.id, e.target.value)}
+                          style={{width:'46px',background:'#0f0f0f',border:'1px solid #252525',borderRadius:'4px',padding:'2px 4px',color:'#fff',fontSize:'11px',outline:'none',textAlign:'center'}}/>
+                      </label>
                     </div>
                     <input value={f.label||''} onChange={e=>setFieldLabel(f.id, e.target.value)} placeholder="Label"
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
