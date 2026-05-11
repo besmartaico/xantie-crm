@@ -24,6 +24,7 @@ export default function DocumentsPage() {
   const [uploadError, setUploadError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -69,12 +70,20 @@ export default function DocumentsPage() {
   }
 
   async function doDelete(id) {
-    setDeleting(true)
+    setDeleting(true); setDeleteError('')
     try {
-      await fetch('/api/documents/' + id + '/fields', { method: 'DELETE' })
+      const res = await fetch('/api/documents/' + id + '/fields', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) {
+        setDeleteError(data.error || ('HTTP ' + res.status))
+        setDeleting(false)
+        return
+      }
       setConfirmDelete(null)
       await load()
-    } catch(e) {}
+    } catch(e) {
+      setDeleteError(e.message || 'Network error')
+    }
     setDeleting(false)
   }
 
@@ -121,7 +130,7 @@ export default function DocumentsPage() {
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
               <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📍 Place fields</a>
               <a href={'/admin/documents/' + d.id} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Send to sign →</a>
-              <button onClick={()=>setConfirmDelete(d)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
+              <button onClick={()=>{setConfirmDelete(d);setDeleteError('')}} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
             </div>
           </div>
         ))}
@@ -132,7 +141,10 @@ export default function DocumentsPage() {
           <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'22px',width:'420px',maxWidth:'100%'}} onClick={e=>e.stopPropagation()}>
             <h3 style={{margin:'0 0 10px',fontSize:'16px',fontWeight:700,color:'#fff'}}>Delete template?</h3>
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'10px 12px',marginBottom:'14px',fontSize:'13px',color:'#d1d5db'}}>{confirmDelete.name}</div>
-            <p style={{color:'#9ca3af',fontSize:'12px',margin:'0 0 14px'}}>This removes the PDF from Google Drive. Previously signed PDFs in Blob storage are not affected.</p>
+            <p style={{color:'#9ca3af',fontSize:'12px',margin:'0 0 14px'}}>This removes the PDF from Google Drive (moved to trash if the service account lacks permanent-delete permission). Previously signed PDFs in Blob storage are not affected.</p>
+            {deleteError && (
+              <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'8px 12px',marginBottom:'12px',fontSize:'12px',wordBreak:'break-word'}}>{deleteError}</div>
+            )}
             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
               <button onClick={()=>setConfirmDelete(null)} disabled={deleting} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:deleting?'not-allowed':'pointer'}}>Cancel</button>
               <button onClick={()=>doDelete(confirmDelete.id)} disabled={deleting} style={{background:'#dc2626',border:'none',color:'#fff',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,cursor:deleting?'wait':'pointer'}}>{deleting?'Deleting…':'Delete'}</button>

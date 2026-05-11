@@ -95,6 +95,22 @@ export async function updateDriveFileMeta(fileId, appProperties) {
 // Delete a Drive file (used when removing a template)
 export async function deleteDriveFile(fileId) {
   const drive = getDrive()
-  await drive.files.delete({ fileId, supportsAllDrives: true })
-  return true
+  // Try permanent delete first (works if service account is Content Manager / Manager on the Shared Drive).
+  // If that fails with a permission error, fall back to moving the file to trash (works with Contributor).
+  try {
+    await drive.files.delete({ fileId, supportsAllDrives: true })
+    return { method: 'deleted' }
+  } catch(e) {
+    const code = e && (e.code || (e.response && e.response.status))
+    if (code === 403 || code === 401) {
+      await drive.files.update({
+        fileId,
+        requestBody: { trashed: true },
+        supportsAllDrives: true,
+        fields: 'id,trashed',
+      })
+      return { method: 'trashed' }
+    }
+    throw e
+  }
 }
