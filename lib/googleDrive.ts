@@ -18,14 +18,16 @@ export function getDrive() {
 
 const FOLDER_ID = () => process.env.GOOGLE_DRIVE_FOLDER_ID
 
-// Upload a PDF buffer to the configured Drive folder
+// Upload a PDF buffer to the configured Drive folder.
+// For Shared Drives, we upload directly with parents set so the file is
+// owned by the Shared Drive (not by the service account, which has no quota).
 export async function uploadPdfToDrive(buffer, fileName, opts) {
   opts = opts || {}
   const drive = getDrive()
-  // Step 1: upload without parents (avoids personal-drive quota errors)
   const created = await drive.files.create({
     requestBody: {
       name: fileName,
+      parents: [FOLDER_ID()],
       ...(opts.appProperties ? { appProperties: opts.appProperties } : {}),
     },
     media: {
@@ -35,14 +37,7 @@ export async function uploadPdfToDrive(buffer, fileName, opts) {
     fields: 'id,name,webViewLink,appProperties',
     supportsAllDrives: true,
   })
-  // Step 2: move into folder
-  const moved = await drive.files.update({
-    fileId: created.data.id,
-    addParents: FOLDER_ID(),
-    fields: 'id,name,webViewLink,appProperties',
-    supportsAllDrives: true,
-  })
-  return moved.data
+  return created.data
 }
 
 // List PDFs in the configured Drive folder
@@ -55,6 +50,7 @@ export async function listPdfsInFolder() {
     pageSize: 200,
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
+    corpora: 'allDrives',
   })
   return res.data.files || []
 }
@@ -83,7 +79,6 @@ export async function getDriveFileMeta(fileId) {
 // Update file metadata (used to save field definitions to appProperties)
 export async function updateDriveFileMeta(fileId, appProperties) {
   const drive = getDrive()
-  // Google Drive appProperties: values must be strings; null deletes the key
   const cleaned = {}
   for (const [k, v] of Object.entries(appProperties)) {
     cleaned[k] = v === null || v === undefined ? null : String(v)
