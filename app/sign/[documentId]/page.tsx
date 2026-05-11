@@ -59,6 +59,21 @@ export default function PublicSignPage({ params }) {
     setValues(prev => ({...prev, [id]: val}))
   }
 
+  // Cascade a value to all fields in the same group + same type
+  function setFieldValueAndGroup(field, val) {
+    setValues(prev => {
+      const next = {...prev, [field.id]: val}
+      if (field.group) {
+        fields.forEach(f => {
+          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group) {
+            next[f.id] = val
+          }
+        })
+      }
+      return next
+    })
+  }
+
   function applyToAll(field, val) {
     setValues(prev => {
       const next = {...prev}
@@ -160,7 +175,7 @@ export default function PublicSignPage({ params }) {
 
       {activeField && <FieldModal field={activeField} fields={fields} currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
         if (applyAll) applyToAll(activeField, val)
-        else setFieldValue(activeField.id, val)
+        else setFieldValueAndGroup(activeField, val)
         setActiveField(null)
       }}/>}
     </div>
@@ -181,8 +196,16 @@ function FieldModal({ field, fields, currentValue, onClose, onSave }) {
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px',overflow:'auto'}} onClick={onClose}>
       <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'22px',width:'640px',maxWidth:'100%'}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
-          <h3 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff',textTransform:'capitalize'}}>{field.label || field.type}</h3>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'14px',gap:'12px'}}>
+          <div>
+            <h3 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff',textTransform:'capitalize'}}>{field.label || field.type}</h3>
+            {(() => {
+              if (!field.group) return null
+              const linkedCount = fields.filter(f => f.id !== field.id && f.type === field.type && f.group === field.group).length
+              if (linkedCount === 0) return null
+              return <p style={{fontSize:'11px',color:'#8DC63F',margin:'4px 0 0'}}>🔗 Will also fill {linkedCount} linked field{linkedCount===1?'':'s'} in group "{field.group}"</p>
+            })()}
+          </div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
         </div>
 

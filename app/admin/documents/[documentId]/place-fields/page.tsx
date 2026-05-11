@@ -132,6 +132,10 @@ export default function PlaceFieldsPage({ params }) {
     setFields(prev => prev.map(f => f.id === id ? {...f, label} : f))
   }
 
+  function setFieldGroup(id, group) {
+    setFields(prev => prev.map(f => f.id === id ? {...f, group} : f))
+  }
+
   async function save() {
     setSaving(true); setSaveStatus('')
     try {
@@ -182,20 +186,25 @@ export default function PlaceFieldsPage({ params }) {
               <PdfViewer fileUrl={pdfBlobUrl} fields={fields} onUpdateField={updateField} onRemoveField={removeField}/>
             </div>
             <div style={{width:'260px',background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px',overflow:'auto',maxHeight:'calc(100vh - 220px)'}}>
-              <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 10px'}}>Fields</h3>
+              <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 4px'}}>Fields</h3>
+              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Tip: give matching fields the same <strong style={{color:'#8DC63F'}}>Group</strong> (e.g., "name") to share one value at signing.</p>
               {fields.length === 0 && <p style={{color:'#6b7280',fontSize:'12px',margin:0}}>None yet. Use the buttons above to add fields to the current page.</p>}
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                {fields.map(f => (
-                  <div key={f.id} style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'8px 10px'}}>
+                {fields.map(f => {
+                  const groupCount = f.group ? fields.filter(x => x.group === f.group && x.type === f.type).length : 0
+                  return (
+                  <div key={f.id} style={{background:'#0f0f0f',border:'1px solid '+(f.group?'#8DC63F44':'#1e1e1e'),borderRadius:'8px',padding:'8px 10px'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
-                      <span style={{fontSize:'11px',color:'#8DC63F',fontWeight:700,textTransform:'uppercase'}}>{f.type}</span>
+                      <span style={{fontSize:'11px',color:'#8DC63F',fontWeight:700,textTransform:'uppercase'}}>{f.type}{groupCount > 1 ? ' · 🔗 '+groupCount : ''}</span>
                       <span style={{fontSize:'11px',color:'#6b7280'}}>Page {f.page}</span>
                     </div>
                     <input value={f.label||''} onChange={e=>setFieldLabel(f.id, e.target.value)} placeholder="Label"
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
+                    <input value={f.group||''} onChange={e=>setFieldGroup(f.id, e.target.value)} placeholder="Group (optional)" title="Fields with the same group share one value at signing"
+                      style={{width:'100%',background:'#111',border:'1px solid '+(f.group?'#8DC63F66':'#252525'),borderRadius:'6px',padding:'6px 8px',color:f.group?'#8DC63F':'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
                     <button onClick={()=>removeField(f.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'11px',padding:0}}>Remove</button>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           </>
