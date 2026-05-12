@@ -117,7 +117,12 @@ export default function PlaceFieldsPage({ params }) {
       width: base.width,
       height: base.height,
       label: base.label,
+      assignee: 'user',
     }])
+  }
+
+  function setFieldAssignee(id, assignee) {
+    setFields(prev => prev.map(f => f.id === id ? {...f, assignee} : f))
   }
 
   function updateField(id, patch) {
@@ -133,6 +138,7 @@ export default function PlaceFieldsPage({ params }) {
       const orig = prev.find(f => f.id === id)
       if (!orig) return prev
       // Drop the copy on the currently visible page, slightly offset so it doesn't sit on top.
+      // {...orig} preserves assignee, group, label, etc.
       return [...prev, {
         ...orig,
         id: uid(),
@@ -212,7 +218,8 @@ export default function PlaceFieldsPage({ params }) {
             </div>
             <div style={{width:'260px',background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px',overflow:'auto',maxHeight:'calc(100vh - 220px)'}}>
               <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 4px'}}>Fields</h3>
-              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Tip: give matching fields the same <strong style={{color:'#8DC63F'}}>Group</strong> (e.g., "name") to share one value at signing.</p>
+              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 6px',lineHeight:1.4}}>Tip: give matching fields the same <strong style={{color:'#8DC63F'}}>Group</strong> (e.g., "name") to share one value at signing.</p>
+              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Mark a field <strong style={{color:'#f97316'}}>Admin</strong> if you'll fill it before/after the signer (the signer can't fill admin fields).</p>
               {fields.length === 0 && <p style={{color:'#6b7280',fontSize:'12px',margin:0}}>None yet. Use the buttons above to add fields to the current page.</p>}
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                 {fields.map(f => {
@@ -230,6 +237,12 @@ export default function PlaceFieldsPage({ params }) {
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
                     <input value={f.group||''} onChange={e=>setFieldGroup(f.id, e.target.value)} placeholder="Group (optional)" title="Fields with the same group share one value at signing"
                       style={{width:'100%',background:'#111',border:'1px solid '+(f.group?'#8DC63F66':'#252525'),borderRadius:'6px',padding:'6px 8px',color:f.group?'#8DC63F':'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
+                    <div style={{display:'flex',gap:'4px',marginBottom:'6px'}}>
+                      <button type="button" onClick={()=>setFieldAssignee(f.id, 'user')}
+                        style={{flex:1,background:(!f.assignee||f.assignee==='user')?'#8DC63F':'#1e1e1e',color:(!f.assignee||f.assignee==='user')?'#0a0a0a':'#9ca3af',border:'none',borderRadius:'6px',padding:'5px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>User</button>
+                      <button type="button" onClick={()=>setFieldAssignee(f.id, 'admin')}
+                        style={{flex:1,background:f.assignee==='admin'?'#f97316':'#1e1e1e',color:f.assignee==='admin'?'#0a0a0a':'#9ca3af',border:'none',borderRadius:'6px',padding:'5px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>Admin</button>
+                    </div>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}}>
                       <button onClick={()=>duplicateField(f.id)} title={'Copy this field to page '+visiblePage+' (keeps type, label, group)'} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'11px',padding:0,fontWeight:600}}>+ Duplicate</button>
                       <button onClick={()=>removeField(f.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'11px',padding:0}}>Remove</button>

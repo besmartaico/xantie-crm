@@ -16,7 +16,10 @@ const TYPE_COLORS = {
   date:      { border:'#fbbf24', bg:'rgba(251,191,36,0.16)', label:'Date' },
 }
 
-export default function SignPdfViewer({ fileUrl, fields, values, onClickField, scale = 1.2 }) {
+export default function SignPdfViewer({ fileUrl, fields, values, onClickField, scale = 1.2, restrictedAssignee, readOnlyFieldIds }) {
+  // restrictedAssignee: if set, fields with field.assignee !== restrictedAssignee are shown but not clickable.
+  // readOnlyFieldIds: set of field IDs that should be displayed (with their value) but not clickable (e.g., admin-prefilled).
+  const readOnlySet = new Set(Array.isArray(readOnlyFieldIds) ? readOnlyFieldIds : (readOnlyFieldIds instanceof Set ? Array.from(readOnlyFieldIds) : []))
   const [numPages, setNumPages] = useState(0)
   return (
     <div style={{flex:1,overflow:'auto',background:'#0a0a0a',padding:'16px',borderRadius:'12px',border:'1px solid #1e1e1e'}}>
@@ -32,9 +35,12 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
               {pageFields.map(f => {
                 const c = TYPE_COLORS[f.type] || TYPE_COLORS.text
                 const val = values && values[f.id]
+                const isReadOnly = readOnlySet.has(f.id) || (restrictedAssignee && f.assignee && f.assignee !== restrictedAssignee)
+                const clickable = !isReadOnly
                 return (
-                  <div key={f.id} onClick={()=>onClickField && onClickField(f)}
-                    style={{position:'absolute',left:f.x*scale,top:f.y*scale,width:f.width*scale,height:f.height*scale,border:'2px solid '+c.border,background: val ? 'rgba(255,255,255,0.95)' : c.bg,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
+                  <div key={f.id} onClick={()=>clickable && onClickField && onClickField(f)}
+                    title={isReadOnly ? (f.assignee === 'admin' ? 'Filled by admin' : 'Not your field') : (f.label || c.label)}
+                    style={{position:'absolute',left:f.x*scale,top:f.y*scale,width:f.width*scale,height:f.height*scale,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: val ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
                     {val ? <PreviewValue type={f.type} value={val}/> : (f.label || c.label)}
                   </div>
                 )

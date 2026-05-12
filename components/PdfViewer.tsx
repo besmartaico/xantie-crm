@@ -75,10 +75,12 @@ const TYPE_COLORS = {
   text:      { border:'#34d399', bg:'rgba(52,211,153,0.18)', label:'Text' },
   date:      { border:'#fbbf24', bg:'rgba(251,191,36,0.18)', label:'Date' },
 }
+const ADMIN_OVERLAY = { border:'#f97316', bg:'rgba(249,115,22,0.18)' }
 
 function FieldBox({ field, scale, onUpdate, onRemove }) {
   const { Rnd } = require('react-rnd')
-  const c = TYPE_COLORS[field.type] || TYPE_COLORS.text
+  const baseC = TYPE_COLORS[field.type] || TYPE_COLORS.text
+  const c = field.assignee === 'admin' ? { ...baseC, border: ADMIN_OVERLAY.border, bg: ADMIN_OVERLAY.bg } : baseC
   return (
     <Rnd
       size={{ width: field.width * scale, height: field.height * scale }}
@@ -92,7 +94,7 @@ function FieldBox({ field, scale, onUpdate, onRemove }) {
       })}
       bounds="parent"
       style={{border:'2px solid '+c.border,background:c.bg,zIndex:3,display:'flex',alignItems:'center',justifyContent:'center',color:c.border,fontSize:'11px',fontWeight:700,cursor:'move',borderRadius:'2px'}}>
-      <span style={{pointerEvents:'none',userSelect:'none'}}>{field.label || c.label}</span>
+      <span style={{pointerEvents:'none',userSelect:'none'}}>{field.label || baseC.label}{field.assignee === 'admin' ? ' (admin)' : ''}</span>
     </Rnd>
   )
 }

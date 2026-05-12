@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 
 const SignPdfViewer = dynamic(() => import('@/components/SignPdfViewer'), { ssr: false })
 
-export default function PublicSignPage({ params }) {
+export default function FinishSignRequestPage({ params }) {
   const [resolvedParams, setResolvedParams] = useState(null)
   const [request, setRequest] = useState(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState('')
@@ -17,7 +17,11 @@ export default function PublicSignPage({ params }) {
   const [submitResult, setSubmitResult] = useState(null)
   const [submitError, setSubmitError] = useState('')
 
-  useEffect(() => { Promise.resolve(params).then(p => setResolvedParams(p)) }, [])
+  useEffect(() => {
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    if (u.role !== 'admin') { window.location.href = '/admin/dashboard'; return }
+    Promise.resolve(params).then(p => setResolvedParams(p))
+  }, [])
 
   useEffect(() => {
     if (!resolvedParams) return
@@ -27,13 +31,10 @@ export default function PublicSignPage({ params }) {
   async function load() {
     setLoading(true); setLoadError('')
     try {
-      // requestId is in route param documentId (keeping path '/sign/[documentId]' for now)
-      const id = resolvedParams.documentId
-      const res = await fetch('/api/sign-requests/' + id)
+      const res = await fetch('/api/sign-requests/' + resolvedParams.requestId)
       const data = await res.json()
-      if (!res.ok || data.error) { setLoadError(data.error || 'Unable to load signing request'); setLoading(false); return }
+      if (!res.ok || data.error) { setLoadError(data.error || 'Unable to load'); setLoading(false); return }
       setRequest(data)
-      // Pre-populate the values map with any admin pre-filled values
       if (data.values) setValues(data.values)
       const pdfRes = await fetch('/api/documents/raw/' + data.documentId)
       if (pdfRes.ok) {
@@ -49,7 +50,7 @@ export default function PublicSignPage({ params }) {
       const next = {...prev, [field.id]: val}
       if (field.group && request) {
         request.fields.forEach(f => {
-          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && (!f.assignee || f.assignee === 'user')) {
+          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && f.assignee === 'admin') {
             next[f.id] = val
           }
         })
@@ -62,82 +63,79 @@ export default function PublicSignPage({ params }) {
     if (!request) return
     setValues(prev => {
       const next = {...prev}
-      request.fields.filter(f => f.type === field.type && (!f.assignee || f.assignee === 'user')).forEach(f => { next[f.id] = val })
+      request.fields.filter(f => f.type === field.type && f.assignee === 'admin').forEach(f => { next[f.id] = val })
       return next
     })
   }
 
   async function submit() {
     if (!request) return
-    const userFields = request.fields.filter(f => !f.assignee || f.assignee === 'user')
-    const unfilled = userFields.filter(f => !values[f.id])
+    const adminFields = request.fields.filter(f => f.assignee === 'admin')
+    const unfilled = adminFields.filter(f => !values[f.id])
     if (unfilled.length > 0) {
-      setSubmitError('Please fill in all ' + userFields.length + ' field' + (userFields.length===1?'':'s') + ' before submitting. ' + unfilled.length + ' remaining.')
+      setSubmitError('Please fill in all ' + adminFields.length + ' admin field' + (adminFields.length===1?'':'s') + '. ' + unfilled.length + ' remaining.')
       return
     }
-    // Strip out admin pre-filled values from the diff — only send user-filled changes
     const diff = {}
-    userFields.forEach(f => { if (values[f.id]) diff[f.id] = values[f.id] })
+    adminFields.forEach(f => { if (values[f.id] && values[f.id] !== (request.values || {})[f.id]) diff[f.id] = values[f.id] })
     setSubmitting(true); setSubmitError('')
     try {
-      const res = await fetch('/api/sign-requests/' + resolvedParams.documentId, {
+      const res = await fetch('/api/sign-requests/' + resolvedParams.requestId, {
         method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ values: diff, source: 'user' })
+        body: JSON.stringify({ values: diff, source: 'admin_post' })
       })
       const data = await res.json()
       if (!res.ok || !data.success) { setSubmitError(data.error || 'Submission failed'); setSubmitting(false); return }
       setSubmitResult(data)
-    } catch(e) {
-      setSubmitError(e.message || 'Network error')
-      setSubmitting(false)
-    }
+    } catch(e) { setSubmitError(e.message || 'Network error'); setSubmitting(false) }
   }
 
   if (!resolvedParams) return null
 
   if (loadError) {
-    return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}>⚠</div><h1 style={{fontSize:'18px',fontWeight:700,margin:'0 0 8px'}}>Unable to load</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:0}}>{loadError}</p></div></div>)
+    return (<div><a href="/admin/sign-requests" style={{color:'#9ca3af',fontSize:'13px'}}>← Back</a><p style={{color:'#f87171',marginTop:'20px'}}>{loadError}</p></div>)
   }
 
   if (submitResult) {
-    const wasFinalized = submitResult.status === 'complete'
-    return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}>✓</div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 8px',color:'#8DC63F'}}>Thank you!</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>{wasFinalized ? 'Your signed document has been finalized and emailed to the requester.' : 'Your signature has been received. The document will be finalized by the administrator and emailed to you.'}</p>{wasFinalized && submitResult.signedPdfUrl && <a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'13px',fontWeight:700,textDecoration:'none',display:'inline-block'}}>Download signed PDF</a>}</div></div>)
+    return (<div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px',color:'#8DC63F'}}>✓ Document finalized</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>Sent to {request && request.signerEmail}. Available in Signed PDFs and on the sign requests list.</p><div style={{display:'flex',gap:'10px'}}><a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a><a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>← All sign requests</a></div></div>)
   }
 
-  const userFields = request ? request.fields.filter(f => !f.assignee || f.assignee === 'user') : []
-  const userFilled = userFields.filter(f => values[f.id]).length
-  // Admin-prefilled fields should be read-only and visually shown filled (already in values)
-  const adminPrefilledIds = request ? request.fields.filter(f => f.assignee === 'admin' && values[f.id]).map(f => f.id) : []
+  const adminFields = request ? request.fields.filter(f => f.assignee === 'admin') : []
+  const adminFilled = adminFields.filter(f => values[f.id]).length
+  // User-filled fields are read-only
+  const userFilledIds = request ? request.fields.filter(f => (!f.assignee || f.assignee === 'user')).map(f => f.id) : []
 
   return (
-    <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff'}}>
-      <div style={{maxWidth:'1100px',margin:'0 auto',padding:'24px 16px'}}>
-        <div style={{marginBottom:'18px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
-          <div>
-            <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{request && request.documentName ? request.documentName : 'Sign Document'}</h1>
-            <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? request.signerName : ''}, click each highlighted field to fill it. Orange fields are already filled by the administrator.</p>
-          </div>
-          <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Submitting…':'Submit signed document'}</button>
-        </div>
-
-        {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
-
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
-          <span>Your progress:</span>
-          <strong style={{color:'#8DC63F'}}>{userFilled} of {userFields.length} filled</strong>
-        </div>
-
-        {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading document...</div>}
-        {!loading && pdfBlobUrl && request && (
-          <div style={{maxHeight:'calc(100vh - 280px)',display:'flex'}}>
-            <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
-              onClickField={(f) => { if (!f.assignee || f.assignee === 'user') setActiveField(f) }}
-              restrictedAssignee="user" readOnlyFieldIds={adminPrefilledIds}/>
-          </div>
-        )}
+    <div>
+      <div style={{marginBottom:'18px'}}>
+        <a href="/admin/sign-requests" style={{color:'#9ca3af',fontSize:'13px',textDecoration:'none'}}>← All sign requests</a>
+        <h1 style={{fontSize:'22px',fontWeight:700,margin:'4px 0 0'}}>Finish signing: {request && request.documentName}</h1>
+        <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
+          Signed by {request && request.signerName} ({request && request.signerEmail}). Fill any remaining admin fields to finalize.
+        </p>
       </div>
 
-      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee="user" currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
+      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
+        <span>Admin fields:</span>
+        <strong style={{color:'#f97316'}}>{adminFilled} of {adminFields.length} filled</strong>
+      </div>
+
+      {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
+
+      <div style={{display:'flex',gap:'10px',marginBottom:'18px'}}>
+        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Finalizing…':'✓ Finalize & generate PDF'}</button>
+      </div>
+
+      {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
+      {!loading && pdfBlobUrl && request && (
+        <div style={{maxHeight:'calc(100vh - 320px)',display:'flex'}}>
+          <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
+            onClickField={(f) => { if (f.assignee === 'admin') setActiveField(f) }}
+            restrictedAssignee="admin" readOnlyFieldIds={userFilledIds}/>
+        </div>
+      )}
+
+      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee="admin" currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
         if (applyAll) applyToAll(activeField, val)
         else setFieldValueAndGroup(activeField, val)
         setActiveField(null)
