@@ -68,10 +68,10 @@ export default function AdminLayout({ children }) {
   const adminLinks = user.role === 'admin' ? [
     { label: 'Rates', href: '/admin/rates' },
     { label: 'Candidates', href: '/admin/candidates' },
+    { label: 'Comp Calculator', href: '/admin/comp-calc', parent: '/admin/candidates' },
     { label: 'Sales CRM', href: '/admin/sales' },
-    { label: 'Comp Calculator', href: '/admin/comp-calc' },
     { label: 'Documents', href: '/admin/documents' },
-    { label: 'Sign Requests', href: '/admin/sign-requests' },
+    { label: 'Sign Requests', href: '/admin/sign-requests', parent: '/admin/documents' },
     { label: 'Clients', href: '/admin/projects' },
     { label: 'Users', href: '/admin/users' },
     { label: 'Import', href: '/admin/import' },
@@ -121,11 +121,23 @@ export default function AdminLayout({ children }) {
               <span style={{fontSize:'10px',color:'#3a3a3a',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap'}}>Admin</span>
               <div style={{flex:1,height:'1px',background:'#252525'}}/>
             </div>
-            {adminLinks.map(link => (
-              <button key={link.href} onClick={()=>router.push(link.href)} style={navLinkStyle(link.href)}>
-                {link.label}
-              </button>
-            ))}
+            {adminLinks.map(link => {
+              const isChild = !!link.parent
+              const baseStyle = navLinkStyle(link.href)
+              const childStyle = isChild ? {
+                ...baseStyle,
+                marginLeft: '14px',
+                paddingLeft: '20px',
+                fontSize: '13px',
+                borderLeft: '2px solid #1e1e1e',
+                borderRadius: '0 8px 8px 0',
+              } : baseStyle
+              return (
+                <button key={link.href} onClick={()=>router.push(link.href)} style={childStyle}>
+                  {isChild ? '↳ ' : ''}{link.label}
+                </button>
+              )
+            })}
           </>
         )}
       </nav>
