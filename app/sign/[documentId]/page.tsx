@@ -101,7 +101,28 @@ export default function PublicSignPage({ params }) {
 
   if (submitResult) {
     const wasFinalized = submitResult.status === 'complete'
-    return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}>✓</div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 8px',color:'#8DC63F'}}>Thank you!</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>{wasFinalized ? 'Your signed document has been finalized and emailed to the requester.' : 'Your signature has been received. The document will be finalized by the administrator and emailed to you.'}</p>{wasFinalized && submitResult.signedPdfUrl && <a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'13px',fontWeight:700,textDecoration:'none',display:'inline-block'}}>Download signed PDF</a>}</div></div>)
+    const downloadUrl = submitResult.signedPdfUrl || submitResult.partialPdfUrl
+    return (
+      <div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}>
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}>
+          <div style={{fontSize:'48px',marginBottom:'12px'}}>✓</div>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 8px',color:'#8DC63F'}}>Thank you!</h1>
+          <p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 14px'}}>
+            {wasFinalized
+              ? 'Your signed document has been finalized. A copy has been emailed to you.'
+              : 'Your signature has been received. The administrator still has fields to complete; you\'ll receive the final document by email once they\'re done.'}
+          </p>
+          {!wasFinalized && (
+            <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 14px'}}>You can download a copy of what you signed now.</p>
+          )}
+          {downloadUrl && (
+            <a href={downloadUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'13px',fontWeight:700,textDecoration:'none',display:'inline-block'}}>
+              {wasFinalized ? 'Download signed PDF' : 'Download your signed copy'}
+            </a>
+          )}
+        </div>
+      </div>
+    )
   }
 
   const userFields = request ? request.fields.filter(f => !f.assignee || f.assignee === 'user') : []

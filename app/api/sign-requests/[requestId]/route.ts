@@ -36,7 +36,7 @@ function dataUrlToBytes(dataUrl) {
   return Buffer.from(dataUrl.substring(idx + 1), 'base64')
 }
 
-async function generateSignedPdf(record) {
+async function generateSignedPdf(record, filenameSuffix) {
   const origBytes = await downloadPdfFromDrive(record.documentId)
   const pdfDoc = await PDFDocument.load(origBytes)
   const pages = pdfDoc.getPages()
@@ -78,7 +78,7 @@ async function generateSignedPdf(record) {
   const dateStr = new Date().toISOString().split('T')[0]
   const safeName = (record.signerName || 'signer').replace(/[^a-zA-Z0-9-_ ]/g, '').trim() || 'signer'
   const origName = (record.documentName || 'document.pdf').replace(/\.pdf$/i, '')
-  const filename = `${origName} - ${safeName} - ${dateStr}.pdf`
+  const filename = `${origName} - ${safeName} - ${dateStr}${filenameSuffix||''}.pdf`
 
   const blob = await put(filename, signedBytes, {
     access: 'public',
@@ -127,6 +127,13 @@ export async function PUT(req, ctx) {
       const adminFieldsPending = record.fields.some(f => f.assignee === 'admin' && !record.values[f.id])
       if (adminFieldsPending) {
         record.status = 'pending_admin_post'
+        // Generate a partial PDF so the signer can download a copy of what they signed.
+        // It contains the user's filled values + any admin pre-fill; admin post-fill happens later.
+        try {
+          const partial = await generateSignedPdf(record, '-partial-signer')
+          record.partialPdfUrl = partial.url
+        } catch(e) { console.error('partial PDF generation failed:', e.message) }
+
         // Notify admin
         if (process.env.ADMIN_NOTIFICATION_EMAIL && process.env.RESEND_API_KEY) {
           try {
@@ -148,7 +155,7 @@ export async function PUT(req, ctx) {
           } catch(e) { console.error('admin notify failed:', e.message) }
         }
         await saveRequest(record)
-        return NextResponse.json({ success: true, status: record.status })
+        return NextResponse.json({ success: true, status: record.status, partialPdfUrl: record.partialPdfUrl || null })
       } else {
         // No admin fields left — finalize
         const pdf = await generateSignedPdf(record)
@@ -170,6 +177,52 @@ export async function PUT(req, ctx) {
       record.status = 'complete'
       record.completedAt = new Date().toISOString()
       await saveRequest(record)
+
+      // Email both signer and admin with the finalized PDF
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY)
+          const attachment = { filename: pdf.filename, content: Buffer.from(pdf.bytes).toString('base64') }
+
+          // Email the signer first
+          await resend.emails.send({
+            from: process.env.RESEND_FROM_EMAIL || 'noreply@xantie.com',
+            to: [record.signerEmail],
+            subject: `Completed: ${record.documentName}`,
+            html: `
+              <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0a0a0a">
+                <h2 style="margin:0 0 12px">Your document has been finalized</h2>
+                <p>Hi ${record.signerName},</p>
+                <p>The administrator has completed signing <strong>${record.documentName}</strong>. The final document is attached to this email.</p>
+                <p style="margin:24px 0"><a href="${pdf.url}" style="background:#8DC63F;color:#0a0a0a;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Download signed PDF</a></p>
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+                <p style="color:#9ca3af;font-size:12px">Xantie · noreply@xantie.com</p>
+              </div>`,
+            attachments: [attachment],
+          })
+
+          // Notify admin (separate send so a signer-side failure doesn't drop the admin copy)
+          if (process.env.ADMIN_NOTIFICATION_EMAIL) {
+            await resend.emails.send({
+              from: process.env.RESEND_FROM_EMAIL || 'noreply@xantie.com',
+              to: [process.env.ADMIN_NOTIFICATION_EMAIL],
+              subject: `Signed: ${record.documentName}`,
+              html: `
+                <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0a0a0a">
+                  <h2 style="margin:0 0 12px">Document signed</h2>
+                  <p><strong>${record.documentName}</strong> was finalized.</p>
+                  <ul>
+                    <li><strong>Signer:</strong> ${record.signerName} (${record.signerEmail})</li>
+                    <li><strong>Completed:</strong> ${new Date().toLocaleString('en-US')}</li>
+                  </ul>
+                  <p><a href="${pdf.url}" style="background:#8DC63F;color:#0a0a0a;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">View signed PDF</a></p>
+                </div>`,
+              attachments: [attachment],
+            })
+          }
+        } catch(e) { console.error('completion email failed:', e.message) }
+      }
+
       return NextResponse.json({ success: true, status: record.status, signedPdfUrl: pdf.url })
     }
 
