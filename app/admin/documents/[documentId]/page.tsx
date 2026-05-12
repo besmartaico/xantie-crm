@@ -116,7 +116,7 @@ export default function DocumentDetailPage({ params }) {
 
       {showSend && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1300,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>!sending&&setShowSend(false)}>
-          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'22px',width:'440px',maxWidth:'100%'}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'22px',width:'440px',maxWidth:'100%',maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
             <h3 style={{margin:'0 0 16px',fontSize:'16px',fontWeight:700,color:'#fff'}}>Send signing link</h3>
             {!sendResult && (
               <>
@@ -137,7 +137,8 @@ export default function DocumentDetailPage({ params }) {
               <div style={{marginBottom:'14px'}}>
                 <p style={{color:'#8DC63F',fontSize:'13px',margin:'0 0 10px',fontWeight:600}}>✓ Email sent to {signerEmail}</p>
                 <p style={{color:'#9ca3af',fontSize:'12px',margin:'0 0 8px'}}>Direct link (in case email is filtered):</p>
-                <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'6px',padding:'8px 10px',fontSize:'11px',color:'#60a5fa',wordBreak:'break-all',fontFamily:'monospace'}}>{sendResult}</div>
+                <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'6px',padding:'8px 10px',fontSize:'11px',color:'#60a5fa',wordBreak:'break-all',fontFamily:'monospace',maxHeight:'140px',overflowY:'auto'}}>{sendResult}</div>
+                <button onClick={()=>{navigator.clipboard.writeText(sendResult);}} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'6px',padding:'5px 10px',fontSize:'11px',cursor:'pointer',marginTop:'6px',fontWeight:600}}>📋 Copy link</button>
               </div>
             )}
             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>

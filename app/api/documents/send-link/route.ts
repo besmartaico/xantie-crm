@@ -11,10 +11,10 @@ export async function POST(req) {
     if (!documentId || !email || !name) {
       return NextResponse.json({ error: 'Missing documentId, name, or email' }, { status: 400 })
     }
-    // Build signing URL — include base64-encoded fields so the link is self-contained
-    const fieldsB64 = fields ? Buffer.from(JSON.stringify(fields)).toString('base64url') : ''
+    // Build signing URL — fields are loaded server-side from Drive on the sign page,
+    // so we keep the URL short to avoid browser/email URL-length limits.
     const base = appUrl || process.env.APP_URL || 'https://crm.xantie.com'
-    const url = `${base}/sign/${documentId}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}${fieldsB64 ? '&fields=' + fieldsB64 : ''}`
+    const url = `${base}/sign/${documentId}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`
     const resend = new Resend(process.env.RESEND_API_KEY)
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'noreply@xantie.com',
