@@ -128,6 +128,7 @@ export default function DocumentsPage() {
               </div>
             </div>
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              <a href={'/api/documents/raw/' + d.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>👁 Preview</a>
               <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📍 Place fields</a>
               <a href={'/admin/documents/' + d.id} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Send to sign →</a>
               <button onClick={()=>{setConfirmDelete(d);setDeleteError('')}} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
