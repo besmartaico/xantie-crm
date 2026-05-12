@@ -20,6 +20,11 @@ async function getRequestById(id) {
   return { record: data, blobUrl: match.url }
 }
 
+function addEvent(record, type, message) {
+  if (!Array.isArray(record.events)) record.events = []
+  record.events.push({ at: new Date().toISOString(), type, message: message || '' })
+}
+
 async function saveRequest(record) {
   const json = JSON.stringify(record)
   await put(`${BLOB_PREFIX}${record.id}.json`, json, {
@@ -89,12 +94,22 @@ async function generateSignedPdf(record, filenameSuffix) {
   return { url: blob.url, pathname: blob.pathname, filename, bytes: signedBytes }
 }
 
-export async function GET(_req, ctx) {
+export async function GET(req, ctx) {
   try {
     const { requestId } = await ctx.params
     const found = await getRequestById(requestId)
     if (!found) return NextResponse.json({ error: 'Sign request not found' }, { status: 404 })
-    return NextResponse.json(found.record)
+    const record = found.record
+    // Log 'signer_viewed' the first time the signer hits this endpoint (only when status is pending_user)
+    // Skip if the call appears to come from the admin UI (referer contains '/admin')
+    const referer = req.headers.get('referer') || ''
+    const isFromAdmin = referer.includes('/admin/')
+    const alreadyViewed = Array.isArray(record.events) && record.events.some(e => e.type === 'signer_viewed')
+    if (record.status === 'pending_user' && !alreadyViewed && !isFromAdmin) {
+      addEvent(record, 'signer_viewed', 'Signer opened the signing page')
+      try { await saveRequest(record) } catch(e) { console.warn('failed to persist signer_viewed event:', e.message) }
+    }
+    return NextResponse.json(record)
   } catch(e) {
     console.error('GET sign-request error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -123,18 +138,25 @@ export async function PUT(req, ctx) {
         return NextResponse.json({ error: 'This signing request has already been completed by the signer.' }, { status: 400 })
       }
       record.userSignedAt = new Date().toISOString()
+      const userFieldsFilled = record.fields.filter(f => (!f.assignee || f.assignee === 'user') && record.values[f.id]).length
+      addEvent(record, 'signer_signed', 'Signer submitted ' + userFieldsFilled + ' field' + (userFieldsFilled===1?'':'s'))
+
       // Are there any admin fields still empty?
       const adminFieldsPending = record.fields.some(f => f.assignee === 'admin' && !record.values[f.id])
       if (adminFieldsPending) {
         record.status = 'pending_admin_post'
         // Generate a partial PDF so the signer can download a copy of what they signed.
-        // It contains the user's filled values + any admin pre-fill; admin post-fill happens later.
         try {
           const partial = await generateSignedPdf(record, '-partial-signer')
           record.partialPdfUrl = partial.url
-        } catch(e) { console.error('partial PDF generation failed:', e.message) }
+          addEvent(record, 'partial_pdf_generated', 'Partial PDF generated for signer download: ' + partial.filename)
+        } catch(e) {
+          console.error('partial PDF generation failed:', e.message)
+          addEvent(record, 'partial_pdf_failed', 'Failed to generate partial PDF: ' + (e.message || 'unknown'))
+        }
 
         // Notify admin
+        let adminNotified = false
         if (process.env.ADMIN_NOTIFICATION_EMAIL && process.env.RESEND_API_KEY) {
           try {
             const resend = new Resend(process.env.RESEND_API_KEY)
@@ -152,8 +174,16 @@ export async function PUT(req, ctx) {
                   <p style="margin:24px 0"><a href="${url}" style="background:#8DC63F;color:#0a0a0a;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Complete signing →</a></p>
                 </div>`,
             })
-          } catch(e) { console.error('admin notify failed:', e.message) }
+            adminNotified = true
+          } catch(e) {
+            console.error('admin notify failed:', e.message)
+            addEvent(record, 'admin_notify_failed', 'Failed to notify admin: ' + (e.message || 'unknown'))
+          }
         }
+        if (adminNotified) {
+          addEvent(record, 'admin_notified', 'Admin notified that signer completed')
+        }
+        addEvent(record, 'status_changed', 'Status changed to pending_admin_post')
         await saveRequest(record)
         return NextResponse.json({ success: true, status: record.status, partialPdfUrl: record.partialPdfUrl || null })
       } else {
@@ -162,6 +192,8 @@ export async function PUT(req, ctx) {
         record.signedPdfUrl = pdf.url
         record.status = 'complete'
         record.completedAt = new Date().toISOString()
+        addEvent(record, 'final_pdf_generated', 'Final PDF generated: ' + pdf.filename)
+        addEvent(record, 'status_changed', 'Status changed to complete')
         await saveRequest(record)
         return NextResponse.json({ success: true, status: record.status, signedPdfUrl: pdf.url })
       }
@@ -172,13 +204,18 @@ export async function PUT(req, ctx) {
         return NextResponse.json({ error: 'This signing request is not awaiting admin completion.' }, { status: 400 })
       }
       // Finalize
+      const filledByAdminThisStep = Object.keys(newValues).length
+      addEvent(record, 'admin_completed', 'Admin filled ' + filledByAdminThisStep + ' field' + (filledByAdminThisStep===1?'':'s') + ' and finalized')
       const pdf = await generateSignedPdf(record)
       record.signedPdfUrl = pdf.url
       record.status = 'complete'
       record.completedAt = new Date().toISOString()
+      addEvent(record, 'final_pdf_generated', 'Final PDF generated: ' + pdf.filename)
+      addEvent(record, 'status_changed', 'Status changed to complete')
       await saveRequest(record)
 
       // Email both signer and admin with the finalized PDF
+      let signerEmailedFinal = false, adminEmailedFinal = false
       if (process.env.RESEND_API_KEY) {
         try {
           const resend = new Resend(process.env.RESEND_API_KEY)
@@ -200,6 +237,7 @@ export async function PUT(req, ctx) {
               </div>`,
             attachments: [attachment],
           })
+          signerEmailedFinal = true
 
           // Notify admin (separate send so a signer-side failure doesn't drop the admin copy)
           if (process.env.ADMIN_NOTIFICATION_EMAIL) {
@@ -219,9 +257,17 @@ export async function PUT(req, ctx) {
                 </div>`,
               attachments: [attachment],
             })
+            adminEmailedFinal = true
           }
-        } catch(e) { console.error('completion email failed:', e.message) }
+        } catch(e) {
+          console.error('completion email failed:', e.message)
+          addEvent(record, 'final_email_failed', 'Final email error: ' + (e.message || 'unknown'))
+        }
       }
+      if (signerEmailedFinal) addEvent(record, 'signer_emailed_final', 'Final signed PDF emailed to ' + record.signerEmail)
+      if (adminEmailedFinal) addEvent(record, 'admin_emailed_final', 'Final signed PDF emailed to admin')
+      // Persist the post-email events (the earlier save() ran before emails were sent)
+      try { await saveRequest(record) } catch(e) { console.warn('failed to save post-email events:', e.message) }
 
       return NextResponse.json({ success: true, status: record.status, signedPdfUrl: pdf.url })
     }

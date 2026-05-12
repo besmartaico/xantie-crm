@@ -64,6 +64,15 @@ export async function POST(req) {
     else if (hasAdminFieldsRemaining) status = 'pending_admin_post'
     else status = 'complete'  // unusual, but handle it
 
+    const events = [
+      { at: now, type: 'created', message: 'Request created by ' + (body.createdBy || 'admin') + ' for signer ' + body.signerEmail },
+    ]
+    const adminFieldCount = fields.filter(f => f.assignee === 'admin').length
+    const userFieldCount = fields.length - adminFieldCount
+    const prefilledCount = Object.keys(adminPreValues).length
+    if (prefilledCount > 0) {
+      events.push({ at: now, type: 'admin_prefilled', message: 'Admin pre-filled ' + prefilledCount + ' field' + (prefilledCount===1?'':'s') })
+    }
     const record = {
       id,
       documentId: body.documentId,
@@ -76,8 +85,10 @@ export async function POST(req) {
       status,
       values: adminPreValues,
       signedPdfUrl: null,
+      partialPdfUrl: null,
       userSignedAt: null,
       completedAt: null,
+      events,
     }
 
     // Persist
@@ -89,6 +100,7 @@ export async function POST(req) {
     })
 
     // Email signer if pending_user
+    let signerEmailedOk = false
     if (status === 'pending_user' && process.env.RESEND_API_KEY) {
       try {
         const { Resend } = await import('resend')
@@ -111,7 +123,16 @@ export async function POST(req) {
             </div>`,
           text: `Hi ${body.signerName},\n\nYou've been asked to sign ${record.documentName || 'a document'}.\nOpen this link to sign: ${url}`,
         })
-      } catch(e) { console.error('email signer failed:', e.message) }
+        signerEmailedOk = true
+      } catch(e) {
+        console.error('email signer failed:', e.message)
+        record.events.push({ at: new Date().toISOString(), type: 'email_failed', message: 'Failed to email signer: ' + (e.message || 'unknown') })
+      }
+    }
+    if (signerEmailedOk) {
+      record.events.push({ at: new Date().toISOString(), type: 'signer_emailed', message: 'Email sent to ' + body.signerEmail })
+      // Resave with the new event
+      await put(`${BLOB_PREFIX}${id}.json`, JSON.stringify(record), { access: 'public', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true })
     }
 
     return NextResponse.json({ success: true, id, status })

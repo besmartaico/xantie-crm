@@ -81,6 +81,7 @@ export default function SignRequestsListPage() {
                 <div style={{fontSize:'12px',color:'#6b7280',marginTop:'2px'}}>For: <strong style={{color:'#9ca3af'}}>{r.signerName}</strong> ({r.signerEmail}) · Created {fmtDate(r.createdAt)}</div>
               </div>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                <a href={'/admin/sign-requests/' + r.id} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📋 Log</a>
                 {r.status === 'pending_admin_post' && <a href={'/admin/sign-requests/' + r.id + '/finish'} style={{background:'#f97316',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Complete →</a>}
                 {r.status === 'pending_user' && <a href={'/sign/' + r.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>View signer link</a>}
                 {r.status === 'complete' && r.signedPdfUrl && <a href={r.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>⬇ Download</a>}
