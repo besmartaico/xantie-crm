@@ -75,8 +75,16 @@ export default function PlaceFieldsPage({ params }) {
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
   const [pdfBlobUrl, setPdfBlobUrl] = useState('')
+  const [selectedFieldId, setSelectedFieldId] = useState(null)
 
   const visiblePage = useVisiblePage([pdfBlobUrl])
+
+  // When a field is selected, scroll its sidebar card into view
+  useEffect(() => {
+    if (!selectedFieldId) return
+    const el = document.getElementById('field-card-' + selectedFieldId)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [selectedFieldId])
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -214,7 +222,7 @@ export default function PlaceFieldsPage({ params }) {
         {!loading && pdfBlobUrl && (
           <>
             <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,maxHeight:'calc(100vh - 220px)'}}>
-              <PdfViewer fileUrl={pdfBlobUrl} fields={fields} onUpdateField={updateField} onRemoveField={removeField}/>
+              <PdfViewer fileUrl={pdfBlobUrl} fields={fields} onUpdateField={updateField} onRemoveField={removeField} onSelectField={setSelectedFieldId} selectedFieldId={selectedFieldId}/>
             </div>
             <div style={{width:'260px',background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px',overflow:'auto',maxHeight:'calc(100vh - 220px)'}}>
               <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 4px'}}>Fields</h3>
@@ -222,10 +230,11 @@ export default function PlaceFieldsPage({ params }) {
               <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Mark a field <strong style={{color:'#f97316'}}>Admin</strong> if you'll fill it before/after the signer (the signer can't fill admin fields).</p>
               {fields.length === 0 && <p style={{color:'#6b7280',fontSize:'12px',margin:0}}>None yet. Use the buttons above to add fields to the current page.</p>}
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                {fields.map(f => {
+                {[...fields].sort((a,b) => (a.page||1) - (b.page||1) || (a.y||0) - (b.y||0) || (a.x||0) - (b.x||0)).map(f => {
                   const groupCount = f.group ? fields.filter(x => x.group === f.group && x.type === f.type).length : 0
+                  const isSelected = selectedFieldId === f.id
                   return (
-                  <div key={f.id} style={{background:'#0f0f0f',border:'1px solid '+(f.group?'#8DC63F44':'#1e1e1e'),borderRadius:'8px',padding:'8px 10px'}}>
+                  <div key={f.id} id={'field-card-' + f.id} onClick={()=>setSelectedFieldId(f.id)} style={{background:isSelected?'rgba(141,198,63,0.10)':'#0f0f0f',border:'1px solid '+(isSelected?'#8DC63F':(f.group?'#8DC63F44':'#1e1e1e')),borderRadius:'8px',padding:'8px 10px',cursor:'pointer',boxShadow:isSelected?'0 0 0 2px rgba(141,198,63,0.25)':'none',transition:'all 120ms ease'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
                       <span style={{fontSize:'11px',color:'#8DC63F',fontWeight:700,textTransform:'uppercase'}}>{f.type}{groupCount > 1 ? ' · 🔗 '+groupCount : ''}</span>
                       <label style={{fontSize:'11px',color:'#6b7280',display:'inline-flex',alignItems:'center',gap:'4px'}}>Page

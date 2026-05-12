@@ -10,7 +10,7 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
 }
 
-export default function PdfViewer({ fileUrl, fields, onAddFieldAtPage, onUpdateField, onRemoveField, scale = 1.2 }) {
+export default function PdfViewer({ fileUrl, fields, onAddFieldAtPage, onUpdateField, onRemoveField, onSelectField, selectedFieldId, scale = 1.2 }) {
   const [numPages, setNumPages] = useState(0)
   const [visiblePage, setVisiblePage] = useState(1)
   const containerRef = useRef(null)
@@ -60,7 +60,7 @@ export default function PdfViewer({ fileUrl, fields, onAddFieldAtPage, onUpdateF
             <div key={pageNum} data-page={pageNum}
               style={{position:'relative',marginBottom:'14px',background:'#fff',display:'inline-block'}}>
               <Page pageNumber={pageNum} scale={scale} renderTextLayer={false} renderAnnotationLayer={false}/>
-              {pageFields.map(f => <FieldBox key={f.id} field={f} scale={scale} onUpdate={onUpdateField} onRemove={onRemoveField}/>)}
+              {pageFields.map(f => <FieldBox key={f.id} field={f} scale={scale} onUpdate={onUpdateField} onRemove={onRemoveField} onSelect={onSelectField} isSelected={selectedFieldId === f.id}/>)}
             </div>
           )
         })}
@@ -77,7 +77,7 @@ const TYPE_COLORS = {
 }
 const ADMIN_OVERLAY = { border:'#f97316', bg:'rgba(249,115,22,0.18)' }
 
-function FieldBox({ field, scale, onUpdate, onRemove }) {
+function FieldBox({ field, scale, onUpdate, onRemove, onSelect, isSelected }) {
   const { Rnd } = require('react-rnd')
   const baseC = TYPE_COLORS[field.type] || TYPE_COLORS.text
   const c = field.assignee === 'admin' ? { ...baseC, border: ADMIN_OVERLAY.border, bg: ADMIN_OVERLAY.bg } : baseC
@@ -93,7 +93,10 @@ function FieldBox({ field, scale, onUpdate, onRemove }) {
         y: position.y / scale,
       })}
       bounds="parent"
-      style={{border:'2px solid '+c.border,background:c.bg,zIndex:3,display:'flex',alignItems:'center',justifyContent:'center',color:c.border,fontSize:'11px',fontWeight:700,cursor:'move',borderRadius:'2px'}}>
+      onMouseDown={() => onSelect && onSelect(field.id)}
+      onDragStart={() => onSelect && onSelect(field.id)}
+      onResizeStart={() => onSelect && onSelect(field.id)}
+      style={{border: (isSelected ? '3px solid #8DC63F' : '2px solid '+c.border),background:c.bg,zIndex: isSelected ? 5 : 3,display:'flex',alignItems:'center',justifyContent:'center',color:c.border,fontSize:'11px',fontWeight:700,cursor:'move',borderRadius:'2px',boxShadow:isSelected?'0 0 0 4px rgba(141,198,63,0.35)':'none',transition:'box-shadow 120ms ease, border-color 120ms ease'}}>
       <span style={{pointerEvents:'none',userSelect:'none'}}>{field.label || baseC.label}{field.assignee === 'admin' ? ' (admin)' : ''}</span>
     </Rnd>
   )
