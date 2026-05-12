@@ -157,14 +157,14 @@ export default function AdminLayout({ children }) {
                 if (isParent) {
                   const isOpen = navExpanded[link.href] !== false
                   return (
-                    <div key={link.href} style={{display:'flex',alignItems:'center'}}>
-                      <button onClick={()=>toggleExpanded(link.href)}
-                        title={isOpen ? 'Collapse' : 'Expand'}
-                        style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'6px',marginRight:'2px',fontSize:'11px',width:'20px',display:'flex',alignItems:'center',justifyContent:'center',transition:'transform 120ms ease',transform:isOpen?'rotate(0deg)':'rotate(-90deg)'}}>
-                        ▾
-                      </button>
-                      <button onClick={()=>router.push(link.href)} style={{...baseStyle,flex:1,textAlign:'left'}}>
+                    <div key={link.href} style={{position:'relative'}}>
+                      <button onClick={()=>router.push(link.href)} style={{...baseStyle,width:'100%',textAlign:'left',paddingRight:'34px'}}>
                         {link.label}
+                      </button>
+                      <button onClick={(e)=>{e.stopPropagation();toggleExpanded(link.href)}}
+                        title={isOpen ? 'Collapse' : 'Expand'}
+                        style={{position:'absolute',right:'4px',top:'50%',transform:'translateY(-50%) '+(isOpen?'rotate(0deg)':'rotate(-90deg)'),background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'4px 6px',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'4px',transition:'transform 120ms ease'}}>
+                        ▾
                       </button>
                     </div>
                   )
