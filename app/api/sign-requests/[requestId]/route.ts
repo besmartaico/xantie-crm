@@ -139,6 +139,21 @@ export async function PUT(req, ctx) {
       }
       record.userSignedAt = new Date().toISOString()
       const userFieldsFilled = record.fields.filter(f => (!f.assignee || f.assignee === 'user') && record.values[f.id]).length
+
+      // Capture consent metadata (required for legal validity under ESIGN/UETA)
+      if (body.consent && body.consent.agreed) {
+        const ipHeader = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''
+        const ip = (ipHeader.split(',')[0] || '').trim()
+        record.signerConsent = {
+          agreed: true,
+          agreedAt: body.consent.agreedAt || new Date().toISOString(),
+          disclosureVersion: body.consent.disclosure || '',
+          userAgent: body.consent.userAgent || '',
+          ip: ip || null,
+        }
+        addEvent(record, 'consent_given', 'Signer consented to electronic signature' + (ip ? ' (IP: ' + ip + ')' : ''))
+      }
+
       addEvent(record, 'signer_signed', 'Signer submitted ' + userFieldsFilled + ' field' + (userFieldsFilled===1?'':'s'))
 
       // Are there any admin fields still empty?

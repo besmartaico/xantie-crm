@@ -65,6 +65,22 @@ export default function AdminLayout({ children }) {
   ]
 
   // Admin-only links (shown with a divider)
+  // Persistent collapse state for parent nav items (keyed by parent href)
+  const [navExpanded, setNavExpanded] = useState({})
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('xantie_nav_expanded')
+      if (raw) setNavExpanded(JSON.parse(raw))
+    } catch(e) {}
+  }, [])
+  function toggleExpanded(href) {
+    setNavExpanded(prev => {
+      const next = { ...prev, [href]: !prev[href] }
+      try { localStorage.setItem('xantie_nav_expanded', JSON.stringify(next)) } catch(e) {}
+      return next
+    })
+  }
+
   const adminLinks = user.role === 'admin' ? [
     { label: 'Rates', href: '/admin/rates' },
     { label: 'Candidates', href: '/admin/candidates' },
@@ -121,23 +137,45 @@ export default function AdminLayout({ children }) {
               <span style={{fontSize:'10px',color:'#3a3a3a',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap'}}>Admin</span>
               <div style={{flex:1,height:'1px',background:'#252525'}}/>
             </div>
-            {adminLinks.map(link => {
-              const isChild = !!link.parent
-              const baseStyle = navLinkStyle(link.href)
-              const childStyle = isChild ? {
-                ...baseStyle,
-                marginLeft: '14px',
-                paddingLeft: '20px',
-                fontSize: '13px',
-                borderLeft: '2px solid #1e1e1e',
-                borderRadius: '0 8px 8px 0',
-              } : baseStyle
-              return (
-                <button key={link.href} onClick={()=>router.push(link.href)} style={childStyle}>
-                  {isChild ? '↳ ' : ''}{link.label}
-                </button>
-              )
-            })}
+            {(() => {
+              // Compute which hrefs are parents (have children)
+              const parentHrefs = new Set(adminLinks.filter(l => l.parent).map(l => l.parent))
+              return adminLinks.map(link => {
+                const isChild = !!link.parent
+                const isParent = parentHrefs.has(link.href)
+                // Child visibility: only show if parent is expanded (default: expanded)
+                if (isChild && navExpanded[link.parent] === false) return null
+                const baseStyle = navLinkStyle(link.href)
+                const childStyle = isChild ? {
+                  ...baseStyle,
+                  marginLeft: '14px',
+                  paddingLeft: '20px',
+                  fontSize: '13px',
+                  borderLeft: '2px solid #1e1e1e',
+                  borderRadius: '0 8px 8px 0',
+                } : baseStyle
+                if (isParent) {
+                  const isOpen = navExpanded[link.href] !== false
+                  return (
+                    <div key={link.href} style={{display:'flex',alignItems:'center'}}>
+                      <button onClick={()=>toggleExpanded(link.href)}
+                        title={isOpen ? 'Collapse' : 'Expand'}
+                        style={{background:'none',border:'none',color:'#6b7280',cursor:'pointer',padding:'6px',marginRight:'2px',fontSize:'11px',width:'20px',display:'flex',alignItems:'center',justifyContent:'center',transition:'transform 120ms ease',transform:isOpen?'rotate(0deg)':'rotate(-90deg)'}}>
+                        ▾
+                      </button>
+                      <button onClick={()=>router.push(link.href)} style={{...baseStyle,flex:1,textAlign:'left'}}>
+                        {link.label}
+                      </button>
+                    </div>
+                  )
+                }
+                return (
+                  <button key={link.href} onClick={()=>router.push(link.href)} style={childStyle}>
+                    {isChild ? '↳ ' : ''}{link.label}
+                  </button>
+                )
+              })
+            })()}
           </>
         )}
       </nav>

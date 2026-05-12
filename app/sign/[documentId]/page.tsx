@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 
+const CONSENT_DISCLOSURE_VERSION = 'esign-disclosure-v1'
+
 const SignPdfViewer = dynamic(() => import('@/components/SignPdfViewer'), { ssr: false })
 
 export default function PublicSignPage({ params }) {
@@ -16,6 +18,8 @@ export default function PublicSignPage({ params }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState(null)
   const [submitError, setSubmitError] = useState('')
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [showDisclosure, setShowDisclosure] = useState(false)
 
   useEffect(() => { Promise.resolve(params).then(p => setResolvedParams(p)) }, [])
 
@@ -69,20 +73,29 @@ export default function PublicSignPage({ params }) {
 
   async function submit() {
     if (!request) return
+    if (!consentChecked) { setSubmitError('Please consent to the use of electronic signatures before submitting.'); return }
     const userFields = request.fields.filter(f => !f.assignee || f.assignee === 'user')
     const unfilled = userFields.filter(f => !values[f.id])
     if (unfilled.length > 0) {
       setSubmitError('Please fill in all ' + userFields.length + ' field' + (userFields.length===1?'':'s') + ' before submitting. ' + unfilled.length + ' remaining.')
       return
     }
-    // Strip out admin pre-filled values from the diff — only send user-filled changes
     const diff = {}
     userFields.forEach(f => { if (values[f.id]) diff[f.id] = values[f.id] })
     setSubmitting(true); setSubmitError('')
     try {
       const res = await fetch('/api/sign-requests/' + resolvedParams.documentId, {
         method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ values: diff, source: 'user' })
+        body: JSON.stringify({
+          values: diff,
+          source: 'user',
+          consent: {
+            agreed: true,
+            agreedAt: new Date().toISOString(),
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            disclosure: CONSENT_DISCLOSURE_VERSION,
+          },
+        })
       })
       const data = await res.json()
       if (!res.ok || !data.success) { setSubmitError(data.error || 'Submission failed'); setSubmitting(false); return }
@@ -133,20 +146,32 @@ export default function PublicSignPage({ params }) {
   return (
     <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'24px 16px'}}>
-        <div style={{marginBottom:'18px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px'}}>
-          <div>
-            <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{request && request.documentName ? request.documentName : 'Sign Document'}</h1>
-            <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? request.signerName : ''}, click each highlighted field to fill it. Orange fields are already filled by the administrator.</p>
+        <div style={{marginBottom:'18px'}}>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{request && request.documentName ? request.documentName : 'Sign Document'}</h1>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? request.signerName : ''}, click each highlighted field to fill it. Orange fields are already filled by the administrator.</p>
+        </div>
+
+        {/* E-signature consent panel */}
+        <div style={{background:'#141414',border:'1px solid '+(consentChecked?'#8DC63F66':'#1e1e1e'),borderRadius:'12px',padding:'14px 16px',marginBottom:'14px'}}>
+          <label style={{display:'flex',gap:'12px',cursor:'pointer',alignItems:'flex-start'}}>
+            <input type="checkbox" checked={consentChecked} onChange={e=>setConsentChecked(e.target.checked)}
+              style={{marginTop:'3px',width:'18px',height:'18px',accentColor:'#8DC63F',cursor:'pointer',flexShrink:0}}/>
+            <div style={{flex:1,fontSize:'13px',color:'#d1d5db',lineHeight:1.5}}>
+              I agree that my electronic signature is the legal equivalent of my manual/handwritten signature on this document and that I am legally bound by it. I have read the <button type="button" onClick={(ev)=>{ev.preventDefault();setShowDisclosure(true)}} style={{background:'none',border:'none',color:'#8DC63F',padding:0,fontSize:'13px',cursor:'pointer',textDecoration:'underline'}}>Electronic Records and Signatures Disclosure</button>.
+            </div>
+          </label>
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'10px'}}>
+          <div style={{fontSize:'12px',color:'#9ca3af'}}>
+            <span>Your progress: </span>
+            <strong style={{color:'#8DC63F'}}>{userFilled} of {userFields.length} filled</strong>
           </div>
-          <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Submitting…':'Submit signed document'}</button>
+          <button onClick={submit} disabled={submitting || !consentChecked} title={!consentChecked ? 'Please check the consent box first' : ''}
+            style={{background:(submitting||!consentChecked)?'#2a2a2a':'#8DC63F',color:(submitting||!consentChecked)?'#4b5563':'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:(submitting||!consentChecked)?'not-allowed':'pointer'}}>{submitting?'Submitting…':'Submit signed document'}</button>
         </div>
 
         {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
-
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
-          <span>Your progress:</span>
-          <strong style={{color:'#8DC63F'}}>{userFilled} of {userFields.length} filled</strong>
-        </div>
 
         {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading document...</div>}
         {!loading && pdfBlobUrl && request && (
@@ -157,6 +182,37 @@ export default function PublicSignPage({ params }) {
           </div>
         )}
       </div>
+
+      {showDisclosure && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:1500,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>setShowDisclosure(false)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'620px',maxWidth:'100%',maxHeight:'85vh',overflowY:'auto',color:'#d1d5db'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'14px',gap:'12px'}}>
+              <h3 style={{fontSize:'18px',fontWeight:700,margin:0,color:'#fff'}}>Electronic Records and Signatures Disclosure</h3>
+              <button onClick={()=>setShowDisclosure(false)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
+            </div>
+            <div style={{fontSize:'13px',lineHeight:1.6}}>
+              <p>Please read this disclosure carefully. By checking the consent box and submitting your signature, you agree to the terms below.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>1. Consent to use electronic records and signatures</h4>
+              <p>You agree to receive the document referenced in this signing request electronically and to sign it using an electronic signature. Your electronic signature has the same legal effect as a handwritten signature under the U.S. ESIGN Act (15 U.S.C. § 7001 et seq.) and applicable state versions of the Uniform Electronic Transactions Act (UETA).</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>2. Right to a paper copy</h4>
+              <p>You may request a paper copy of any document signed electronically by contacting the sender of this signing request. We may charge reasonable copying costs.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>3. Withdrawing consent</h4>
+              <p>You may withdraw your consent to receive electronic records by notifying the sender in writing before you sign. Withdrawing consent after signing does not invalidate the signed document.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>4. Required hardware and software</h4>
+              <p>To view and sign documents you need: a current version of a major web browser (Chrome, Firefox, Safari, or Edge), an active internet connection, and the ability to view PDF files.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>5. Updating contact information</h4>
+              <p>You are responsible for keeping your email address current with the sender so we can deliver electronic records.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>6. Audit trail</h4>
+              <p>An audit trail is recorded for each signing request, including the IP address, browser, timestamps for each action, and a copy of the consent text you agreed to. This audit trail can be produced as evidence of your signature.</p>
+              <h4 style={{color:'#fff',fontSize:'14px',marginTop:'18px',marginBottom:'6px'}}>7. Acknowledgement</h4>
+              <p>By checking the consent box, you acknowledge that you have read this disclosure, that you can access and read this disclosure on the device you are using, and that you consent to conducting business electronically.</p>
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:'20px'}}>
+              <button onClick={()=>setShowDisclosure(false)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee="user" currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
         if (applyAll) applyToAll(activeField, val)
