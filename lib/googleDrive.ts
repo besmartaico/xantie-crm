@@ -40,19 +40,98 @@ export async function uploadPdfToDrive(buffer, fileName, opts) {
   return created.data
 }
 
-// List PDFs in the configured Drive folder
+// List PDFs in the configured Drive folder.
+// - If FOLDER_ID is a Shared Drive ID (starts with '0A'), search the ENTIRE Shared Drive
+//   so PDFs in subfolders also show up.
+// - Otherwise, list files in just that folder (legacy behaviour).
 export async function listPdfsInFolder() {
   const drive = getDrive()
-  const res = await drive.files.list({
-    q: `'${FOLDER_ID()}' in parents and mimeType='application/pdf' and trashed=false`,
-    fields: 'files(id,name,webViewLink,modifiedTime,createdTime,size,appProperties)',
+  const folderId = FOLDER_ID()
+  const isSharedDrive = typeof folderId === 'string' && folderId.startsWith('0A')
+
+  const listParams = {
+    fields: 'files(id,name,webViewLink,modifiedTime,createdTime,size,appProperties,parents)',
     orderBy: 'modifiedTime desc',
     pageSize: 200,
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
-    corpora: 'allDrives',
-  })
+  }
+
+  if (isSharedDrive) {
+    // Scope to this specific Shared Drive; do NOT filter by parent so subfolders are included.
+    listParams.corpora = 'drive'
+    listParams.driveId = folderId
+    listParams.q = `mimeType='application/pdf' and trashed=false`
+  } else {
+    // Regular folder — only direct children
+    listParams.corpora = 'allDrives'
+    listParams.q = `'${folderId}' in parents and mimeType='application/pdf' and trashed=false`
+  }
+
+  const res = await drive.files.list(listParams)
   return res.data.files || []
+}
+
+// Diagnostic helper: returns a snapshot of what the service account can see.
+// Used by /api/documents/diagnose to debug missing-template issues.
+export async function diagnoseListing() {
+  const drive = getDrive()
+  const folderId = FOLDER_ID()
+  const isSharedDrive = typeof folderId === 'string' && folderId.startsWith('0A')
+
+  // 1. Try listing as currently configured
+  let primaryFiles = []
+  let primaryError = null
+  try {
+    primaryFiles = await listPdfsInFolder()
+  } catch(e) {
+    primaryError = e.message || String(e)
+  }
+
+  // 2. Also list ALL PDFs the service account can see anywhere
+  let allFiles = []
+  let allError = null
+  try {
+    const res = await drive.files.list({
+      q: `mimeType='application/pdf' and trashed=false`,
+      fields: 'files(id,name,modifiedTime,size,parents,driveId)',
+      pageSize: 100,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      corpora: 'allDrives',
+    })
+    allFiles = res.data.files || []
+  } catch(e) {
+    allError = e.message || String(e)
+  }
+
+  // 3. Verify access to the configured Drive itself
+  let folderMeta = null
+  let folderError = null
+  try {
+    const res = await drive.files.get({
+      fileId: folderId,
+      fields: 'id,name,driveId,mimeType,trashed',
+      supportsAllDrives: true,
+    })
+    folderMeta = res.data
+  } catch(e) {
+    folderError = e.message || String(e)
+  }
+
+  return {
+    configuredFolderId: folderId,
+    detectedAsSharedDrive: isSharedDrive,
+    serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    folderMeta,
+    folderError,
+    primaryFileCount: primaryFiles.length,
+    primaryFiles: primaryFiles.map(f => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, parents: f.parents })),
+    primaryError,
+    allAccessibleFileCount: allFiles.length,
+    allAccessibleFiles: allFiles.map(f => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, parents: f.parents, driveId: f.driveId })),
+    allError,
+  }
 }
 
 // Download a Drive file as a Buffer (for pdf-lib to process)
