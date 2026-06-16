@@ -88,7 +88,7 @@ const COLS = [
 ]
 
 function newDay(dateStr) {
-  return { date: dateStr || new Date().toISOString().split('T')[0], hours: '', billable: 'yes', id: Math.random() }
+  return { date: dateStr || new Date().toISOString().split('T')[0], hours: '', billable: 'yes', description: '', id: Math.random() }
 }
 
 function getMondayOf(dateStr) {
@@ -125,9 +125,8 @@ export default function TimeEntries() {
   const [showAdd, setShowAdd] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
 
-  // Shared fields for multi-entry
+  // Shared fields for multi-entry (description is now per-day)
   const [project, setProject] = useState('')
-  const [description, setDescription] = useState('')
   const [days, setDays] = useState(() => {
     const today = new Date().toISOString().split('T')[0]
     const monday = getMondayOf(today)
@@ -147,16 +146,29 @@ export default function TimeEntries() {
   const [subProjectError, setSubProjectError] = useState('')
 
   // Filters
-  const [nameFilter, setNameFilter] = useState('')
-  const [projectFilter, setProjectFilter] = useState('')
-  const [subProjectFilter, setSubProjectFilter] = useState('')
+  // Filters: persisted per-user in localStorage so they survive page refresh
+  const filtersStorageKey = () => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      return 'xantie_te_filters_' + (u.email || 'default')
+    } catch { return 'xantie_te_filters_default' }
+  }
+  const initFilters = (() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(filtersStorageKey()) : null
+      return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+  })()
+  const [nameFilter, setNameFilter] = useState(initFilters.nameFilter || '')
+  const [projectFilter, setProjectFilter] = useState(initFilters.projectFilter || '')
+  const [subProjectFilter, setSubProjectFilter] = useState(initFilters.subProjectFilter || '')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [deleteError, setDeleteError] = useState('')
-  const [billableFilter, setBillableFilter] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
-  const [customStart, setCustomStart] = useState('')
-  const [customEnd, setCustomEnd] = useState('')
+  const [billableFilter, setBillableFilter] = useState(initFilters.billableFilter || '')
+  const [dateFilter, setDateFilter] = useState(initFilters.dateFilter || '')
+  const [customStart, setCustomStart] = useState(initFilters.customStart || '')
+  const [customEnd, setCustomEnd] = useState(initFilters.customEnd || '')
 
   // Sort - persisted per user
   const [sorts, setSorts] = useState(() => {
@@ -179,6 +191,16 @@ export default function TimeEntries() {
       if (u.email) localStorage.setItem('xantie_sorts_' + u.email, JSON.stringify(sorts))
     } catch {}
   }, [sorts])
+
+  // Persist all filters as a single blob whenever any one changes
+  useEffect(() => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+      if (!u.email) return
+      const blob = { nameFilter, projectFilter, subProjectFilter, billableFilter, dateFilter, customStart, customEnd }
+      localStorage.setItem('xantie_te_filters_' + u.email, JSON.stringify(blob))
+    } catch {}
+  }, [nameFilter, projectFilter, subProjectFilter, billableFilter, dateFilter, customStart, customEnd])
 
   async function load() {
     setLoading(true)
@@ -260,7 +282,7 @@ export default function TimeEntries() {
     // When user changes the anchor weekday, regenerate all week days
     const weekDays = getWeekDays(newMonday)
     const billable = days[0]?.billable || 'yes'
-    setDays(weekDays.map(date => ({ date, hours: '', billable, id: Math.random() })))
+    setDays(weekDays.map(date => ({ date, hours: '', billable, description: '', id: Math.random() })))
   }
   
   function addDay() {
@@ -288,7 +310,7 @@ export default function TimeEntries() {
         // Single entry edit
         const day = days[0]
         const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, subProject, importedFrom:editEntry.importedFrom })
+          body: JSON.stringify({ action:'update', id:editEntry.id, name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description:day.description||'', project, subProject, importedFrom:editEntry.importedFrom })
         })
         const data = await res.json()
         if (!data.success) { setSaveError(data.error||'Failed.'); setSaving(false); return }
@@ -296,7 +318,7 @@ export default function TimeEntries() {
         // Multi-entry save - one API call per day
         for (const day of validDays) {
           const res = await fetch('/api/time', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ action:'add', name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description, project, subProject })
+            body: JSON.stringify({ action:'add', name:u.name||'', email:u.email||'', date:day.date, hours:day.hours, billable:day.billable, description:day.description||'', project, subProject })
           })
           const data = await res.json()
           if (!data.success) { setSaveError(data.error||'Failed to save entry for ' + day.date); setSaving(false); return }
@@ -328,15 +350,15 @@ export default function TimeEntries() {
 
   function openEdit(e) {
     setEditEntry(e); setSaveError('')
-    setProject(e.project||''); setSubProject(e.subProject||'N/A'); setDescription(e.description||'')
-    setDays([{ date:e.date, hours:e.hours, billable:e.billable||'yes', id:Math.random() }])
+    setProject(e.project||''); setSubProject(e.subProject||'N/A')
+    setDays([{ date:e.date, hours:e.hours, billable:e.billable||'yes', description:e.description||'', id:Math.random() }])
     setShowAdd(true); setShowNewProject(false); setShowNewSubProject(false)
   }
 
   function openAdd() {
     setEditEntry(null); setSaveError('')
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-    setProject(getLastProject(u)); setSubProject('N/A'); setDescription('')
+    setProject(getLastProject(u)); setSubProject('N/A')
     const today = new Date().toISOString().split('T')[0]; const monday = getMondayOf(today); setDays(getWeekDays(monday).map(date => newDay(date)))
     setShowAdd(true); setShowNewProject(false); setShowNewSubProject(false)
   }
@@ -585,12 +607,6 @@ export default function TimeEntries() {
               </div>
             )}
 
-            {/* Description - shared */}
-            <div style={{marginBottom:'20px'}}>
-              <label style={lbl}>Description</label>
-              <textarea rows={2} value={description} onChange={e=>setDescription(e.target.value)} placeholder="What was worked on?" style={{...inp,resize:'vertical'}}/>
-            </div>
-
             {/* Day rows */}
             <div style={{marginBottom:'8px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
@@ -626,6 +642,8 @@ export default function TimeEntries() {
                   {days.length > 1 ? (
                     <button onClick={()=>removeDay(day.id)} style={{background:'none',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'16px',padding:0,display:'flex',alignItems:'center',justifyContent:'center',height:'38px'}}>×</button>
                   ) : <div/>}
+                </div>
+                <input type="text" value={day.description||''} onChange={e=>updateDay(day.id,'description',e.target.value)} placeholder="Description for this entry" style={{...inp,fontSize:'13px',padding:'7px 10px',marginTop:'6px'}}/>
                 </div>
               ))}
 
