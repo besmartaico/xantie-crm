@@ -9,6 +9,10 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(null)
   const [currentUser, setCurrentUser] = useState({})
   const [confirmAction, setConfirmAction] = useState(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState({ name:'', email:'', role:'viewer' })
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -43,6 +47,26 @@ export default function UsersPage() {
     setSaving(null)
   }
 
+  async function createUser(e) {
+    e.preventDefault()
+    setAddSaving(true); setAddError(null)
+    try {
+      const res = await fetch('/api/users/create', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name: addForm.name.trim(), email: addForm.email.trim(), role: addForm.role }) })
+      const data = await res.json()
+      if (data.success) {
+        setShowAdd(false)
+        setAddForm({ name:'', email:'', role:'viewer' })
+        await load()
+      } else {
+        setAddError(data.error || 'Failed to add user')
+      }
+    } catch(e) {
+      setAddError('Failed to add user')
+    }
+    setAddSaving(false)
+  }
+
   function viewAs(user) {
     const realSession = sessionStorage.getItem('xantie_user')
     const realAuth = sessionStorage.getItem('xantie_auth')
@@ -67,13 +91,19 @@ export default function UsersPage() {
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>User Management</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{activeUsers.length} active users</p>
         </div>
-        {inactiveCount > 0 && (
-          <Link href="/admin/users/inactive"
-            style={{background:'#1e1e1e',border:'1px solid #2a2a2a',color:'#9ca3af',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:'6px'}}>
-            View Inactive Users
-            <span style={{background:'rgba(156,163,175,0.2)',color:'#9ca3af',fontSize:'11px',fontWeight:700,padding:'1px 7px',borderRadius:'10px'}}>{inactiveCount}</span>
-          </Link>
-        )}
+        <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+          {inactiveCount > 0 && (
+            <Link href="/admin/users/inactive"
+              style={{background:'#1e1e1e',border:'1px solid #2a2a2a',color:'#9ca3af',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:'6px'}}>
+              View Inactive Users
+              <span style={{background:'rgba(156,163,175,0.2)',color:'#9ca3af',fontSize:'11px',fontWeight:700,padding:'1px 7px',borderRadius:'10px'}}>{inactiveCount}</span>
+            </Link>
+          )}
+          <button onClick={()=>{setAddError(null);setShowAdd(true)}}
+            style={{background:'#8DC63F',border:'none',color:'#0a0a0a',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+            <span style={{fontSize:'16px',lineHeight:1}}>+</span> Add User
+          </button>
+        </div>
       </div>
 
       {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
@@ -145,6 +175,46 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div onClick={()=>!addSaving&&setShowAdd(false)}
+          style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',zIndex:50}}>
+          <form onClick={e=>e.stopPropagation()} onSubmit={createUser}
+            style={{background:'#141414',border:'1px solid #252525',borderRadius:'12px',padding:'24px',width:'100%',maxWidth:'420px'}}>
+            <h2 style={{fontSize:'18px',fontWeight:700,margin:'0 0 4px'}}>Add User</h2>
+            <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 20px'}}>They can set a password later by registering with this email.</p>
+
+            <label style={{display:'block',fontSize:'12px',color:'#9ca3af',fontWeight:600,marginBottom:'6px'}}>Name</label>
+            <input value={addForm.name} onChange={e=>setAddForm({...addForm,name:e.target.value})} autoFocus required
+              style={{width:'100%',background:'#0f0f0f',border:'1px solid #252525',borderRadius:'8px',padding:'9px 12px',color:'#fff',fontSize:'13px',outline:'none',marginBottom:'16px',boxSizing:'border-box'}} />
+
+            <label style={{display:'block',fontSize:'12px',color:'#9ca3af',fontWeight:600,marginBottom:'6px'}}>Email</label>
+            <input type="email" value={addForm.email} onChange={e=>setAddForm({...addForm,email:e.target.value})} required
+              style={{width:'100%',background:'#0f0f0f',border:'1px solid #252525',borderRadius:'8px',padding:'9px 12px',color:'#fff',fontSize:'13px',outline:'none',marginBottom:'16px',boxSizing:'border-box'}} />
+
+            <label style={{display:'block',fontSize:'12px',color:'#9ca3af',fontWeight:600,marginBottom:'6px'}}>Role</label>
+            <select value={addForm.role} onChange={e=>setAddForm({...addForm,role:e.target.value})}
+              style={{width:'100%',background:'#0f0f0f',border:'1px solid #252525',borderRadius:'8px',padding:'9px 12px',color:'#d1d5db',fontSize:'13px',outline:'none',marginBottom:'20px',boxSizing:'border-box',cursor:'pointer'}}>
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Admin</option>
+            </select>
+
+            {addError && <div style={{color:'#f87171',fontSize:'12px',marginBottom:'16px'}}>{addError}</div>}
+
+            <div style={{display:'flex',gap:'10px',justifyContent:'flex-end'}}>
+              <button type="button" onClick={()=>setShowAdd(false)} disabled={addSaving}
+                style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+                Cancel
+              </button>
+              <button type="submit" disabled={addSaving||!addForm.name.trim()||!addForm.email.trim()}
+                style={{background:'#8DC63F',border:'none',color:'#0a0a0a',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:addSaving?'default':'pointer',opacity:(addSaving||!addForm.name.trim()||!addForm.email.trim())?0.5:1}}>
+                {addSaving?'Adding…':'Add User'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
