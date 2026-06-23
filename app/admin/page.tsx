@@ -627,7 +627,8 @@ export default function TimeEntries() {
               </div>
 
               {days.map((day, i) => (
-                <div key={day.id} style={{display:'grid',gridTemplateColumns:'1fr 100px 1fr 32px',gap:'8px',marginBottom:'8px',alignItems:'center'}}>
+                <div key={day.id} style={{marginBottom:'8px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 100px 1fr 32px',gap:'8px',alignItems:'center'}}>
                   <input type="date" value={day.date} onChange={e=>updateDay(day.id,'date',e.target.value)} style={{...inp,fontSize:'14px',padding:'8px 10px',colorScheme:'dark'}} className="hide-cal-icon"/>
                   <input type="number" step="0.25" placeholder="0.00" value={day.hours} onChange={e=>updateDay(day.id,'hours',e.target.value)}
                     style={{...inp,fontSize:'14px',padding:'8px 10px'}}/>
