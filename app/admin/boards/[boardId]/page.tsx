@@ -24,6 +24,23 @@ function formatDate(d) {
   return { fmt, overdue, soon }
 }
 
+const WEEKDAYS = ['Su','Mo','Tu','We','Th','Fr','Sa']
+function parseRecUI(s) {
+  try {
+    const r = s ? (typeof s==='string'?JSON.parse(s):s) : null
+    if (r && r.type) return { type:r.type, interval:r.interval||1, weekdays:Array.isArray(r.weekdays)?r.weekdays:[], day:r.day||1 }
+  } catch(e){}
+  return { type:'none', interval:1, weekdays:[], day:1 }
+}
+function recurLabel(s) {
+  const r = parseRecUI(s)
+  if (r.type==='none') return null
+  if (r.type==='daily') return r.interval>1?`Every ${r.interval}d`:'Daily'
+  if (r.type==='weekly') return (r.weekdays&&r.weekdays.length) ? r.weekdays.slice().sort().map(d=>WEEKDAYS[d]).join(' ') : (r.interval>1?`Every ${r.interval}w`:'Weekly')
+  if (r.type==='monthly') return r.interval>1?`Every ${r.interval}mo`:'Monthly'
+  return 'Repeats'
+}
+
 export default function BoardPage() {
   const router = useRouter()
   const { boardId } = useParams()
@@ -44,6 +61,7 @@ export default function BoardPage() {
   // Card detail modal
   const [cardModal, setCardModal] = useState(null)
   const [editCard, setEditCard] = useState({})
+  const [recur, setRecur] = useState({ type:'none', interval:1, weekdays:[], day:1 })
   const [savingCard, setSavingCard] = useState(false)
 
   // Share modal
@@ -100,7 +118,13 @@ export default function BoardPage() {
   }
   async function saveCard() {
     setSavingCard(true)
-    await fetch('/api/boards/'+boardId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update_card',cardId:cardModal.id,...editCard})})
+    const interval = Math.max(1, parseInt(recur.interval)||1)
+    const recurrence = recur.type==='none' ? '' : JSON.stringify(
+      recur.type==='daily'  ? { type:'daily', interval }
+    : recur.type==='weekly' ? { type:'weekly', interval, weekdays:(recur.weekdays&&recur.weekdays.length)?recur.weekdays:undefined }
+    :                         { type:'monthly', interval, day:Math.min(31,Math.max(1,parseInt(recur.day)||1)) }
+    )
+    await fetch('/api/boards/'+boardId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update_card',cardId:cardModal.id,...editCard,recurrence})})
     setSavingCard(false); setCardModal(null); load()
   }
   async function deleteCard(cardId) {
@@ -188,7 +212,7 @@ export default function BoardPage() {
                   return (
                     <div key={card.id} draggable
                       onDragStart={()=>onDragStart(card.id,col.id)}
-                      onClick={()=>{setCardModal(card);setEditCard({title:card.title,description:card.description,assignedTo:card.assignedTo,dueDate:card.dueDate,priority:card.priority,columnId:card.columnId})}}
+                      onClick={()=>{setCardModal(card);setEditCard({title:card.title,description:card.description,assignedTo:card.assignedTo,dueDate:card.dueDate,priority:card.priority,columnId:card.columnId});setRecur(parseRecUI(card.recurrence))}}
                       style={{background:'#1a1a1a',border:'1px solid #252525',borderRadius:'8px',padding:'10px 12px',cursor:'pointer',transition:'all 0.12s'}}
                       onMouseEnter={e=>e.currentTarget.style.borderColor=board.color}
                       onMouseLeave={e=>e.currentTarget.style.borderColor='#252525'}>
@@ -196,6 +220,7 @@ export default function BoardPage() {
                       {card.description&&<div style={{fontSize:'11px',color:'#6b7280',marginBottom:'8px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{card.description}</div>}
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                         <PBadge p={card.priority}/>
+                        {card.recurrence&&<span style={{fontSize:'10px',fontWeight:700,color:'#8DC63F',background:'rgba(141,198,63,0.1)',padding:'2px 7px',borderRadius:'4px'}}>🔁 {recurLabel(card.recurrence)}</span>}
                         {due&&<span style={{fontSize:'10px',fontWeight:600,color:due.overdue?'#f87171':due.soon?'#f59e0b':'#6b7280',background:due.overdue?'rgba(248,113,113,0.1)':due.soon?'rgba(245,158,11,0.1)':'#1e1e1e',padding:'2px 7px',borderRadius:'4px'}}>📅 {due.fmt}</span>}
                         {card.assignedTo&&<span style={{fontSize:'10px',color:'#9ca3af',background:'#141414',padding:'2px 7px',borderRadius:'4px',border:'1px solid #252525'}}>{card.assignedTo.split(' ')[0]}</span>}
                       </div>
@@ -295,6 +320,44 @@ export default function BoardPage() {
               <select value={editCard.columnId||cardModal.columnId} onChange={e=>setEditCard({...editCard,columnId:e.target.value})} style={{...inp,cursor:'pointer'}}>
                 {columns.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            </div>
+            <div style={{marginBottom:'24px'}}>
+              <label style={{display:'block',color:'#6b7280',fontSize:'11px',fontWeight:600,marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.07em'}}>Repeat</label>
+              <select value={recur.type} onChange={e=>setRecur({...recur,type:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                <option value="none">Does not repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+              {recur.type!=='none' && (
+                <div style={{marginTop:'12px',background:'#111',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'12px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:(recur.type==='weekly'||recur.type==='monthly')?'12px':0}}>
+                    <span style={{fontSize:'13px',color:'#9ca3af'}}>Every</span>
+                    <input type="number" min="1" value={recur.interval} onChange={e=>setRecur({...recur,interval:e.target.value})} style={{...inp,width:'64px',padding:'6px 8px'}}/>
+                    <span style={{fontSize:'13px',color:'#9ca3af'}}>{recur.type==='daily'?'day(s)':recur.type==='weekly'?'week(s)':'month(s)'}</span>
+                  </div>
+                  {recur.type==='weekly' && (
+                    <div style={{display:'flex',gap:'4px'}}>
+                      {WEEKDAYS.map((w,i)=>{
+                        const on = recur.weekdays?.includes(i)
+                        return <button key={i} type="button"
+                          onClick={()=>setRecur({...recur,weekdays: on?recur.weekdays.filter(d=>d!==i):[...(recur.weekdays||[]),i]})}
+                          style={{flex:1,padding:'7px 0',borderRadius:'6px',border:'1px solid '+(on?'#8DC63F':'#252525'),background:on?'#8DC63F':'#1a1a1a',color:on?'#0a0a0a':'#9ca3af',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>{w}</button>
+                      })}
+                    </div>
+                  )}
+                  {recur.type==='monthly' && (
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontSize:'13px',color:'#9ca3af'}}>On day</span>
+                      <input type="number" min="1" max="31" value={recur.day} onChange={e=>setRecur({...recur,day:e.target.value})} style={{...inp,width:'64px',padding:'6px 8px'}}/>
+                      <span style={{fontSize:'12px',color:'#4b5563'}}>of the month</span>
+                    </div>
+                  )}
+                  <p style={{fontSize:'11px',color:'#4b5563',margin:'12px 0 0',lineHeight:1.5}}>
+                    New instances appear at 2am EST on each scheduled date, in this card's starting column. An incomplete prior instance is replaced; completed ones keep the latest 5.
+                  </p>
+                </div>
+              )}
             </div>
             <div style={{display:'flex',gap:'10px'}}>
               <button onClick={saveCard} disabled={savingCard} style={{flex:1,background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'11px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
