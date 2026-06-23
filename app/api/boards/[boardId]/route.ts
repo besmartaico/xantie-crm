@@ -191,6 +191,16 @@ export async function POST(req, { params }) {
       return NextResponse.json({ success:true, id })
     }
 
+    // Reorder columns (body.order = array of columnIds in new left-to-right order)
+    if (body.action === 'reorder_columns') {
+      const order = Array.isArray(body.order) ? body.order : []
+      const posById = {}; order.forEach((id,i)=>{ posById[id] = i })
+      const cols = await getRows(sheets, 'PM_Columns')
+      const updated = cols.map(c => (c[1]===boardId && posById[c[0]]!==undefined) ? [c[0], c[1], c[2], posById[c[0]]] : c)
+      await clearAndRewrite(sheets, 'PM_Columns', updated)
+      return NextResponse.json({ success:true })
+    }
+
     // Rename column
     if (body.action === 'rename_column') {
       const cols = await getRows(sheets, 'PM_Columns')

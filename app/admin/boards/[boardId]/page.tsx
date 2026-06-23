@@ -73,6 +73,7 @@ export default function BoardPage() {
   // Drag state
   const dragCardId = useRef(null)
   const dragFromCol = useRef(null)
+  const dragColId = useRef(null)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user')||'{}')
@@ -143,6 +144,20 @@ export default function BoardPage() {
     dragCardId.current=null; dragFromCol.current=null; load()
   }
 
+  // Reorder columns: dropped column is placed before/after the target depending on drop side
+  async function dropColumn(targetColId, after) {
+    const from = dragColId.current
+    dragColId.current = null
+    if (!from || from===targetColId) return
+    const ids = (board.columns||[]).map(c=>c.id).filter(id=>id!==from)
+    const at = ids.indexOf(targetColId)
+    ids.splice(at<0 ? ids.length : (after ? at+1 : at), 0, from)
+    // Optimistic local reorder so it feels instant
+    setBoard(b=>({ ...b, columns: ids.map((id,i)=>({ ...b.columns.find(c=>c.id===id), position:i })) }))
+    await fetch('/api/boards/'+boardId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reorder_columns',order:ids})})
+    load()
+  }
+
   // ── SHARE ─────────────────────────────────────────────────────────────
   async function addMember() {
     if (!shareEmail) return
@@ -187,16 +202,21 @@ export default function BoardPage() {
             <div key={col.id}
               onDragOver={e=>{e.preventDefault();e.currentTarget.style.outline='2px solid '+board.color}}
               onDragLeave={e=>e.currentTarget.style.outline=''}
-              onDrop={e=>{e.currentTarget.style.outline='';onDrop(col.id)}}
+              onDrop={e=>{e.currentTarget.style.outline=''; if(dragColId.current){const r=e.currentTarget.getBoundingClientRect();dropColumn(col.id, e.clientX > r.left + r.width/2)} else {onDrop(col.id)}}}
               style={{width:'280px',flexShrink:0,background:'#111111',borderRadius:'12px',padding:'12px',border:'1px solid #1e1e1e',display:'flex',flexDirection:'column',maxHeight:'calc(100vh - 180px)',minHeight:'120px'}}>
               {/* Column header */}
-              <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px',flexShrink:0}}>
+              <div
+                draggable={editingColId!==col.id}
+                onDragStart={e=>{ dragColId.current=col.id; e.dataTransfer.effectAllowed='move' }}
+                onDragEnd={()=>{ dragColId.current=null }}
+                style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px',flexShrink:0,cursor:editingColId===col.id?'default':'grab'}}>
                 {editingColId===col.id ? (
                   <input autoFocus value={editingColName} onChange={e=>setEditingColName(e.target.value)}
                     onBlur={()=>renameColumn(col.id,editingColName)} onKeyDown={e=>e.key==='Enter'&&renameColumn(col.id,editingColName)}
                     style={{...inp,padding:'4px 8px',fontSize:'13px',flex:1}}/>
                 ) : (
                   <>
+                    <span style={{color:'#3a3a3a',fontSize:'12px',lineHeight:1,letterSpacing:'-1px',userSelect:'none'}} title="Drag to reorder">⠿</span>
                     <span onDoubleClick={()=>{setEditingColId(col.id);setEditingColName(col.name)}}
                       style={{fontWeight:700,fontSize:'13px',color:'#fff',flex:1,cursor:'default'}}>{col.name}</span>
                     <span style={{fontSize:'11px',color:'#4b5563',fontWeight:600,background:'#1a1a1a',borderRadius:'4px',padding:'1px 6px'}}>{colCards.length}</span>
