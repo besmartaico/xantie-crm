@@ -28,7 +28,7 @@ function getDateRange(filter, start, end) {
   if (filter==='last_month') return [new Date(y,m-1,1), new Date(y,m,0)]
   if (filter==='this_quarter') { const q=Math.floor(m/3); return [new Date(y,q*3,1), new Date(y,q*3+3,0)] }
   if (filter==='this_year') return [new Date(y,0,1), new Date(y,11,31)]
-  if (filter==='custom'&&start&&end) return [new Date(start), new Date(end)]
+  if (filter==='custom'&&start&&end) return [new Date(start+'T00:00:00'), new Date(end+'T00:00:00')]
   return null
 }
 
@@ -406,7 +406,7 @@ export default function TimeEntries() {
     if (subProjectFilter && e.subProject!==subProjectFilter) return false
     if (billableFilter && e.billable!==billableFilter) return false
     const range = getDateRange(dateFilter, customStart, customEnd)
-    if (range) { const d=new Date(e.date); if(d<range[0]||d>range[1]) return false }
+    if (range) { const d=new Date(e.date+'T00:00:00'); if(d<range[0]||d>range[1]) return false }
     return true
   }))
 
