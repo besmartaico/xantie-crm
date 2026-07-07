@@ -71,9 +71,10 @@ export default function FinishSignRequestPage({ params }) {
   async function submit() {
     if (!request) return
     const adminFields = request.fields.filter(f => f.assignee === 'admin')
-    const unfilled = adminFields.filter(f => !values[f.id])
+    const requiredAdmin = adminFields.filter(f => !f.optional)
+    const unfilled = requiredAdmin.filter(f => !values[f.id])
     if (unfilled.length > 0) {
-      setSubmitError('Please fill in all ' + adminFields.length + ' admin field' + (adminFields.length===1?'':'s') + '. ' + unfilled.length + ' remaining.')
+      setSubmitError('Please fill in all ' + requiredAdmin.length + ' required admin field' + (requiredAdmin.length===1?'':'s') + '. ' + unfilled.length + ' remaining.')
       return
     }
     const diff = {}
@@ -102,7 +103,8 @@ export default function FinishSignRequestPage({ params }) {
   }
 
   const adminFields = request ? request.fields.filter(f => f.assignee === 'admin') : []
-  const adminFilled = adminFields.filter(f => values[f.id]).length
+  const requiredAdmin = adminFields.filter(f => !f.optional)
+  const adminFilled = requiredAdmin.filter(f => values[f.id]).length
   const isMulti = request ? Array.isArray(request.recipients) : false
   // Everything not assigned to admin is filled by recipients → read-only here.
   const userFilledIds = request ? request.fields.filter(f => f.assignee !== 'admin').map(f => f.id) : []
@@ -136,7 +138,7 @@ export default function FinishSignRequestPage({ params }) {
 
       <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
         <span>Admin fields:</span>
-        <strong style={{color:'#f97316'}}>{adminFilled} of {adminFields.length} filled</strong>
+        <strong style={{color:'#f97316'}}>{adminFilled} of {requiredAdmin.length} required filled</strong>
       </div>
 
       {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}

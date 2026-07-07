@@ -296,6 +296,10 @@ export default function PlaceFieldsPage({ params }) {
                         <option value="admin">Admin (you)</option>
                       </select>
                     </div>
+                    <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:'#9ca3af',marginBottom:'6px',cursor:'pointer'}}>
+                      <input type="checkbox" checked={!!f.optional} onChange={e=>updateField(f.id,{optional:e.target.checked})} style={{accentColor:'#8DC63F',cursor:'pointer'}}/>
+                      Optional (can be left blank)
+                    </label>
                     {(f.type==='signature'||f.type==='initials') && (
                       <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:'#9ca3af',marginBottom:'6px',cursor:'pointer'}}>
                         <input type="checkbox" checked={!!f.requireDraw} onChange={e=>updateField(f.id,{requireDraw:e.target.checked})} style={{accentColor:'#8DC63F',cursor:'pointer'}}/>

@@ -90,9 +90,10 @@ export default function PublicSignPage({ params }) {
     if (!request) return
     if (!consentChecked) { setSubmitError('Please consent to the use of electronic signatures before submitting.'); return }
     const userFields = request.fields.filter(isMine)
-    const unfilled = userFields.filter(f => !values[f.id])
+    const requiredFields = userFields.filter(f => !f.optional)
+    const unfilled = requiredFields.filter(f => !values[f.id])
     if (unfilled.length > 0) {
-      setSubmitError('Please fill in all ' + userFields.length + ' field' + (userFields.length===1?'':'s') + ' before submitting. ' + unfilled.length + ' remaining.')
+      setSubmitError('Please fill in all ' + requiredFields.length + ' required field' + (requiredFields.length===1?'':'s') + ' before submitting. ' + unfilled.length + ' remaining.')
       return
     }
     const diff = {}
@@ -166,7 +167,8 @@ export default function PublicSignPage({ params }) {
   }
 
   const userFields = request ? request.fields.filter(isMine) : []
-  const userFilled = userFields.filter(f => values[f.id]).length
+  const requiredFields = userFields.filter(f => !f.optional)
+  const userFilled = requiredFields.filter(f => values[f.id]).length
   // Fields not mine that already carry a value (admin-prefilled, or other recipients when shared) → read-only.
   const adminPrefilledIds = request ? request.fields.filter(f => !isMine(f) && values[f.id]).map(f => f.id) : []
 
@@ -192,7 +194,8 @@ export default function PublicSignPage({ params }) {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'10px'}}>
           <div style={{fontSize:'12px',color:'#9ca3af'}}>
             <span>Your progress: </span>
-            <strong style={{color:'#8DC63F'}}>{userFilled} of {userFields.length} filled</strong>
+            <strong style={{color:'#8DC63F'}}>{userFilled} of {requiredFields.length} required filled</strong>
+            {userFields.length > requiredFields.length && <span style={{color:'#6b7280'}}> · {userFields.length - requiredFields.length} optional</span>}
           </div>
           <button onClick={submit} disabled={submitting || !consentChecked} title={!consentChecked ? 'Please check the consent box first' : ''}
             style={{background:(submitting||!consentChecked)?'#2a2a2a':'#8DC63F',color:(submitting||!consentChecked)?'#4b5563':'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:(submitting||!consentChecked)?'not-allowed':'pointer'}}>{submitting?'Submitting…':'Submit signed document'}</button>
