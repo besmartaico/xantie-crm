@@ -296,6 +296,12 @@ export default function PlaceFieldsPage({ params }) {
                         <option value="admin">Admin (you)</option>
                       </select>
                     </div>
+                    {(f.type==='signature'||f.type==='initials') && (
+                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:'#9ca3af',marginBottom:'6px',cursor:'pointer'}}>
+                        <input type="checkbox" checked={!!f.requireDraw} onChange={e=>updateField(f.id,{requireDraw:e.target.checked})} style={{accentColor:'#8DC63F',cursor:'pointer'}}/>
+                        Require drawn (no typing)
+                      </label>
+                    )}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}}>
                       <button onClick={()=>duplicateField(f.id)} title={'Copy this field to page '+visiblePage+' (keeps type, label, group)'} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'11px',padding:0,fontWeight:600}}>+ Duplicate</button>
                       <button onClick={()=>removeField(f.id)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'11px',padding:0}}>Remove</button>

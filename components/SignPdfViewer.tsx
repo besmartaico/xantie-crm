@@ -21,18 +21,44 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
   // readOnlyFieldIds: set of field IDs that should be displayed (with their value) but not clickable (e.g., admin-prefilled).
   const readOnlySet = new Set(Array.isArray(readOnlyFieldIds) ? readOnlyFieldIds : (readOnlyFieldIds instanceof Set ? Array.from(readOnlyFieldIds) : []))
   const [numPages, setNumPages] = useState(0)
+  // Original page dimensions (PDF points, i.e. scale 1) keyed by page number.
+  const [pageDims, setPageDims] = useState({})
+  const containerRef = useRef(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  // Track the container's width so pages fit the screen (critical on mobile).
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setContainerWidth(el.clientWidth)
+    measure()
+    let ro
+    if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(measure); ro.observe(el) }
+    if (typeof window !== 'undefined') window.addEventListener('resize', measure)
+    return () => { if (ro) ro.disconnect(); if (typeof window !== 'undefined') window.removeEventListener('resize', measure) }
+  }, [])
+
+  const HPAD = 16
+  const avail = containerWidth > 0 ? Math.max(120, containerWidth - HPAD * 2) : 0
+
   return (
-    <div style={{flex:1,overflow:'auto',background:'#0a0a0a',padding:'16px',borderRadius:'12px',border:'1px solid #1e1e1e'}}>
+    <div ref={containerRef} style={{flex:1,overflow:'auto',background:'#0a0a0a',padding:HPAD+'px',borderRadius:'12px',border:'1px solid #1e1e1e'}}>
       <Document file={fileUrl} onLoadSuccess={(p)=>setNumPages(p.numPages)}
         loading={<div style={{color:'#6b7280',padding:'40px',textAlign:'center'}}>Loading PDF...</div>}
         error={<div style={{color:'#f87171',padding:'40px',textAlign:'center'}}>Failed to load PDF</div>}>
-        {Array.from({length: numPages}, (_, i) => {
+        {avail > 0 && Array.from({length: numPages}, (_, i) => {
           const pageNum = i + 1
+          const dim = pageDims[pageNum]
+          // Fit the page to the container width, but never upscale past the desktop `scale` size.
+          const renderW = dim ? Math.min(avail, dim.width * scale) : Math.min(avail, 800)
+          // Effective scale that maps field coords (PDF points) → rendered pixels.
+          const s = dim ? renderW / dim.width : scale
           const pageFields = (fields || []).filter(f => f.page === pageNum)
           return (
-            <div key={pageNum} style={{position:'relative',marginBottom:'14px',background:'#fff',display:'inline-block'}}>
-              <Page pageNumber={pageNum} scale={scale} renderTextLayer={false} renderAnnotationLayer={false}/>
-              {pageFields.map(f => {
+            <div key={pageNum} style={{position:'relative',marginBottom:'14px',background:'#fff',display:'inline-block',maxWidth:'100%'}}>
+              <Page pageNumber={pageNum} width={renderW} renderTextLayer={false} renderAnnotationLayer={false}
+                onLoadSuccess={(p)=>setPageDims(prev => (prev[pageNum] && prev[pageNum].width === p.originalWidth) ? prev : ({ ...prev, [pageNum]: { width: p.originalWidth, height: p.originalHeight } }))}/>
+              {dim && pageFields.map(f => {
                 const c = TYPE_COLORS[f.type] || TYPE_COLORS.text
                 const val = values && values[f.id]
                 const isReadOnly = readOnlySet.has(f.id) || (restrictedAssignee && f.assignee && f.assignee !== restrictedAssignee)
@@ -40,7 +66,7 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
                 return (
                   <div key={f.id} onClick={()=>clickable && onClickField && onClickField(f)}
                     title={isReadOnly ? (f.assignee === 'admin' ? 'Filled by admin' : 'Not your field') : (f.label || c.label)}
-                    style={{position:'absolute',left:f.x*scale,top:f.y*scale,width:f.width*scale,height:f.height*scale,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: val ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
+                    style={{position:'absolute',left:f.x*s,top:f.y*s,width:f.width*s,height:f.height*s,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: val ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
                     {val ? <PreviewValue type={f.type} value={val}/> : (f.label || c.label)}
                   </div>
                 )

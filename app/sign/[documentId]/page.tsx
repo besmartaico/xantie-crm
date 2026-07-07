@@ -283,7 +283,7 @@ function FieldModal({ field, fields, restrictedAssignee, currentValue, onClose, 
         </div>
 
         {(field.type === 'signature' || field.type === 'initials') && (
-          <SignatureInput value={val} onChange={setVal} mode={mode} setMode={setMode}/>
+          <SignatureInput value={val} onChange={setVal} mode={mode} setMode={setMode} drawOnly={!!field.requireDraw}/>
         )}
         {field.type === 'text' && (
           <div>
@@ -313,7 +313,7 @@ function FieldModal({ field, fields, restrictedAssignee, currentValue, onClose, 
   )
 }
 
-function SignatureInput({ value, onChange, mode, setMode }) {
+function SignatureInput({ value, onChange, mode, setMode, drawOnly }) {
   // Lazy-import to avoid bundling issues; SignatureCanvas is exported from SignPdfViewer
   const [SignatureCanvas, setSC] = useState(null)
   useEffect(() => {
@@ -338,13 +338,15 @@ function SignatureInput({ value, onChange, mode, setMode }) {
 
   return (
     <div>
-      <div style={{display:'flex',gap:'6px',marginBottom:'10px'}}>
-        <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>✎ Draw</button>
-        <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>⌨ Type</button>
-      </div>
-      {mode === 'draw' && SignatureCanvas && <SignatureCanvas value={value} onChange={onChange} height={150}/>}
-      {mode === 'draw' && !SignatureCanvas && <div style={{height:150,background:'#0f0f0f',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',color:'#6b7280'}}>Loading…</div>}
-      {mode === 'type' && (
+      {drawOnly
+        ? <div style={{fontSize:'12px',color:'#8DC63F',marginBottom:'10px',fontWeight:600}}>✎ Please draw your signature (typing is disabled for this field)</div>
+        : <div style={{display:'flex',gap:'6px',marginBottom:'10px'}}>
+            <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>✎ Draw</button>
+            <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>⌨ Type</button>
+          </div>}
+      {(drawOnly || mode === 'draw') && SignatureCanvas && <SignatureCanvas value={value} onChange={onChange} height={150}/>}
+      {(drawOnly || mode === 'draw') && !SignatureCanvas && <div style={{height:150,background:'#0f0f0f',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',color:'#6b7280'}}>Loading…</div>}
+      {!drawOnly && mode === 'type' && (
         <div>
           <input autoFocus value={typed} onChange={e=>setTyped(e.target.value)} placeholder="Type your name..."
             style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'18px',outline:'none',boxSizing:'border-box',fontFamily:'"Brush Script MT","Lucida Handwriting",cursive',fontStyle:'italic'}}/>
