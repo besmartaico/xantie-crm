@@ -40,6 +40,13 @@ export async function GET() {
         const res = await fetch(b.url)
         const data = await res.json()
         const recips = Array.isArray(data.recipients) ? data.recipients : null
+        const signedCount = recips ? (signedByParent[data.id] ? signedByParent[data.id].size : 0) : null
+        // Derive status: if every recipient has signed, it's ready to finalize even if
+        // the stored status wasn't updated (Blob list lag on the last submit).
+        let status = data.status
+        if (recips && recips.length > 0 && status === 'pending_recipients' && signedCount >= recips.length) {
+          status = 'ready_to_finalize'
+        }
         return {
           id: data.id,
           documentId: data.documentId,
@@ -48,10 +55,10 @@ export async function GET() {
           signerEmail: data.signerEmail,
           recipients: recips ? recips.map(r => ({ rid: r.rid, name: r.name, email: r.email })) : null,
           recipientCount: recips ? recips.length : null,
-          signedCount: recips ? (signedByParent[data.id] ? signedByParent[data.id].size : 0) : null,
+          signedCount,
           createdBy: data.createdBy,
           createdAt: data.createdAt,
-          status: data.status,
+          status,
           signedPdfUrl: data.signedPdfUrl || null,
           completedAt: data.completedAt || null,
         }

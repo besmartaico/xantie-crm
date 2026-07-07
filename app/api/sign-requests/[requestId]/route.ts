@@ -105,11 +105,15 @@ async function generateSignedPdf(record, filenameSuffix) {
       page.drawLine({ start: p1, end: p2, thickness: t, color: rgb(0, 0, 0) })
       page.drawLine({ start: p2, end: p3, thickness: t, color: rgb(0, 0, 0) })
     } else {
+      // Text/date: shrink to fit the box width, then center vertically.
       const text = String(val)
-      const fontSize = Math.min(fh * 0.6, 14)
+      const maxW = Math.max(2, fw - 6)
+      let fontSize = Math.min(fh * 0.7, 14)
+      const measured = helveticaFont.widthOfTextAtSize(text, fontSize)
+      if (measured > maxW) fontSize = Math.max(4, fontSize * (maxW / measured))
       page.drawText(text, {
-        x: fx + 4,
-        y: fy + fh - fontSize - 2,
+        x: fx + 3,
+        y: fy + (fh - fontSize) / 2 + fontSize * 0.18,
         size: fontSize,
         font: helveticaFont,
         color: rgb(0, 0, 0),
@@ -183,8 +187,11 @@ export async function GET(req, ctx) {
         signed: !!recipientData[r.rid],
         signedAt: recipientData[r.rid]?.signedAt || null,
       }))
-      const allRecipientsSigned = recipientsStatus.every(r => r.signed)
-      return NextResponse.json({ ...record, values: merged, recipientsStatus, allRecipientsSigned })
+      const allRecipientsSigned = recipientsStatus.length > 0 && recipientsStatus.every(r => r.signed)
+      // Derive ready-to-finalize if all signed but the stored status lagged behind.
+      let effStatus = record.status
+      if (record.status === 'pending_recipients' && allRecipientsSigned) effStatus = 'ready_to_finalize'
+      return NextResponse.json({ ...record, status: effStatus, values: merged, recipientsStatus, allRecipientsSigned })
     }
 
     // ── Legacy single-signer record ──────────────────────────────────────
@@ -249,10 +256,10 @@ export async function PUT(req, ctx) {
       }
       await saveRecipientBlob(requestId, recipient.rid, payload)
 
-      // Determine if everyone has now signed (include this rid explicitly to avoid list lag).
-      const signedRids = new Set(Object.keys(recipientData))
-      signedRids.add(recipient.rid)
-      const allSigned = record.recipients.every(r => signedRids.has(r.rid))
+      // Determine if everyone has now signed. Re-gather after writing, and count
+      // this recipient as signed regardless (Blob list may lag on the just-written blob).
+      const after = await gatherRecipients(requestId)
+      const allSigned = record.recipients.every(r => r.rid === recipient.rid || !!after[r.rid])
 
       if (allSigned) {
         const adminFieldsRemaining = record.fields.some(f => f.assignee === 'admin' && !(record.values || {})[f.id])
