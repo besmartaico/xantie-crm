@@ -140,6 +140,36 @@ export default function StartSigningPage({ params }) {
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Fill any admin fields, enter each recipient's info, then send. Every recipient gets their own link and fills only their fields, in parallel. Admin fields are <span style={{color:'#f97316'}}>highlighted orange</span>.</p>
         </div>
 
+        {adminFields.length > 0 && (
+          <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}}>
+            <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 4px'}}>Admin fields <span style={{color:'#f97316',textTransform:'none',letterSpacing:0}}>· you fill these before sending</span></h3>
+            <p style={{color:'#6b7280',fontSize:'11px',margin:'0 0 12px'}}>Optional — leave any blank to fill later on the finish step. You can also click the orange boxes on the document below.</p>
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              {adminFields.map(f => {
+                const filled = !!values[f.id]
+                const isSig = f.type === 'signature' || f.type === 'initials'
+                return (
+                  <div key={f.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',padding:'8px 12px',background:'#0f0f0f',borderRadius:'8px',flexWrap:'wrap'}}>
+                    <div style={{minWidth:0,flex:'1 1 200px'}}>
+                      <span style={{fontSize:'13px',color:'#fff',fontWeight:600}}>{f.label || f.type}</span>
+                      <span style={{fontSize:'11px',color:'#6b7280',marginLeft:'8px'}}>{f.type} · page {f.page}{f.optional?' · optional':''}</span>
+                      {filled && <div style={{fontSize:'12px',color:'#8DC63F',marginTop:'2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isSig ? '✓ added' : (f.type==='checkbox' ? '✓ checked' : values[f.id])}</div>}
+                    </div>
+                    <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                      {f.type==='checkbox' ? (
+                        <button onClick={()=>toggleCheckbox(f)} style={{background:filled?'#8DC63F':'#f97316',color:'#0a0a0a',border:'none',borderRadius:'6px',padding:'6px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>{filled?'Checked ✓':'Check'}</button>
+                      ) : (
+                        <button onClick={()=>setActiveField(f)} style={{background:filled?'#1e1e1e':'#f97316',color:filled?'#9ca3af':'#0a0a0a',border:filled?'1px solid #252525':'none',borderRadius:'6px',padding:'6px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>{filled?'Edit':'Fill'}</button>
+                      )}
+                      {filled && <button onClick={()=>setValues(prev=>{ const n={...prev}; delete n[f.id]; return n })} style={{background:'none',border:'1px solid #252525',color:'#6b7280',borderRadius:'6px',padding:'6px 10px',fontSize:'12px',cursor:'pointer'}}>Clear</button>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}}>
           <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Recipients</h3>
           {usedRids.length === 0 && <p style={{color:'#6b7280',fontSize:'13px',margin:0}}>This document has no recipient fields — only admin fields. Fill them below and send to finalize.</p>}
