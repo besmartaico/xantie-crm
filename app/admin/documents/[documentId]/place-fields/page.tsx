@@ -12,6 +12,7 @@ const DEFAULTS = {
   initials:  { width: 80,  height: 40, label: 'Initials' },
   text:      { width: 160, height: 30, label: 'Text' },
   date:      { width: 120, height: 30, label: 'Date' },
+  checkbox:  { width: 26,  height: 26, label: 'Checkbox' },
 }
 
 // Recipient role colors (r1..). Admin uses orange (#f97316) as before.
@@ -238,6 +239,7 @@ export default function PlaceFieldsPage({ params }) {
         <button onClick={()=>addField('initials')} style={btnStyle('#a78bfa')}>+ Initials</button>
         <button onClick={()=>addField('text')} style={btnStyle('#34d399')}>+ Text</button>
         <button onClick={()=>addField('date')} style={btnStyle('#fbbf24')}>+ Date</button>
+        <button onClick={()=>addField('checkbox')} style={btnStyle('#22d3ee')}>+ Checkbox</button>
         <span style={{fontSize:'12px',color:'#6b7280',marginLeft:'12px'}}>{fields.length} field{fields.length===1?'':'s'} total</span>
       </div>
 

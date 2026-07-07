@@ -14,6 +14,7 @@ const TYPE_COLORS = {
   initials:  { border:'#a78bfa', bg:'rgba(167,139,250,0.16)', label:'Initials' },
   text:      { border:'#34d399', bg:'rgba(52,211,153,0.16)', label:'Type here' },
   date:      { border:'#fbbf24', bg:'rgba(251,191,36,0.16)', label:'Date' },
+  checkbox:  { border:'#22d3ee', bg:'rgba(34,211,238,0.16)', label:'' },
 }
 
 export default function SignPdfViewer({ fileUrl, fields, values, onClickField, scale = 1.2, restrictedAssignee, readOnlyFieldIds }) {
@@ -66,8 +67,8 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
                 return (
                   <div key={f.id} onClick={()=>clickable && onClickField && onClickField(f)}
                     title={isReadOnly ? (f.assignee === 'admin' ? 'Filled by admin' : 'Not your field') : (f.label || c.label)}
-                    style={{position:'absolute',left:f.x*s,top:f.y*s,width:f.width*s,height:f.height*s,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: val ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
-                    {val ? <PreviewValue type={f.type} value={val}/> : (f.label || c.label)}
+                    style={{position:'absolute',left:f.x*s,top:f.y*s,width:f.width*s,height:f.height*s,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: (val && f.type!=='checkbox') ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
+                    {val ? <PreviewValue type={f.type} value={val}/> : (f.type==='checkbox' ? '' : (f.label || c.label))}
                   </div>
                 )
               })}
@@ -82,6 +83,13 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
 function PreviewValue({ type, value }) {
   if (type === 'signature' || type === 'initials') {
     return <img src={value} alt="" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain'}}/>
+  }
+  if (type === 'checkbox') {
+    return (
+      <svg viewBox="0 0 24 24" width="100%" height="100%" style={{padding:'2px'}} preserveAspectRatio="xMidYMid meet">
+        <path d="M4 12.5 L10 18.5 L20 5.5" fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    )
   }
   return <span style={{padding:'0 4px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',width:'100%',textAlign:'left',fontSize:'13px'}}>{value}</span>
 }

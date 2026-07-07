@@ -86,6 +86,10 @@ export default function PublicSignPage({ params }) {
     })
   }
 
+  function toggleCheckbox(field) {
+    setValues(prev => ({ ...prev, [field.id]: prev[field.id] ? '' : 'checked' }))
+  }
+
   async function submit() {
     if (!request) return
     if (!consentChecked) { setSubmitError('Please consent to the use of electronic signatures before submitting.'); return }
@@ -207,7 +211,7 @@ export default function PublicSignPage({ params }) {
         {!loading && pdfBlobUrl && request && (
           <div style={{maxHeight:'calc(100vh - 280px)',display:'flex'}}>
             <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
-              onClickField={(f) => { if (isMine(f)) setActiveField(f) }}
+              onClickField={(f) => { if (!isMine(f)) return; if (f.type==='checkbox') toggleCheckbox(f); else setActiveField(f) }}
               restrictedAssignee={request.restrictTo || 'user'} readOnlyFieldIds={adminPrefilledIds}/>
           </div>
         )}

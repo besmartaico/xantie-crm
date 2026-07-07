@@ -68,6 +68,10 @@ export default function FinishSignRequestPage({ params }) {
     })
   }
 
+  function toggleCheckbox(field) {
+    setValues(prev => ({ ...prev, [field.id]: prev[field.id] ? '' : 'checked' }))
+  }
+
   async function submit() {
     if (!request) return
     const adminFields = request.fields.filter(f => f.assignee === 'admin')
@@ -151,7 +155,7 @@ export default function FinishSignRequestPage({ params }) {
       {!loading && pdfBlobUrl && request && (
         <div style={{maxHeight:'calc(100vh - 320px)',display:'flex'}}>
           <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
-            onClickField={(f) => { if (f.assignee === 'admin') setActiveField(f) }}
+            onClickField={(f) => { if (f.assignee !== 'admin') return; if (f.type==='checkbox') toggleCheckbox(f); else setActiveField(f) }}
             restrictedAssignee="admin" readOnlyFieldIds={userFilledIds}/>
         </div>
       )}

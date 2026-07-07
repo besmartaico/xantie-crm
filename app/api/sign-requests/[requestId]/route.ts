@@ -96,6 +96,14 @@ async function generateSignedPdf(record, filenameSuffix) {
       try { img = await pdfDoc.embedPng(bytes) } catch { try { img = await pdfDoc.embedJpg(bytes) } catch { img = null } }
       if (!img) continue
       page.drawImage(img, { x: fx, y: fy, width: fw, height: fh })
+    } else if (field.type === 'checkbox') {
+      // Draw a checkmark with two vector strokes (avoids standard-font glyph limits).
+      const t = Math.max(1.2, Math.min(fw, fh) * 0.12)
+      const p1 = { x: fx + fw * 0.22, y: fy + fh * 0.50 }
+      const p2 = { x: fx + fw * 0.42, y: fy + fh * 0.28 }
+      const p3 = { x: fx + fw * 0.80, y: fy + fh * 0.74 }
+      page.drawLine({ start: p1, end: p2, thickness: t, color: rgb(0, 0, 0) })
+      page.drawLine({ start: p2, end: p3, thickness: t, color: rgb(0, 0, 0) })
     } else {
       const text = String(val)
       const fontSize = Math.min(fh * 0.6, 14)

@@ -74,6 +74,7 @@ const TYPE_COLORS = {
   initials:  { border:'#a78bfa', bg:'rgba(167,139,250,0.18)', label:'Initials' },
   text:      { border:'#34d399', bg:'rgba(52,211,153,0.18)', label:'Text' },
   date:      { border:'#fbbf24', bg:'rgba(251,191,36,0.18)', label:'Date' },
+  checkbox:  { border:'#22d3ee', bg:'rgba(34,211,238,0.18)', label:'☐' },
 }
 const ADMIN_OVERLAY = { border:'#f97316', bg:'rgba(249,115,22,0.18)' }
 
