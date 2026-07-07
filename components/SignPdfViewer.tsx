@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -65,11 +65,16 @@ export default function SignPdfViewer({ fileUrl, fields, values, onClickField, s
                 const isReadOnly = readOnlySet.has(f.id) || (restrictedAssignee && f.assignee && f.assignee !== restrictedAssignee)
                 const clickable = !isReadOnly
                 return (
-                  <div key={f.id} onClick={()=>clickable && onClickField && onClickField(f)}
-                    title={isReadOnly ? (f.assignee === 'admin' ? 'Filled by admin' : 'Not your field') : (f.label || c.label)}
-                    style={{position:'absolute',left:f.x*s,top:f.y*s,width:f.width*s,height:f.height*s,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: (val && f.type!=='checkbox') ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
-                    {val ? <PreviewValue type={f.type} value={val}/> : (f.type==='checkbox' ? '' : (f.label || c.label))}
-                  </div>
+                  <Fragment key={f.id}>
+                    {clickable && !val && f.label && (
+                      <div style={{position:'absolute',left:f.x*s,top:Math.max(0, f.y*s - 15),maxWidth:Math.max(70, f.width*s + 60)+'px',fontSize:'10px',fontWeight:700,color:'#fff',background:'rgba(10,10,10,0.82)',padding:'1px 5px',borderRadius:'3px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',pointerEvents:'none',zIndex:2}}>{f.label}</div>
+                    )}
+                    <div onClick={()=>clickable && onClickField && onClickField(f)}
+                      title={isReadOnly ? (f.assignee === 'admin' ? 'Filled by admin' : 'Not your field') : (f.label || c.label)}
+                      style={{position:'absolute',left:f.x*s,top:f.y*s,width:f.width*s,height:f.height*s,border:'2px solid '+(isReadOnly && f.assignee==='admin' ? '#f9731680' : c.border),background: (val && f.type!=='checkbox') ? 'rgba(255,255,255,0.95)' : (isReadOnly ? 'rgba(0,0,0,0.04)' : c.bg),cursor:clickable?'pointer':'default',opacity: isReadOnly && !val ? 0.45 : 1, display:'flex',alignItems:'center',justifyContent:'center',color: val ? '#0a0a0a' : c.border,fontSize:'12px',fontWeight:600,borderRadius:'2px',overflow:'hidden'}}>
+                      {val ? <PreviewValue type={f.type} value={val}/> : (f.type==='checkbox' ? '' : (f.label || c.label))}
+                    </div>
+                  </Fragment>
                 )
               })}
             </div>

@@ -175,13 +175,16 @@ export default function PublicSignPage({ params }) {
   const userFilled = requiredFields.filter(f => values[f.id]).length
   // Fields not mine that already carry a value (admin-prefilled, or other recipients when shared) → read-only.
   const adminPrefilledIds = request ? request.fields.filter(f => !isMine(f) && values[f.id]).map(f => f.id) : []
+  // Only show my own fields plus any field that already has a value — hides other
+  // recipients' empty boxes so the signer isn't confused by fields that aren't theirs.
+  const visibleFields = request ? request.fields.filter(f => isMine(f) || values[f.id]) : []
 
   return (
     <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'24px 16px'}}>
         <div style={{marginBottom:'18px'}}>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{request && request.documentName ? request.documentName : 'Sign Document'}</h1>
-          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? (request.recipientName || request.signerName) : ''}, click each highlighted field to fill it. Greyed-out fields belong to other signers or the administrator.</p>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? (request.recipientName || request.signerName) : ''}, click each highlighted field to fill it — the label above each box tells you what to enter.</p>
         </div>
 
         {/* E-signature consent panel */}
@@ -210,7 +213,7 @@ export default function PublicSignPage({ params }) {
         {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading document...</div>}
         {!loading && pdfBlobUrl && request && (
           <div style={{maxHeight:'calc(100vh - 280px)',display:'flex'}}>
-            <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
+            <SignPdfViewer fileUrl={pdfBlobUrl} fields={visibleFields} values={values}
               onClickField={(f) => { if (!isMine(f)) return; if (f.type==='checkbox') toggleCheckbox(f); else setActiveField(f) }}
               restrictedAssignee={request.restrictTo || 'user'} readOnlyFieldIds={adminPrefilledIds}/>
           </div>

@@ -284,7 +284,7 @@ export default function PlaceFieldsPage({ params }) {
                           style={{width:'46px',background:'#0f0f0f',border:'1px solid #252525',borderRadius:'4px',padding:'2px 4px',color:'#fff',fontSize:'11px',outline:'none',textAlign:'center'}}/>
                       </label>
                     </div>
-                    <input value={f.label||''} onChange={e=>setFieldLabel(f.id, e.target.value)} placeholder="Label"
+                    <input value={f.label||''} onChange={e=>setFieldLabel(f.id, e.target.value)} placeholder="Label (shown to signer)"
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
                     <input value={f.group||''} onChange={e=>setFieldGroup(f.id, e.target.value)} placeholder="Group (optional)" title="Fields with the same group share one value at signing"
                       style={{width:'100%',background:'#111',border:'1px solid '+(f.group?'#8DC63F66':'#252525'),borderRadius:'6px',padding:'6px 8px',color:f.group?'#8DC63F':'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
