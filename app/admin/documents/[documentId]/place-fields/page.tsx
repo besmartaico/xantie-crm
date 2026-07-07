@@ -14,6 +14,22 @@ const DEFAULTS = {
   date:      { width: 120, height: 30, label: 'Date' },
 }
 
+// Recipient role colors (r1..). Admin uses orange (#f97316) as before.
+const RECIPIENT_COLORS = ['#8DC63F', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#34d399']
+const MAX_RECIPIENTS = RECIPIENT_COLORS.length
+function ridLabel(rid) {
+  if (rid === 'admin') return 'Admin'
+  const n = parseInt(String(rid).replace('r', ''), 10)
+  return isNaN(n) ? 'Recipient 1' : 'Recipient ' + n
+}
+function ridColor(rid) {
+  if (rid === 'admin') return '#f97316'
+  const n = parseInt(String(rid).replace('r', ''), 10)
+  return RECIPIENT_COLORS[(isNaN(n) ? 1 : n) - 1] || '#9ca3af'
+}
+// Legacy 'user'/missing assignee means recipient 1.
+function normAssignee(a) { return (!a || a === 'user') ? 'r1' : a }
+
 function btnStyle(color) {
   return {
     background: color + '22',
@@ -76,6 +92,7 @@ export default function PlaceFieldsPage({ params }) {
   const [saveStatus, setSaveStatus] = useState('')
   const [pdfBlobUrl, setPdfBlobUrl] = useState('')
   const [selectedFieldId, setSelectedFieldId] = useState(null)
+  const [recipientCount, setRecipientCount] = useState(1)
 
   const visiblePage = useVisiblePage([pdfBlobUrl])
 
@@ -105,7 +122,14 @@ export default function PlaceFieldsPage({ params }) {
     try {
       const data = await (await fetch('/api/documents/' + resolvedParams.documentId + '/fields')).json()
       setDoc({ id: data.id, name: data.name })
-      setFields(data.fields || [])
+      // Normalize legacy 'user'/missing assignees to recipient 1 for display.
+      const loaded = (data.fields || []).map(f => ({ ...f, assignee: f.assignee === 'admin' ? 'admin' : normAssignee(f.assignee) }))
+      setFields(loaded)
+      const maxR = loaded.reduce((m, f) => {
+        const n = parseInt(String(f.assignee).replace('r', ''), 10)
+        return (String(f.assignee).startsWith('r') && !isNaN(n)) ? Math.max(m, n) : m
+      }, 1)
+      setRecipientCount(Math.min(MAX_RECIPIENTS, maxR))
       const pdfRes = await fetch('/api/documents/raw/' + resolvedParams.documentId)
       const buf = await pdfRes.arrayBuffer()
       const blob = new Blob([buf], { type: 'application/pdf' })
@@ -125,7 +149,7 @@ export default function PlaceFieldsPage({ params }) {
       width: base.width,
       height: base.height,
       label: base.label,
-      assignee: 'user',
+      assignee: 'r1',
     }])
   }
 
@@ -217,6 +241,22 @@ export default function PlaceFieldsPage({ params }) {
         <span style={{fontSize:'12px',color:'#6b7280',marginLeft:'12px'}}>{fields.length} field{fields.length===1?'':'s'} total</span>
       </div>
 
+      <div style={{display:'flex',gap:'10px',marginBottom:'12px',flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:'12px',color:'#6b7280'}}>Recipients:</span>
+        {Array.from({length: recipientCount}, (_, i) => 'r' + (i + 1)).map(rid => (
+          <span key={rid} style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#d1d5db'}}>
+            <span style={{width:'10px',height:'10px',borderRadius:'3px',background:ridColor(rid)}}/>{ridLabel(rid)}
+          </span>
+        ))}
+        {recipientCount < MAX_RECIPIENTS && (
+          <button onClick={()=>setRecipientCount(c => Math.min(MAX_RECIPIENTS, c + 1))}
+            style={{background:'#1e1e1e',border:'1px dashed #2a2a2a',color:'#9ca3af',borderRadius:'6px',padding:'4px 10px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>+ Add recipient</button>
+        )}
+        <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#d1d5db',marginLeft:'6px'}}>
+          <span style={{width:'10px',height:'10px',borderRadius:'3px',background:'#f97316'}}/>Admin (you)
+        </span>
+      </div>
+
       <div style={{display:'flex',gap:'12px',flex:1,minHeight:0}}>
         {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px',width:'100%'}}>Loading PDF...</div>}
         {!loading && pdfBlobUrl && (
@@ -227,7 +267,7 @@ export default function PlaceFieldsPage({ params }) {
             <div style={{width:'260px',background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px',overflow:'auto',maxHeight:'calc(100vh - 220px)'}}>
               <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 4px'}}>Fields</h3>
               <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 6px',lineHeight:1.4}}>Tip: give matching fields the same <strong style={{color:'#8DC63F'}}>Group</strong> (e.g., "name") to share one value at signing.</p>
-              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Mark a field <strong style={{color:'#f97316'}}>Admin</strong> if you'll fill it before/after the signer (the signer can't fill admin fields).</p>
+              <p style={{fontSize:'11px',color:'#6b7280',margin:'0 0 10px',lineHeight:1.4}}>Assign each field to a <strong style={{color:'#8DC63F'}}>Recipient</strong> (they each fill only their own fields, in parallel) or to <strong style={{color:'#f97316'}}>Admin</strong> (you fill it before/after). Add recipients above.</p>
               {fields.length === 0 && <p style={{color:'#6b7280',fontSize:'12px',margin:0}}>None yet. Use the buttons above to add fields to the current page.</p>}
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                 {[...fields].sort((a,b) => (a.page||1) - (b.page||1) || (a.y||0) - (b.y||0) || (a.x||0) - (b.x||0)).map(f => {
@@ -246,11 +286,15 @@ export default function PlaceFieldsPage({ params }) {
                       style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'6px',padding:'6px 8px',color:'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
                     <input value={f.group||''} onChange={e=>setFieldGroup(f.id, e.target.value)} placeholder="Group (optional)" title="Fields with the same group share one value at signing"
                       style={{width:'100%',background:'#111',border:'1px solid '+(f.group?'#8DC63F66':'#252525'),borderRadius:'6px',padding:'6px 8px',color:f.group?'#8DC63F':'#fff',fontSize:'12px',outline:'none',boxSizing:'border-box',marginBottom:'4px'}}/>
-                    <div style={{display:'flex',gap:'4px',marginBottom:'6px'}}>
-                      <button type="button" onClick={()=>setFieldAssignee(f.id, 'user')}
-                        style={{flex:1,background:(!f.assignee||f.assignee==='user')?'#8DC63F':'#1e1e1e',color:(!f.assignee||f.assignee==='user')?'#0a0a0a':'#9ca3af',border:'none',borderRadius:'6px',padding:'5px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>User</button>
-                      <button type="button" onClick={()=>setFieldAssignee(f.id, 'admin')}
-                        style={{flex:1,background:f.assignee==='admin'?'#f97316':'#1e1e1e',color:f.assignee==='admin'?'#0a0a0a':'#9ca3af',border:'none',borderRadius:'6px',padding:'5px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>Admin</button>
+                    <div style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}}>
+                      <span style={{width:'12px',height:'12px',borderRadius:'3px',flexShrink:0,background:ridColor(normAssignee(f.assignee))}}/>
+                      <select value={normAssignee(f.assignee)} onChange={e=>setFieldAssignee(f.id, e.target.value)}
+                        style={{flex:1,background:'#1a1a1a',border:'1px solid #2a2a2a',color:'#d1d5db',borderRadius:'6px',padding:'5px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer',outline:'none'}}>
+                        {Array.from({length: recipientCount}, (_, i) => 'r' + (i + 1)).map(rid => (
+                          <option key={rid} value={rid}>{ridLabel(rid)}</option>
+                        ))}
+                        <option value="admin">Admin (you)</option>
+                      </select>
                     </div>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}}>
                       <button onClick={()=>duplicateField(f.id)} title={'Copy this field to page '+visiblePage+' (keeps type, label, group)'} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'11px',padding:0,fontWeight:600}}>+ Duplicate</button>

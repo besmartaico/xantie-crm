@@ -5,6 +5,17 @@ import dynamic from 'next/dynamic'
 
 const SignPdfViewer = dynamic(() => import('@/components/SignPdfViewer'), { ssr: false })
 
+function ridLabel(rid) {
+  const n = parseInt(String(rid).replace('r', ''), 10)
+  return isNaN(n) ? 'Recipient 1' : 'Recipient ' + n
+}
+function ridColor(rid) {
+  const colors = ['#8DC63F', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#34d399']
+  const n = parseInt(String(rid).replace('r', ''), 10)
+  return colors[(isNaN(n) ? 1 : n) - 1] || '#9ca3af'
+}
+function normAssignee(a) { return a === 'admin' ? 'admin' : ((!a || a === 'user') ? 'r1' : a) }
+
 export default function StartSigningPage({ params }) {
   const [resolvedParams, setResolvedParams] = useState(null)
   const [docName, setDocName] = useState('')
@@ -13,10 +24,14 @@ export default function StartSigningPage({ params }) {
   const [loading, setLoading] = useState(true)
   const [values, setValues] = useState({})
   const [activeField, setActiveField] = useState(null)
-  const [signerName, setSignerName] = useState('')
-  const [signerEmail, setSignerEmail] = useState('')
+  const [recipients, setRecipients] = useState({}) // { r1: {name, email}, ... }
+  const [visibility, setVisibility] = useState('private')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+
+  function setRecipientField(rid, key, val) {
+    setRecipients(prev => ({ ...prev, [rid]: { ...(prev[rid] || {}), [key]: val } }))
+  }
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -34,7 +49,8 @@ export default function StartSigningPage({ params }) {
     try {
       const data = await (await fetch('/api/documents/' + resolvedParams.documentId + '/fields')).json()
       setDocName(data.name || '')
-      setFields(data.fields || [])
+      // Normalize legacy 'user'/missing assignees to recipient 1.
+      setFields((data.fields || []).map(f => ({ ...f, assignee: normAssignee(f.assignee) })))
       const pdfRes = await fetch('/api/documents/raw/' + resolvedParams.documentId)
       const buf = await pdfRes.arrayBuffer()
       setPdfBlobUrl(URL.createObjectURL(new Blob([buf], { type: 'application/pdf' })))
@@ -65,10 +81,16 @@ export default function StartSigningPage({ params }) {
   }
 
   async function submit() {
-    if (!signerName.trim() || !signerEmail.trim()) {
-      setSubmitError('Please enter the signer name and email.')
-      return
+    const usedRids = Array.from(new Set(fields.filter(f => /^r\d+$/.test(f.assignee)).map(f => f.assignee)))
+      .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)))
+    for (const rid of usedRids) {
+      const r = recipients[rid] || {}
+      if (!r.name || !r.name.trim() || !r.email || !r.email.trim()) {
+        setSubmitError('Please enter a name and email for ' + ridLabel(rid) + '.')
+        return
+      }
     }
+    const recipientsArr = usedRids.map(rid => ({ rid, name: recipients[rid].name.trim(), email: recipients[rid].email.trim() }))
     setSubmitting(true); setSubmitError('')
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -79,8 +101,8 @@ export default function StartSigningPage({ params }) {
           documentName: docName,
           fields,
           adminPreValues: values,
-          signerName: signerName.trim(),
-          signerEmail: signerEmail.trim(),
+          recipients: recipientsArr,
+          visibility,
           createdBy: u.email || '',
         })
       })
@@ -100,8 +122,10 @@ export default function StartSigningPage({ params }) {
   if (!resolvedParams) return null
 
   const adminFields = fields.filter(f => f.assignee === 'admin')
-  const userFields = fields.filter(f => !f.assignee || f.assignee === 'user')
   const adminFilledCount = adminFields.filter(f => values[f.id]).length
+  const usedRids = Array.from(new Set(fields.filter(f => /^r\d+$/.test(f.assignee)).map(f => f.assignee)))
+    .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)))
+  const fieldCountFor = (rid) => fields.filter(f => f.assignee === rid).length
 
   return (
     <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff'}}>
@@ -109,28 +133,40 @@ export default function StartSigningPage({ params }) {
         <div style={{marginBottom:'18px'}}>
           <a href={'/admin/documents/' + resolvedParams.documentId} style={{color:'#9ca3af',fontSize:'13px',textDecoration:'none'}}>← Back to document</a>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:'4px 0 0'}}>{docName || 'Start signing'}</h1>
-          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Fill any admin fields, enter the signer's info, then send. Admin fields are <span style={{color:'#f97316'}}>highlighted orange</span>; user fields are not editable here.</p>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Fill any admin fields, enter each recipient's info, then send. Every recipient gets their own link and fills only their fields, in parallel. Admin fields are <span style={{color:'#f97316'}}>highlighted orange</span>.</p>
         </div>
 
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}}>
-          <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 10px'}}>Send to</h3>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'10px'}}>
-            <div>
-              <label style={{display:'block',color:'#6b7280',fontSize:'11px',fontWeight:600,marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.07em'}}>Signer Name</label>
-              <input value={signerName} onChange={e=>setSignerName(e.target.value)} style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-            </div>
-            <div>
-              <label style={{display:'block',color:'#6b7280',fontSize:'11px',fontWeight:600,marginBottom:'4px',textTransform:'uppercase',letterSpacing:'0.07em'}}>Signer Email</label>
-              <input type="email" value={signerEmail} onChange={e=>setSignerEmail(e.target.value)} style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-            </div>
+          <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Recipients</h3>
+          {usedRids.length === 0 && <p style={{color:'#6b7280',fontSize:'13px',margin:0}}>This document has no recipient fields — only admin fields. Fill them below and send to finalize.</p>}
+          <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
+            {usedRids.map(rid => (
+              <div key={rid}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                  <span style={{width:'11px',height:'11px',borderRadius:'3px',background:ridColor(rid)}}/>
+                  <strong style={{fontSize:'13px',color:'#fff'}}>{ridLabel(rid)}</strong>
+                  <span style={{fontSize:'11px',color:'#6b7280'}}>{fieldCountFor(rid)} field{fieldCountFor(rid)===1?'':'s'}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'10px'}}>
+                  <input placeholder="Name" value={recipients[rid]?.name || ''} onChange={e=>setRecipientField(rid,'name',e.target.value)} style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                  <input type="email" placeholder="Email" value={recipients[rid]?.email || ''} onChange={e=>setRecipientField(rid,'email',e.target.value)} style={{width:'100%',background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                </div>
+              </div>
+            ))}
           </div>
+          {usedRids.length > 1 && (
+            <label style={{display:'flex',gap:'10px',alignItems:'flex-start',marginTop:'14px',cursor:'pointer'}}>
+              <input type="checkbox" checked={visibility==='shared'} onChange={e=>setVisibility(e.target.checked?'shared':'private')} style={{marginTop:'2px',width:'16px',height:'16px',accentColor:'#8DC63F',cursor:'pointer',flexShrink:0}}/>
+              <span style={{fontSize:'12px',color:'#9ca3af',lineHeight:1.5}}>Let recipients see each other's answers (read-only). Off (default) = each person sees only their own fields.</span>
+            </label>
+          )}
         </div>
 
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
           <span>Admin fields filled:</span>
           <strong style={{color:'#f97316'}}>{adminFilledCount} of {adminFields.length}</strong>
-          <span style={{marginLeft:'12px'}}>User fields (filled later by signer):</span>
-          <strong style={{color:'#8DC63F'}}>{userFields.length}</strong>
+          <span style={{marginLeft:'12px'}}>Recipients:</span>
+          <strong style={{color:'#8DC63F'}}>{usedRids.length}</strong>
         </div>
 
         {submitError && (
@@ -138,8 +174,7 @@ export default function StartSigningPage({ params }) {
         )}
 
         <div style={{display:'flex',gap:'10px',marginBottom:'18px'}}>
-          <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Sending…':'📧 Send to signer'}</button>
-          {adminFields.length === 0 && <p style={{color:'#6b7280',fontSize:'12px',alignSelf:'center'}}>No admin fields on this template; just enter signer info and send.</p>}
+          <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Sending…':(usedRids.length>1?'📧 Send to recipients':'📧 Send')}</button>
         </div>
 
         {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading document...</div>}

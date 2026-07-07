@@ -20,8 +20,22 @@ export default function PublicSignPage({ params }) {
   const [submitError, setSubmitError] = useState('')
   const [consentChecked, setConsentChecked] = useState(false)
   const [showDisclosure, setShowDisclosure] = useState(false)
+  const [token, setToken] = useState(null)
 
-  useEffect(() => { Promise.resolve(params).then(p => setResolvedParams(p)) }, [])
+  useEffect(() => {
+    Promise.resolve(params).then(p => setResolvedParams(p))
+    try { const sp = new URLSearchParams(window.location.search); setToken(sp.get('r') || sp.get('token')) } catch(e) {}
+  }, [])
+
+  // A field belongs to this signer? (scoped by recipient token, or legacy 'user'/unassigned)
+  function isMine(f) {
+    const rt = request && request.restrictTo
+    return rt ? (f.assignee === rt) : (!f.assignee || f.assignee === 'user')
+  }
+  function currentToken() {
+    if (token) return token
+    try { return new URLSearchParams(window.location.search).get('r') || new URLSearchParams(window.location.search).get('token') } catch(e) { return null }
+  }
 
   useEffect(() => {
     if (!resolvedParams) return
@@ -33,7 +47,8 @@ export default function PublicSignPage({ params }) {
     try {
       // requestId is in route param documentId (keeping path '/sign/[documentId]' for now)
       const id = resolvedParams.documentId
-      const res = await fetch('/api/sign-requests/' + id)
+      const tok = currentToken()
+      const res = await fetch('/api/sign-requests/' + id + (tok ? '?token=' + encodeURIComponent(tok) : ''))
       const data = await res.json()
       if (!res.ok || data.error) { setLoadError(data.error || 'Unable to load signing request'); setLoading(false); return }
       setRequest(data)
@@ -53,7 +68,7 @@ export default function PublicSignPage({ params }) {
       const next = {...prev, [field.id]: val}
       if (field.group && request) {
         request.fields.forEach(f => {
-          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && (!f.assignee || f.assignee === 'user')) {
+          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && isMine(f)) {
             next[f.id] = val
           }
         })
@@ -66,7 +81,7 @@ export default function PublicSignPage({ params }) {
     if (!request) return
     setValues(prev => {
       const next = {...prev}
-      request.fields.filter(f => f.type === field.type && (!f.assignee || f.assignee === 'user')).forEach(f => { next[f.id] = val })
+      request.fields.filter(f => f.type === field.type && isMine(f)).forEach(f => { next[f.id] = val })
       return next
     })
   }
@@ -74,7 +89,7 @@ export default function PublicSignPage({ params }) {
   async function submit() {
     if (!request) return
     if (!consentChecked) { setSubmitError('Please consent to the use of electronic signatures before submitting.'); return }
-    const userFields = request.fields.filter(f => !f.assignee || f.assignee === 'user')
+    const userFields = request.fields.filter(isMine)
     const unfilled = userFields.filter(f => !values[f.id])
     if (unfilled.length > 0) {
       setSubmitError('Please fill in all ' + userFields.length + ' field' + (userFields.length===1?'':'s') + ' before submitting. ' + unfilled.length + ' remaining.')
@@ -84,18 +99,18 @@ export default function PublicSignPage({ params }) {
     userFields.forEach(f => { if (values[f.id]) diff[f.id] = values[f.id] })
     setSubmitting(true); setSubmitError('')
     try {
-      const res = await fetch('/api/sign-requests/' + resolvedParams.documentId, {
+      const tok = currentToken()
+      const consent = {
+        agreed: true,
+        agreedAt: new Date().toISOString(),
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        disclosure: CONSENT_DISCLOSURE_VERSION,
+      }
+      // Recipient links carry a token → scoped submit; legacy links use source:'user'.
+      const body = tok ? { values: diff, consent } : { values: diff, source: 'user', consent }
+      const res = await fetch('/api/sign-requests/' + resolvedParams.documentId + (tok ? '?token=' + encodeURIComponent(tok) : ''), {
         method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          values: diff,
-          source: 'user',
-          consent: {
-            agreed: true,
-            agreedAt: new Date().toISOString(),
-            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-            disclosure: CONSENT_DISCLOSURE_VERSION,
-          },
-        })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok || !data.success) { setSubmitError(data.error || 'Submission failed'); setSubmitting(false); return }
@@ -112,6 +127,18 @@ export default function PublicSignPage({ params }) {
     return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}>⚠</div><h1 style={{fontSize:'18px',fontWeight:700,margin:'0 0 8px'}}>Unable to load</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:0}}>{loadError}</p></div></div>)
   }
 
+  if (request && request.alreadySigned && !submitResult) {
+    return (
+      <div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}>
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}>
+          <div style={{fontSize:'48px',marginBottom:'12px'}}>✓</div>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 8px',color:'#8DC63F'}}>Already submitted</h1>
+          <p style={{color:'#9ca3af',fontSize:'14px',margin:0}}>You've already completed your part of this document. You'll receive the finished copy by email once everyone has signed and it's finalized.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (submitResult) {
     const wasFinalized = submitResult.status === 'complete'
     const downloadUrl = submitResult.signedPdfUrl || submitResult.partialPdfUrl
@@ -123,7 +150,7 @@ export default function PublicSignPage({ params }) {
           <p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 14px'}}>
             {wasFinalized
               ? 'Your signed document has been finalized. A copy has been emailed to you.'
-              : 'Your signature has been received. The administrator still has fields to complete; you\'ll receive the final document by email once they\'re done.'}
+              : 'Your part has been submitted. You\'ll receive the completed document by email once everyone has signed and it\'s finalized.'}
           </p>
           {!wasFinalized && (
             <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 14px'}}>You can download a copy of what you signed now.</p>
@@ -138,17 +165,17 @@ export default function PublicSignPage({ params }) {
     )
   }
 
-  const userFields = request ? request.fields.filter(f => !f.assignee || f.assignee === 'user') : []
+  const userFields = request ? request.fields.filter(isMine) : []
   const userFilled = userFields.filter(f => values[f.id]).length
-  // Admin-prefilled fields should be read-only and visually shown filled (already in values)
-  const adminPrefilledIds = request ? request.fields.filter(f => f.assignee === 'admin' && values[f.id]).map(f => f.id) : []
+  // Fields not mine that already carry a value (admin-prefilled, or other recipients when shared) → read-only.
+  const adminPrefilledIds = request ? request.fields.filter(f => !isMine(f) && values[f.id]).map(f => f.id) : []
 
   return (
     <div style={{minHeight:'100vh',background:'#0a0a0a',color:'#fff'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'24px 16px'}}>
         <div style={{marginBottom:'18px'}}>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{request && request.documentName ? request.documentName : 'Sign Document'}</h1>
-          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? request.signerName : ''}, click each highlighted field to fill it. Orange fields are already filled by the administrator.</p>
+          <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Hi {request ? (request.recipientName || request.signerName) : ''}, click each highlighted field to fill it. Greyed-out fields belong to other signers or the administrator.</p>
         </div>
 
         {/* E-signature consent panel */}
@@ -177,8 +204,8 @@ export default function PublicSignPage({ params }) {
         {!loading && pdfBlobUrl && request && (
           <div style={{maxHeight:'calc(100vh - 280px)',display:'flex'}}>
             <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
-              onClickField={(f) => { if (!f.assignee || f.assignee === 'user') setActiveField(f) }}
-              restrictedAssignee="user" readOnlyFieldIds={adminPrefilledIds}/>
+              onClickField={(f) => { if (isMine(f)) setActiveField(f) }}
+              restrictedAssignee={request.restrictTo || 'user'} readOnlyFieldIds={adminPrefilledIds}/>
           </div>
         )}
       </div>
@@ -214,7 +241,7 @@ export default function PublicSignPage({ params }) {
         </div>
       )}
 
-      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee="user" currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
+      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee={request?.restrictTo || 'user'} currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
         if (applyAll) applyToAll(activeField, val)
         else setFieldValueAndGroup(activeField, val)
         setActiveField(null)

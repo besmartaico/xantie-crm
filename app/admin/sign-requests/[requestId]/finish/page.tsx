@@ -77,12 +77,13 @@ export default function FinishSignRequestPage({ params }) {
       return
     }
     const diff = {}
-    adminFields.forEach(f => { if (values[f.id] && values[f.id] !== (request.values || {})[f.id]) diff[f.id] = values[f.id] })
+    adminFields.forEach(f => { if (values[f.id]) diff[f.id] = values[f.id] })
     setSubmitting(true); setSubmitError('')
     try {
+      const isMulti = Array.isArray(request.recipients)
       const res = await fetch('/api/sign-requests/' + resolvedParams.requestId, {
         method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ values: diff, source: 'admin_post' })
+        body: JSON.stringify(isMulti ? { values: diff, action: 'finalize' } : { values: diff, source: 'admin_post' })
       })
       const data = await res.json()
       if (!res.ok || !data.success) { setSubmitError(data.error || 'Submission failed'); setSubmitting(false); return }
@@ -97,13 +98,15 @@ export default function FinishSignRequestPage({ params }) {
   }
 
   if (submitResult) {
-    return (<div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px',color:'#8DC63F'}}>✓ Document finalized</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>Sent to {request && request.signerEmail}. Available in Signed PDFs and on the sign requests list.</p><div style={{display:'flex',gap:'10px'}}><a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a><a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>← All sign requests</a></div></div>)
+    return (<div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px',color:'#8DC63F'}}>✓ Document finalized</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>{Array.isArray(request?.recipients) ? 'The signed PDF was emailed to all recipients.' : ('Sent to ' + (request ? request.signerEmail : '') + '.')} Available in Signed PDFs and on the sign requests list.</p><div style={{display:'flex',gap:'10px'}}><a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a><a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>← All sign requests</a></div></div>)
   }
 
   const adminFields = request ? request.fields.filter(f => f.assignee === 'admin') : []
   const adminFilled = adminFields.filter(f => values[f.id]).length
-  // User-filled fields are read-only
-  const userFilledIds = request ? request.fields.filter(f => (!f.assignee || f.assignee === 'user')).map(f => f.id) : []
+  const isMulti = request ? Array.isArray(request.recipients) : false
+  // Everything not assigned to admin is filled by recipients → read-only here.
+  const userFilledIds = request ? request.fields.filter(f => f.assignee !== 'admin').map(f => f.id) : []
+  const recipientsStatus = request && Array.isArray(request.recipientsStatus) ? request.recipientsStatus : []
 
   return (
     <div>
@@ -111,9 +114,25 @@ export default function FinishSignRequestPage({ params }) {
         <a href="/admin/sign-requests" style={{color:'#9ca3af',fontSize:'13px',textDecoration:'none'}}>← All sign requests</a>
         <h1 style={{fontSize:'22px',fontWeight:700,margin:'4px 0 0'}}>Finish signing: {request && request.documentName}</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
-          Signed by {request && request.signerName} ({request && request.signerEmail}). Fill any remaining admin fields to finalize.
+          {isMulti
+            ? 'All recipients have signed. Fill any remaining admin fields, then consolidate & finalize.'
+            : <>Signed by {request && request.signerName} ({request && request.signerEmail}). Fill any remaining admin fields to finalize.</>}
         </p>
       </div>
+
+      {isMulti && recipientsStatus.length > 0 && (
+        <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'14px 16px',marginBottom:'14px'}}>
+          <h3 style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 10px'}}>Recipients</h3>
+          <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+            {recipientsStatus.map(r => (
+              <div key={r.rid} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',fontSize:'13px'}}>
+                <span style={{color:'#d1d5db'}}>{r.name} <span style={{color:'#6b7280'}}>({r.email})</span></span>
+                <span style={{color:r.signed?'#8DC63F':'#fbbf24',fontSize:'12px',fontWeight:600}}>{r.signed ? '✓ Signed' : '○ Pending'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
         <span>Admin fields:</span>
@@ -123,7 +142,7 @@ export default function FinishSignRequestPage({ params }) {
       {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
 
       <div style={{display:'flex',gap:'10px',marginBottom:'18px'}}>
-        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Finalizing…':'✓ Finalize & generate PDF'}</button>
+        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Finalizing…':(isMulti?'✓ Consolidate & finalize':'✓ Finalize & generate PDF')}</button>
       </div>
 
       {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
