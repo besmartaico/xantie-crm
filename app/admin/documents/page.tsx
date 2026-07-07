@@ -25,6 +25,10 @@ export default function DocumentsPage() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [renameDoc, setRenameDoc] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState('')
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -67,6 +71,24 @@ export default function DocumentsPage() {
     }
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function doRename() {
+    if (!renameDoc) return
+    const v = renameValue.trim()
+    if (!v) { setRenameError('Please enter a name'); return }
+    setRenaming(true); setRenameError('')
+    try {
+      const res = await fetch('/api/documents/' + renameDoc.id + '/fields', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: v })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) { setRenameError(data.error || ('HTTP ' + res.status)); setRenaming(false); return }
+      setRenameDoc(null)
+      await load()
+    } catch(e) { setRenameError(e.message || 'Network error') }
+    setRenaming(false)
   }
 
   async function doDelete(id) {
@@ -131,11 +153,34 @@ export default function DocumentsPage() {
               <a href={'/api/documents/raw/' + d.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>👁 Preview</a>
               <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📍 Place fields</a>
               <a href={'/admin/documents/' + d.id} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Send to sign →</a>
+              <button onClick={()=>{setRenameDoc(d);setRenameValue((d.name||'').replace(/\.pdf$/i,''));setRenameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Rename</button>
               <button onClick={()=>{setConfirmDelete(d);setDeleteError('')}} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
             </div>
           </div>
         ))}
       </div>
+
+      {renameDoc && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1300,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>!renaming&&setRenameDoc(null)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'14px',padding:'22px',width:'440px',maxWidth:'100%'}} onClick={e=>e.stopPropagation()}>
+            <h3 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:700,color:'#fff'}}>Rename document</h3>
+            <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'6px'}}>
+              <input autoFocus value={renameValue} onChange={e=>setRenameValue(e.target.value)}
+                onKeyDown={e=>{ if(e.key==='Enter')doRename(); if(e.key==='Escape')setRenameDoc(null) }}
+                style={{flex:1,background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'10px 13px',color:'#fff',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+              <span style={{color:'#6b7280',fontSize:'13px'}}>.pdf</span>
+            </div>
+            <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 14px'}}>Renames the template in Google Drive. Sign requests already sent keep their original name.</p>
+            {renameError && (
+              <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'8px 12px',marginBottom:'12px',fontSize:'12px',wordBreak:'break-word'}}>{renameError}</div>
+            )}
+            <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+              <button onClick={()=>setRenameDoc(null)} disabled={renaming} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:renaming?'not-allowed':'pointer'}}>Cancel</button>
+              <button onClick={doRename} disabled={renaming||!renameValue.trim()} style={{background:'#8DC63F',border:'none',color:'#0a0a0a',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,cursor:(renaming||!renameValue.trim())?'not-allowed':'pointer',opacity:(renaming||!renameValue.trim())?0.6:1}}>{renaming?'Saving…':'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDelete && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1300,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>!deleting&&setConfirmDelete(null)}>

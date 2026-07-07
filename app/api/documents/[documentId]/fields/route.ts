@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import zlib from 'zlib'
-import { getDriveFileMeta, updateDriveFileMeta, deleteDriveFile } from '@/lib/googleDrive'
+import { getDriveFileMeta, updateDriveFileMeta, deleteDriveFile, renameDriveFile } from '@/lib/googleDrive'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -120,6 +120,22 @@ export async function POST(req, ctx) {
       error: e.message + (detail ? ' — ' + detail : ''),
       code,
     }, { status: 500 })
+  }
+}
+
+// Rename the template (Drive file display name). Keeps a .pdf extension.
+export async function PATCH(req, ctx) {
+  try {
+    const { documentId } = await ctx.params
+    const body = await req.json()
+    let name = (body.name || '').trim()
+    if (!name) return NextResponse.json({ error: 'A name is required' }, { status: 400 })
+    if (!/\.pdf$/i.test(name)) name += '.pdf'
+    const updated = await renameDriveFile(documentId, name)
+    return NextResponse.json({ success: true, name: updated.name })
+  } catch(e) {
+    console.error('PATCH rename error:', e)
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 

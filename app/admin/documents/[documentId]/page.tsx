@@ -7,6 +7,10 @@ export default function DocumentDetailPage({ params }) {
   const [doc, setDoc] = useState(null)
   const [fields, setFields] = useState([])
   const [loading, setLoading] = useState(true)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
   // Send workflow now lives at /admin/documents/[id]/start (multi-step process)
 
   useEffect(() => {
@@ -33,6 +37,23 @@ export default function DocumentDetailPage({ params }) {
     setLoading(false)
   }
 
+  async function saveName() {
+    const v = nameValue.trim()
+    if (!v) { setNameError('Please enter a name'); return }
+    setSavingName(true); setNameError('')
+    try {
+      const res = await fetch('/api/documents/' + resolvedParams.documentId + '/fields', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: v })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) { setNameError(data.error || ('HTTP ' + res.status)); setSavingName(false); return }
+      setDoc(prev => ({ ...prev, name: data.name }))
+      setEditingName(false)
+    } catch(e) { setNameError(e.message || 'Network error') }
+    setSavingName(false)
+  }
+
   if (!resolvedParams) return null
 
   return (
@@ -45,7 +66,22 @@ export default function DocumentDetailPage({ params }) {
 
       {!loading && doc && (
         <div>
-          <h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 6px'}}>{doc.name}</h1>
+          {editingName ? (
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px',flexWrap:'wrap'}}>
+              <input autoFocus value={nameValue} onChange={e=>setNameValue(e.target.value)}
+                onKeyDown={e=>{ if(e.key==='Enter')saveName(); if(e.key==='Escape')setEditingName(false) }}
+                style={{background:'#111',border:'1px solid #252525',borderRadius:'8px',padding:'8px 12px',color:'#fff',fontSize:'18px',fontWeight:700,outline:'none',minWidth:'240px'}}/>
+              <span style={{color:'#6b7280',fontSize:'14px'}}>.pdf</span>
+              <button onClick={saveName} disabled={savingName||!nameValue.trim()} style={{background:'#8DC63F',border:'none',color:'#0a0a0a',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',fontWeight:700,cursor:(savingName||!nameValue.trim())?'not-allowed':'pointer',opacity:(savingName||!nameValue.trim())?0.6:1}}>{savingName?'Saving…':'Save'}</button>
+              <button onClick={()=>setEditingName(false)} disabled={savingName} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'8px 12px',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+            </div>
+          ) : (
+            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px',flexWrap:'wrap'}}>
+              <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{doc.name}</h1>
+              <button onClick={()=>{setEditingName(true);setNameValue((doc.name||'').replace(/\.pdf$/i,''));setNameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'6px',padding:'4px 10px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>✎ Rename</button>
+            </div>
+          )}
+          {nameError && <div style={{color:'#f87171',fontSize:'12px',margin:'0 0 6px'}}>{nameError}</div>}
           <p style={{color:'#6b7280',fontSize:'13px',margin:'0 0 20px'}}>{fields.length} field{fields.length===1?'':'s'} placed</p>
 
           {fields.length === 0 && (

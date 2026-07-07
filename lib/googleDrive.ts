@@ -171,6 +171,18 @@ export async function updateDriveFileMeta(fileId, appProperties) {
   return res.data
 }
 
+// Rename a Drive file (template display name)
+export async function renameDriveFile(fileId, newName) {
+  const drive = getDrive()
+  const res = await drive.files.update({
+    fileId,
+    requestBody: { name: newName },
+    fields: 'id,name',
+    supportsAllDrives: true,
+  })
+  return res.data
+}
+
 // Delete a Drive file (used when removing a template)
 export async function deleteDriveFile(fileId) {
   const drive = getDrive()
