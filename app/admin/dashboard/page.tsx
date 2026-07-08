@@ -40,7 +40,7 @@ function getRange(filter, start, end) {
     }
     return [new Date(y,m,1), new Date(y,m,15)]
   }
-  if (filter==='custom'&&start&&end) return [new Date(start), new Date(end)]
+  if (filter==='custom'&&start&&end) return [new Date(start+'T00:00:00'), new Date(end+'T00:00:00')]
   return null
 }
 
@@ -314,7 +314,7 @@ export default function Dashboard() {
     if (employeeFilter) out = out.filter(e=>e.name===employeeFilter)
     if (billableFilter) out = out.filter(e=>e.billable===billableFilter)
     const range = getRange(dateFilter, customStart, customEnd)
-    if (range) out = out.filter(e=>{ const d=new Date(e.date); return d>=range[0]&&d<=range[1] })
+    if (range) out = out.filter(e=>{ const d=new Date(e.date+'T00:00:00'); return d>=range[0]&&d<=range[1] })
     return out
   }
 
