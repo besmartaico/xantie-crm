@@ -178,7 +178,9 @@ export async function GET(req, ctx) {
     // ── Admin view ───────────────────────────────────────────────────────
     if (isMultiRecipient) {
       const recipientData = await gatherRecipients(requestId)
-      const merged = mergeAllValues(record, recipientData)
+      // For a completed request, record.values is the authoritative finalized map
+      // (and may have been edited post-completion) — don't re-overlay the sub-blobs.
+      const merged = record.status === 'complete' ? { ...(record.values || {}) } : mergeAllValues(record, recipientData)
       const recipientsStatus = record.recipients.map(r => ({
         rid: r.rid,
         name: r.name,
@@ -220,6 +222,21 @@ export async function PUT(req, ctx) {
     if (!found) return NextResponse.json({ error: 'Sign request not found' }, { status: 404 })
     const record = found.record
     const isMultiRecipient = Array.isArray(record.recipients)
+
+    // ── Admin edit of a completed document ───────────────────────────────
+    // Replaces the full value map and regenerates the signed PDF. Audit-logged.
+    if (body.action === 'admin_edit') {
+      if (record.status !== 'complete') {
+        return NextResponse.json({ error: 'Only completed documents can be edited here.' }, { status: 400 })
+      }
+      record.values = body.values || {}
+      const pdf = await generateSignedPdf(record)
+      record.signedPdfUrl = pdf.url
+      addEvent(record, 'admin_edited', 'Admin edited document fields after completion')
+      addEvent(record, 'final_pdf_generated', 'Regenerated PDF after edit: ' + pdf.filename)
+      await saveRequest(record)
+      return NextResponse.json({ success: true, status: 'complete', signedPdfUrl: pdf.url })
+    }
 
     // ── Recipient submit (writes only that recipient's sub-blob) ─────────
     if (token && isMultiRecipient) {

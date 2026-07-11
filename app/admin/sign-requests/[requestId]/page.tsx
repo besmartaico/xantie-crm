@@ -23,6 +23,7 @@ const EVENT_ICONS = {
   admin_notified: '🔔',
   admin_notify_failed: '⚠️',
   admin_completed: '✓',
+  admin_edited: '📝',
   final_pdf_generated: '📑',
   signer_emailed_final: '📧',
   recipient_emailed_final: '📧',
@@ -128,6 +129,7 @@ export default function SignRequestDetailPage({ params }) {
         {(req.status === 'ready_to_finalize' || req.status === 'pending_admin_post') && <a href={'/admin/sign-requests/' + req.id + '/finish'} style={{background:'#f97316',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>{Array.isArray(req.recipients) ? 'Consolidate & finalize →' : 'Complete signing →'}</a>}
         {req.status === 'pending_user' && <a href={'/sign/' + req.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>View signer link</a>}
         {req.partialPdfUrl && <a href={req.partialPdfUrl} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>📄 Partial PDF</a>}
+        {req.status === 'complete' && <a href={'/admin/sign-requests/' + req.id + '/finish'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>✎ Edit fields</a>}
         {req.signedPdfUrl && <a href={req.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>⬇ Download signed PDF</a>}
       </div>
 

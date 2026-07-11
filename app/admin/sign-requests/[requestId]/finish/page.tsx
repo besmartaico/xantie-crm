@@ -49,8 +49,9 @@ export default function FinishSignRequestPage({ params }) {
     setValues(prev => {
       const next = {...prev, [field.id]: val}
       if (field.group && request) {
+        const inScope = f => request.status === 'complete' || f.assignee === 'admin'
         request.fields.forEach(f => {
-          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && f.assignee === 'admin') {
+          if (f.id !== field.id && f.type === field.type && f.group && f.group === field.group && inScope(f)) {
             next[f.id] = val
           }
         })
@@ -63,7 +64,7 @@ export default function FinishSignRequestPage({ params }) {
     if (!request) return
     setValues(prev => {
       const next = {...prev}
-      request.fields.filter(f => f.type === field.type && f.assignee === 'admin').forEach(f => { next[f.id] = val })
+      request.fields.filter(f => f.type === field.type && (request.status === 'complete' || f.assignee === 'admin')).forEach(f => { next[f.id] = val })
       return next
     })
   }
@@ -74,6 +75,20 @@ export default function FinishSignRequestPage({ params }) {
 
   async function submit() {
     if (!request) return
+    // Edit mode: the document is already complete — save all edited values + regenerate.
+    if (request.status === 'complete') {
+      setSubmitting(true); setSubmitError('')
+      try {
+        const res = await fetch('/api/sign-requests/' + resolvedParams.requestId, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action: 'admin_edit', values })
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) { setSubmitError(data.error || 'Save failed'); setSubmitting(false); return }
+        setSubmitResult(data)
+      } catch(e) { setSubmitError(e.message || 'Network error'); setSubmitting(false) }
+      return
+    }
     const adminFields = request.fields.filter(f => f.assignee === 'admin')
     const requiredAdmin = adminFields.filter(f => !f.optional)
     const unfilled = requiredAdmin.filter(f => !values[f.id])
@@ -103,26 +118,30 @@ export default function FinishSignRequestPage({ params }) {
   }
 
   if (submitResult) {
-    return (<div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px',color:'#8DC63F'}}>✓ Document finalized</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>{Array.isArray(request?.recipients) ? 'The signed PDF was emailed to all recipients.' : ('Sent to ' + (request ? request.signerEmail : '') + '.')} Available in Signed PDFs and on the sign requests list.</p><div style={{display:'flex',gap:'10px'}}><a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a><a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>← All sign requests</a></div></div>)
+    const edited = request && request.status === 'complete'
+    return (<div><h1 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px',color:'#8DC63F'}}>{edited ? '✓ Document updated' : '✓ Document finalized'}</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 18px'}}>{edited ? 'The signed PDF has been regenerated with your changes.' : (Array.isArray(request?.recipients) ? 'The signed PDF was emailed to all recipients.' : ('Sent to ' + (request ? request.signerEmail : '') + '.'))} Available in Signed PDFs and on the sign requests list.</p><div style={{display:'flex',gap:'10px'}}><a href={submitResult.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a><a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>← All sign requests</a></div></div>)
   }
 
   const adminFields = request ? request.fields.filter(f => f.assignee === 'admin') : []
   const requiredAdmin = adminFields.filter(f => !f.optional)
   const adminFilled = requiredAdmin.filter(f => values[f.id]).length
   const isMulti = request ? Array.isArray(request.recipients) : false
-  // Everything not assigned to admin is filled by recipients → read-only here.
-  const userFilledIds = request ? request.fields.filter(f => f.assignee !== 'admin').map(f => f.id) : []
+  const isComplete = request ? request.status === 'complete' : false
+  // In edit mode (completed doc) every field is editable; otherwise recipient-filled fields are read-only.
+  const userFilledIds = (request && !isComplete) ? request.fields.filter(f => f.assignee !== 'admin').map(f => f.id) : []
   const recipientsStatus = request && Array.isArray(request.recipientsStatus) ? request.recipientsStatus : []
 
   return (
     <div>
       <div style={{marginBottom:'18px'}}>
         <a href="/admin/sign-requests" style={{color:'#9ca3af',fontSize:'13px',textDecoration:'none'}}>← All sign requests</a>
-        <h1 style={{fontSize:'22px',fontWeight:700,margin:'4px 0 0'}}>Finish signing: {request && request.documentName}</h1>
+        <h1 style={{fontSize:'22px',fontWeight:700,margin:'4px 0 0'}}>{isComplete ? 'Edit document: ' : 'Finish signing: '}{request && request.documentName}</h1>
         <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>
-          {isMulti
-            ? 'All recipients have signed. Fill any remaining admin fields, then consolidate & finalize.'
-            : <>Signed by {request && request.signerName} ({request && request.signerEmail}). Fill any remaining admin fields to finalize.</>}
+          {isComplete
+            ? 'This document is already complete. You can edit any field and regenerate the signed PDF. Changes are audit-logged; recipients are not re-emailed automatically.'
+            : (isMulti
+              ? 'All recipients have signed. Fill any remaining admin fields, then consolidate & finalize.'
+              : <>Signed by {request && request.signerName} ({request && request.signerEmail}). Fill any remaining admin fields to finalize.</>)}
         </p>
       </div>
 
@@ -140,27 +159,32 @@ export default function FinishSignRequestPage({ params }) {
         </div>
       )}
 
-      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
-        <span>Admin fields:</span>
-        <strong style={{color:'#f97316'}}>{adminFilled} of {requiredAdmin.length} required filled</strong>
-      </div>
+      {!isComplete && (
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',fontSize:'12px',color:'#9ca3af',flexWrap:'wrap'}}>
+          <span>Admin fields:</span>
+          <strong style={{color:'#f97316'}}>{adminFilled} of {requiredAdmin.length} required filled</strong>
+        </div>
+      )}
+      {isComplete && (
+        <p style={{fontSize:'12px',color:'#9ca3af',margin:'0 0 14px'}}>Click any box on the document below to change its value, then save.</p>
+      )}
 
       {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
 
       <div style={{display:'flex',gap:'10px',marginBottom:'18px'}}>
-        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?'Finalizing…':(isMulti?'✓ Consolidate & finalize':'✓ Finalize & generate PDF')}</button>
+        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?(isComplete?'Saving…':'Finalizing…'):(isComplete?'💾 Save & regenerate PDF':(isMulti?'✓ Consolidate & finalize':'✓ Finalize & generate PDF'))}</button>
       </div>
 
       {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
       {!loading && pdfBlobUrl && request && (
         <div style={{maxHeight:'calc(100vh - 320px)',display:'flex'}}>
           <SignPdfViewer fileUrl={pdfBlobUrl} fields={request.fields} values={values}
-            onClickField={(f) => { if (f.assignee !== 'admin') return; if (f.type==='checkbox') toggleCheckbox(f); else setActiveField(f) }}
-            restrictedAssignee="admin" readOnlyFieldIds={userFilledIds}/>
+            onClickField={(f) => { if (!isComplete && f.assignee !== 'admin') return; if (f.type==='checkbox') toggleCheckbox(f); else setActiveField(f) }}
+            restrictedAssignee={isComplete ? undefined : 'admin'} readOnlyFieldIds={userFilledIds}/>
         </div>
       )}
 
-      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee="admin" currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
+      {activeField && <FieldModal field={activeField} fields={request ? request.fields : []} restrictedAssignee={isComplete ? undefined : 'admin'} currentValue={values[activeField.id]} onClose={()=>setActiveField(null)} onSave={(val, applyAll)=>{
         if (applyAll) applyToAll(activeField, val)
         else setFieldValueAndGroup(activeField, val)
         setActiveField(null)
