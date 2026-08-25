@@ -183,6 +183,27 @@ export async function renameDriveFile(fileId, newName) {
   return res.data
 }
 
+// Duplicate a Drive file (PDF content + field definitions in appProperties).
+export async function copyDriveFile(fileId, newName) {
+  const drive = getDrive()
+  const src = await drive.files.get({
+    fileId,
+    fields: 'appProperties,parents',
+    supportsAllDrives: true,
+  })
+  const res = await drive.files.copy({
+    fileId,
+    requestBody: {
+      name: newName,
+      appProperties: src.data.appProperties || {},
+      parents: (src.data.parents && src.data.parents.length) ? src.data.parents : [FOLDER_ID()],
+    },
+    fields: 'id,name,appProperties',
+    supportsAllDrives: true,
+  })
+  return res.data
+}
+
 // Delete a Drive file (used when removing a template)
 export async function deleteDriveFile(fileId) {
   const drive = getDrive()

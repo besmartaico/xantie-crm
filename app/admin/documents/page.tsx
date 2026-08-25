@@ -29,6 +29,7 @@ export default function DocumentsPage() {
   const [renameValue, setRenameValue] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const [duplicatingId, setDuplicatingId] = useState(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -71,6 +72,19 @@ export default function DocumentsPage() {
     }
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function doDuplicate(d) {
+    setDuplicatingId(d.id); setUploadError('')
+    try {
+      const res = await fetch('/api/documents/' + d.id + '/duplicate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) { setUploadError(data.error || 'Duplicate failed') }
+      else { await load() }
+    } catch(e) { setUploadError(e.message || 'Network error') }
+    setDuplicatingId(null)
   }
 
   async function doRename() {
@@ -153,6 +167,7 @@ export default function DocumentsPage() {
               <a href={'/api/documents/raw/' + d.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>👁 Preview</a>
               <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📍 Place fields</a>
               <a href={'/admin/documents/' + d.id} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Send to sign →</a>
+              <button onClick={()=>doDuplicate(d)} disabled={duplicatingId===d.id} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',cursor:duplicatingId===d.id?'wait':'pointer',fontSize:'12px',fontWeight:600}}>{duplicatingId===d.id?'Duplicating…':'Duplicate'}</button>
               <button onClick={()=>{setRenameDoc(d);setRenameValue((d.name||'').replace(/\.pdf$/i,''));setRenameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Rename</button>
               <button onClick={()=>{setConfirmDelete(d);setDeleteError('')}} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
             </div>
