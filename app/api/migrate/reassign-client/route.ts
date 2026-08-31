@@ -54,7 +54,8 @@ export async function POST(req) {
 
     if (!apply) {
       return NextResponse.json({
-        success: true, apply: false, matched: matches.length,
+        success: true, apply: false, version: 'v2-datefilter', matched: matches.length,
+        datePrefixes: datePrefixes || 'all',
         distinctSubProjects: distinctSubs,
         sample: matches.slice(0, 8).map(m => ({ row: m.sheetRow, date: m.date, hours: m.hours, sub: m.sub })),
       })
