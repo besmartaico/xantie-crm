@@ -30,6 +30,8 @@ export async function POST(req) {
     const fromClient = (body.fromClient || '').trim()
     const toClient = (body.toClient || '').trim()
     const apply = body.apply === true
+    // Optional: restrict to entries whose date (YYYY-MM-DD) starts with one of these prefixes.
+    const datePrefixes = Array.isArray(body.datePrefixes) && body.datePrefixes.length ? body.datePrefixes.map(String) : null
     if (!email || !fromClient || !toClient) {
       return NextResponse.json({ error: 'email, fromClient, toClient required' }, { status: 400 })
     }
@@ -43,7 +45,9 @@ export async function POST(req) {
     const matches = []
     rows.forEach((r, i) => {
       if ((r[1] || '').trim().toLowerCase() === email && (r[6] || '').trim() === fromClient) {
-        matches.push({ sheetRow: i + 2, date: r[2] || '', hours: r[3] || '', sub: r[8] || 'N/A' })
+        const date = (r[2] || '').trim()
+        if (datePrefixes && !datePrefixes.some(p => date.startsWith(p))) return
+        matches.push({ sheetRow: i + 2, date, hours: r[3] || '', sub: r[8] || 'N/A' })
       }
     })
     const distinctSubs = [...new Set(matches.map(m => m.sub || 'N/A'))]
