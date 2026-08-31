@@ -222,7 +222,7 @@ export default function TimeEntries() {
     setSavingProject(true); setProjectError('')
     try {
       const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
-      const res = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'add', name: newProjectName.trim(), description:'', createdBy: u.name||u.email||'' }) })
+      const res = await fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: newProjectName.trim(), description:'', createdBy: u.name||u.email||'' }) })
       const data = await res.json()
       if (data.success) { await loadProjects(); setProject(newProjectName.trim()); setNewProjectName(''); setShowNewProject(false) }
       else setProjectError(data.error||'Failed.')
@@ -593,9 +593,9 @@ export default function TimeEntries() {
 
             {showNewProject && (
               <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'10px',padding:'14px',marginBottom:'16px'}}>
-                <label style={{...lbl,marginBottom:'8px'}}>New Project Name</label>
+                <label style={{...lbl,marginBottom:'8px'}}>New Client Name</label>
                 <div style={{display:'flex',gap:'8px'}}>
-                  <input autoFocus value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveNewProject()} placeholder="e.g. Website Redesign" style={{...inp,flex:1,fontSize:'14px'}}/>
+                  <input autoFocus value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&saveNewProject()} placeholder="e.g. Acme Corp" style={{...inp,flex:1,fontSize:'14px'}}/>
                   <button onClick={saveNewProject} disabled={!newProjectName.trim()}
                     style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',fontWeight:700,cursor:'pointer',opacity:!newProjectName.trim()?0.5:1,whiteSpace:'nowrap'}}>
                     {savingProject?'Adding…':'Add'}
