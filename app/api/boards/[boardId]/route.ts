@@ -20,12 +20,12 @@ function uid() { return Date.now().toString(36)+Math.random().toString(36).subst
 
 async function getRows(sheets, tab) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId:SID(), range:`'${tab}'!A2:Z5000` })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId:SID(), range:`'${tab}'!A2:Z200000` })
     return r.data.values || []
   } catch(e) { return [] }
 }
 async function clearAndRewrite(sheets, tab, rows) {
-  await sheets.spreadsheets.values.clear({ spreadsheetId:SID(), range:`'${tab}'!A2:Z5000` })
+  await sheets.spreadsheets.values.clear({ spreadsheetId:SID(), range:`'${tab}'!A2:Z200000` })
   if (rows.length) {
     await sheets.spreadsheets.values.update({ spreadsheetId:SID(), range:`'${tab}'!A2`, valueInputOption:'RAW', requestBody:{ values:rows } })
   }

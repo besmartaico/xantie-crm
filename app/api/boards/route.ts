@@ -34,7 +34,7 @@ async function ensureSheets(sheets) {
 
 async function getRows(sheets, tab) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId:SID(), range:`'${tab}'!A2:Z5000` })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId:SID(), range:`'${tab}'!A2:Z200000` })
     return r.data.values || []
   } catch(e) { return [] }
 }
@@ -85,7 +85,7 @@ export async function POST(req) {
         const colIdx = tab === 'PM_Boards' ? 0 : tab === 'PM_Members' ? 0 : 1
         const keep = rows.filter(r => r[colIdx] !== boardId)
         // Clear and rewrite
-        const range = `'${tab}'!A2:Z5000`
+        const range = `'${tab}'!A2:Z200000`
         await sheets.spreadsheets.values.clear({ spreadsheetId:SID(), range })
         if (keep.length) {
           await sheets.spreadsheets.values.update({ spreadsheetId:SID(), range:`'${tab}'!A2`, valueInputOption:'RAW', requestBody:{ values:keep } })

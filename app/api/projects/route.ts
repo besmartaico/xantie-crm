@@ -17,7 +17,7 @@ const SID = () => process.env.GOOGLE_SHEETS_ID
 
 async function getRows(sheets) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E5000" })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E200000" })
     return r.data.values || []
   } catch(e) { return [] }
 }
@@ -49,7 +49,7 @@ export async function POST(req) {
     if (body.action === 'delete') {
       const rows = await getRows(sheets)
       const filtered = rows.filter(r => !(r[0]===body.name && r[1]===body.clientName))
-      await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E5000" })
+      await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E200000" })
       if (filtered.length) {
         await sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: "'Sub_Projects'!A2", valueInputOption: 'RAW', requestBody: { values: filtered } })
       }

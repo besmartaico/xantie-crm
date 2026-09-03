@@ -37,7 +37,7 @@ export async function POST(req) {
 
     const sheets = getSheets()
     const SID = process.env.GOOGLE_SHEETS_ID
-    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:G5000' })
+    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:G200000' })
     const rows = existing.data.values || []
     const existingIdx = rows.findIndex(r => r[1]?.toLowerCase() === normalizedEmail)
     const appUrl = process.env.APP_URL || 'https://time.xantie.com'

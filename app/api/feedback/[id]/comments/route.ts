@@ -28,7 +28,7 @@ async function ensureSheet(sheets) {
 
 async function getRows(sheets) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Feedback_Comments'!A2:F5000" })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Feedback_Comments'!A2:F200000" })
     return r.data.values || []
   } catch(e) { return [] }
 }

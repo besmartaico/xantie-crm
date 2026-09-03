@@ -24,7 +24,7 @@ export async function POST() {
     // ── STEP 1: Read existing Projects sheet ──────────────────────────────
     let clientNames = []
     if (existing.includes('Projects')) {
-      const projRes = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Projects'!A2:E5000" })
+      const projRes = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Projects'!A2:E200000" })
       const projRows = projRes.data.values || []
       clientNames = [...new Set(projRows.map(r => r[0]).filter(Boolean))]
       log.push('Read ' + projRows.length + ' projects (now clients): ' + clientNames.join(', '))
@@ -71,7 +71,7 @@ export async function POST() {
     }
 
     // ── STEP 4: Update Time Entries - add Project (sub) column I ─────────
-    const teRes = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Time Entries'!A1:I5000" })
+    const teRes = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Time Entries'!A1:I200000" })
     const teRows = teRes.data.values || []
     
     if (teRows.length > 0) {
@@ -93,7 +93,7 @@ export async function POST() {
         }
         
         // Rewrite all of Time Entries
-        await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Time Entries'!A1:I5000" })
+        await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Time Entries'!A1:I200000" })
         await sheets.spreadsheets.values.update({
           spreadsheetId: SID(), range: "'Time Entries'!A1",
           valueInputOption: 'RAW', requestBody: { values: newRows }

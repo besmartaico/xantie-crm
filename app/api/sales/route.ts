@@ -20,9 +20,9 @@ const PROJECTS_COLS = ['id','billingCustomer','customerName','customerType','sal
 const BENCH_COLS = ['id','name','status','rate','availabilityStart','notes','createdAt']
 
 const SHEETS_CONFIG = {
-  funnel:   { sheet:'Sales_Funnel',     cols: FUNNEL_COLS,   range: 'A2:P5000', headerRange: 'A1:P1' },
-  projects: { sheet:'Current_Projects', cols: PROJECTS_COLS, range: 'A2:N5000', headerRange: 'A1:N1' },
-  bench:    { sheet:'Bench',            cols: BENCH_COLS,    range: 'A2:G5000', headerRange: 'A1:G1' },
+  funnel:   { sheet:'Sales_Funnel',     cols: FUNNEL_COLS,   range: 'A2:P200000', headerRange: 'A1:P1' },
+  projects: { sheet:'Current_Projects', cols: PROJECTS_COLS, range: 'A2:N200000', headerRange: 'A1:N1' },
+  bench:    { sheet:'Bench',            cols: BENCH_COLS,    range: 'A2:G200000', headerRange: 'A1:G1' },
 }
 
 async function ensureSheet(sheets, key) {

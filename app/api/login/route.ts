@@ -20,7 +20,7 @@ export async function POST(req) {
     const sheets = getSheets()
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Users!A2:E5000'
+      range: 'Users!A2:E200000'
     })
     const rows = res.data.values || []
     const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())

@@ -30,7 +30,7 @@ async function ensureSheet(sheets) {
 
 async function getRows(sheets) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Candidates'!A2:T5000" })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Candidates'!A2:T200000" })
     return r.data.values || []
   } catch(e) { return [] }
 }

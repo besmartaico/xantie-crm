@@ -14,7 +14,7 @@ function getSheets() {
 }
 
 const SID = () => process.env.GOOGLE_SHEETS_ID
-const RANGE = "'Time Off'!A2:H5000"
+const RANGE = "'Time Off'!A2:H200000"
 
 async function ensureSheet(sheets) {
   try {

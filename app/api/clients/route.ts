@@ -16,7 +16,7 @@ const SID = () => process.env.GOOGLE_SHEETS_ID
 
 async function getRows(sheets, tab) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `'${tab}'!A2:E5000` })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `'${tab}'!A2:E200000` })
     return r.data.values || []
   } catch(e) { return [] }
 }
@@ -40,7 +40,7 @@ export async function POST(req) {
     if (body.action === 'delete') {
       const rows = await getRows(sheets, 'Clients')
       const filtered = rows.filter(r => r[0] !== body.name)
-      await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Clients'!A2:E5000" })
+      await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: "'Clients'!A2:E200000" })
       if (filtered.length) {
         await sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: "'Clients'!A2", valueInputOption: 'RAW', requestBody: { values: filtered } })
       }
@@ -57,7 +57,7 @@ export async function POST(req) {
     })
     // Auto-create N/A sub-project
     const subRows = await (async () => {
-      try { const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E5000" }); return r.data.values||[] } catch(e){ return [] }
+      try { const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Sub_Projects'!A2:E200000" }); return r.data.values||[] } catch(e){ return [] }
     })()
     const nextSub = subRows.length + 2
     await sheets.spreadsheets.values.update({

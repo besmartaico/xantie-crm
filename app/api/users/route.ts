@@ -18,7 +18,7 @@ export async function GET() {
   try {
     const sheets = getSheets()
     const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SID(), range: 'Users!A2:E5000'
+      spreadsheetId: SID(), range: 'Users!A2:E200000'
     })
     const rows = (res.data.values || []).map((r, i) => ({
       id: i + 2,
@@ -57,7 +57,7 @@ export async function POST(req) {
       let rowIdx = id
       if (!rowIdx && email) {
         // Find row by email
-        const all = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Users'!A2:E5000" })
+        const all = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Users'!A2:E200000" })
         const rows = all.data.values || []
         const found = rows.findIndex(r => (r[1]||'').toLowerCase() === email.toLowerCase())
         if (found === -1) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
@@ -74,7 +74,7 @@ export async function POST(req) {
     if (action === 'deactivate') {
       let rowNum = body.id
       if (!rowNum && body.email) {
-        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E5000' })
+        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E200000' })
         const rows = lookup.data.values || []
         const idx = rows.findIndex(r => r[1]?.toLowerCase() === body.email.toLowerCase())
         if (idx === -1) return NextResponse.json({ success: false, error: 'User not found' })
@@ -91,7 +91,7 @@ export async function POST(req) {
       // support email lookup
       let rowNum = body.id
       if (!rowNum && body.email) {
-        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E5000' })
+        const lookup = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: 'Users!A2:E200000' })
         const rows = lookup.data.values || []
         const idx = rows.findIndex(r => r[1]?.toLowerCase() === body.email.toLowerCase())
         if (idx === -1) return NextResponse.json({ success: false, error: 'User not found' })

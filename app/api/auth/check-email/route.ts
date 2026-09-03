@@ -18,7 +18,7 @@ export async function POST(req) {
     const { email } = await req.json()
     if (!email) return NextResponse.json({ exists: false })
     const sheets = getSheets()
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: process.env.GOOGLE_SHEETS_ID, range: 'Users!A2:C5000' })
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: process.env.GOOGLE_SHEETS_ID, range: 'Users!A2:C200000' })
     const rows = res.data.values || []
     const user = rows.find(r => r[1]?.toLowerCase() === email.toLowerCase())
     if (!user) return NextResponse.json({ exists: false })

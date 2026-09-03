@@ -22,7 +22,7 @@ export async function POST(req) {
     const SID = process.env.GOOGLE_SHEETS_ID
 
     // Check if already exists
-    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:E5000' })
+    const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SID, range: 'Users!A2:E200000' })
     const rows = existing.data.values || []
     if (rows.some(r => r[1]?.toLowerCase() === email.toLowerCase())) {
       return NextResponse.json({ success: false, error: 'User already exists' })
