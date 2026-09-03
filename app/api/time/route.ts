@@ -13,7 +13,10 @@ function getSheets() {
   return google.sheets({ version:'v4', auth })
 }
 const SID = () => process.env.GOOGLE_SHEETS_ID
-const RANGE = "'Time Entries'!A2:I5000"
+// Bounded but large: the sheet outgrew the old 5000-row cap, which caused new
+// entries to write past the read range (invisible) and overwrite each other.
+// Sheets only returns populated rows, so a high bound has no perf cost.
+const RANGE = "'Time Entries'!A2:I200000"
 
 function rowToEntry(r, i) {
   return {
