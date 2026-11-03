@@ -67,7 +67,8 @@ export default function HealthPage() {
   function hasLog(em, elementId, date) {
     return logs.some(l => l.email === em && l.elementId === elementId && l.date === date)
   }
-  // Completed days for a participant = days where ALL their assigned activities are logged, within the window.
+  // Completed days for a participant = days (strictly before today) where ALL their
+  // assigned activities are logged, within the competition window.
   function completedDays(p) {
     const assigned = elements.filter(e => p.elementIds.includes(e.id)).map(e => e.id)
     if (!assigned.length) return 0
@@ -78,10 +79,18 @@ export default function HealthPage() {
     for (const d of Object.keys(byDate)) {
       if (comp?.startDate && d < comp.startDate) continue
       if (comp?.endDate && d > comp.endDate) continue
-      if (d > t) continue
+      if (d >= t) continue // today is still in progress — doesn't count yet
       if (assigned.every(id => byDate[d].has(id))) count++
     }
     return count
+  }
+  // Potential days so far = elapsed days in the window, NOT including today.
+  function potentialDays() {
+    if (!comp?.startDate) return null
+    let end = addDays(todayStr(), -1) // yesterday
+    if (comp.endDate && comp.endDate < end) end = comp.endDate
+    if (end < comp.startDate) return 0
+    return Math.max(0, Math.floor((parseD(end) - parseD(comp.startDate)) / 86400000) + 1)
   }
 
   async function act(body) {
@@ -149,8 +158,8 @@ export default function HealthPage() {
           <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'16px'}}>
             <div style={{...card,flex:'1 1 180px'}}>
               <div style={{fontSize:'11px',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:700}}>Days completed</div>
-              <div style={{fontSize:'32px',fontWeight:800,color:LIME}}>{completedDays(me)}</div>
-              <div style={{fontSize:'11px',color:'#6b7280'}}>all {myElements.length} activit{myElements.length===1?'y':'ies'} done</div>
+              <div style={{fontSize:'32px',fontWeight:800,color:LIME}}>{completedDays(me)}{potentialDays()!=null && <span style={{color:'#6b7280',fontSize:'20px',fontWeight:700}}> / {potentialDays()}</span>}</div>
+              <div style={{fontSize:'11px',color:'#6b7280'}}>{potentialDays()!=null ? `of ${potentialDays()} day${potentialDays()===1?'':'s'} so far — today isn't counted yet` : `all ${myElements.length} activit${myElements.length===1?'y':'ies'} done`}</div>
             </div>
           </div>
 
