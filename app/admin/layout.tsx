@@ -22,6 +22,7 @@ export default function AdminLayout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [impersonating, setImpersonating] = useState(false)
   const [realAdmin, setRealAdmin] = useState(null)
+  const [showHealth, setShowHealth] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -31,6 +32,15 @@ export default function AdminLayout({ children }) {
     if (backup) { setImpersonating(true); setRealAdmin(JSON.parse(backup)) }
     else { setImpersonating(false); setRealAdmin(null) }
   }, [path])
+
+  // Health tab shows for admins (who manage it) and for invited participants.
+  useEffect(() => {
+    const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
+    if (!u.role) return
+    if (u.role === 'admin') { setShowHealth(true); return }
+    fetch('/api/health?check=' + encodeURIComponent((u.email || '').toLowerCase()))
+      .then(r => r.json()).then(d => setShowHealth(!!d.participant)).catch(() => {})
+  }, [])
 
   function signOut() {
     sessionStorage.removeItem('xantie_auth')
@@ -61,6 +71,7 @@ export default function AdminLayout({ children }) {
     { label: 'Boards', href: '/admin/boards' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
+    ...(showHealth ? [{ label: 'Health', href: '/admin/health' }] : []),
     { label: 'Help', href: '/admin/help' },
   ]
 
