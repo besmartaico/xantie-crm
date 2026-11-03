@@ -71,7 +71,8 @@ export default function AdminLayout({ children }) {
     { label: 'Boards', href: '/admin/boards' },
     { label: 'Time Off', href: '/admin/time-off' },
     { label: 'Feedback', href: '/admin/feedback' },
-    ...(showHealth ? [{ label: 'Health', href: '/admin/health' }] : []),
+    // Participants (non-admins) see Health here; admins get it under the Admin section.
+    ...(showHealth && user.role !== 'admin' ? [{ label: 'Health', href: '/admin/health' }] : []),
     { label: 'Help', href: '/admin/help' },
   ]
 
@@ -97,6 +98,7 @@ export default function AdminLayout({ children }) {
     { label: 'Candidates', href: '/admin/candidates' },
     { label: 'Comp Calculator', href: '/admin/comp-calc', parent: '/admin/candidates' },
     { label: 'Sales CRM', href: '/admin/sales' },
+    { label: 'Health', href: '/admin/health' },
     { label: 'Documents', href: '/admin/documents' },
     { label: 'Sign Requests', href: '/admin/sign-requests', parent: '/admin/documents' },
     { label: 'Clients', href: '/admin/projects' },
