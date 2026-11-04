@@ -360,7 +360,11 @@ export default function SalesCrmPage() {
                         {partners.map(p => {
                           const cnt = counts[p]||0
                           const op = cnt>0 ? Math.min(1, Math.max(0.2, cnt/CONTACT_TARGET)) : 0
-                          return <div key={p} title={p+': '+cnt} style={{flex:1,borderRadius:'3px',background: cnt>0 ? hexA(colorFor(p), op) : '#1a1a1a'}}/>
+                          return (
+                            <div key={p} title={p+': '+cnt} style={{flex:1,borderRadius:'3px',display:'flex',alignItems:'center',justifyContent:'center',minHeight:'22px',background: cnt>0 ? hexA(colorFor(p), op) : '#1a1a1a'}}>
+                              {cnt>0 && <span style={{fontSize:'12px',fontWeight:800,color: op>0.5?'#0a0a0a':'#fff'}}>{cnt}</span>}
+                            </div>
+                          )
                         })}
                       </div>
                     </div>
