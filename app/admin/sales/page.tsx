@@ -56,7 +56,7 @@ function StageBadge({ stage }) {
 }
 
 export default function SalesCrmPage() {
-  const [tab, setTab] = useState('funnel')
+  const [tab, setTab] = useState('contacts')
   const [funnel, setFunnel] = useState([])
   const [projects, setProjects] = useState([])
   const [bench, setBench] = useState([])
