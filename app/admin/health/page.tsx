@@ -123,6 +123,7 @@ export default function HealthPage() {
 
   const subTabs = [
     ...(me ? [['progress','My Progress']] : []),
+    ...(comp ? [['everyone','Everyone']] : []),
     ['leaderboard','Leaderboard'],
     ...(isAdmin ? [['manage','Manage']] : []),
   ]
@@ -214,6 +215,61 @@ export default function HealthPage() {
               <p style={{fontSize:'11px',color:'#4b5563',margin:'12px 0 0'}}>Tap a box to mark an activity done for that day. A day counts only when every activity is checked.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── EVERYONE (daily tracking) ──────────────────────────── */}
+      {tab === 'everyone' && (
+        <div style={card}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
+            <button onClick={()=>setWeekAnchor(addDays(weekAnchor,-7))} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',cursor:'pointer'}}>← Prev</button>
+            <span style={{fontSize:'13px',color:'#9ca3af',fontWeight:600}}>Week of {weekAnchor}</span>
+            <button onClick={()=>setWeekAnchor(addDays(weekAnchor,7))} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',cursor:'pointer'}}>Next →</button>
+          </div>
+          {participants.length === 0 ? <p style={{color:'#6b7280',margin:0}}>No participants yet.</p> : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',minWidth:'640px'}}>
+                <thead>
+                  <tr>
+                    <th style={{textAlign:'left',padding:'8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase',position:'sticky',left:0,background:'#141414'}}>Participant</th>
+                    {days.map(d => (
+                      <th key={d} style={{padding:'6px 4px',textAlign:'center',minWidth:'58px'}}>
+                        <div style={{fontSize:'10px',color:d===t?LIME:'#6b7280',fontWeight:700}}>{DOW[parseD(d).getDay()]}</div>
+                        <div style={{fontSize:'11px',color:'#9ca3af'}}>{d.slice(5)}</div>
+                      </th>
+                    ))}
+                    <th style={{padding:'8px',textAlign:'right',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participants.map(p => {
+                    const assigned = elements.filter(e => p.elementIds.includes(e.id))
+                    const total = assigned.length
+                    const mine = p.email === email
+                    return (
+                      <tr key={p.id} style={{borderTop:'1px solid #1a1a1a', background: mine?'rgba(141,198,63,0.05)':'transparent'}}>
+                        <td style={{padding:'8px',fontSize:'13px',color:'#fff',fontWeight:500,position:'sticky',left:0,background: mine?'#182215':'#141414'}}>{p.name||p.email}{mine && <span style={{fontSize:'10px',color:LIME,marginLeft:'5px'}}>(you)</span>}</td>
+                        {days.map(d => {
+                          const future = d > t
+                          const count = assigned.filter(e => hasLog(p.email, e.id, d)).length
+                          const complete = total>0 && count===total
+                          return (
+                            <td key={d} style={{textAlign:'center',padding:'4px'}}>
+                              {future ? <span style={{color:'#2a2a2a'}}>·</span>
+                                : complete ? <div style={{width:'28px',height:'28px',borderRadius:'7px',background:LIME,color:'#0a0a0a',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:'15px',fontWeight:800}}>✓</div>
+                                : <span style={{fontSize:'12px',fontWeight:700,color: count>0?'#fbbf24':'#3a3a3a'}}>{total?`${count}/${total}`:'—'}</span>}
+                            </td>
+                          )
+                        })}
+                        <td style={{padding:'8px',textAlign:'right',fontSize:'15px',fontWeight:800,color:LIME}}>{completedDays(p)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p style={{fontSize:'11px',color:'#4b5563',margin:'12px 0 0'}}>✓ = all activities done that day (a completed day). Numbers show activities done out of assigned. Today isn't counted toward totals yet.</p>
         </div>
       )}
 

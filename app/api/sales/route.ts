@@ -87,7 +87,7 @@ export async function POST(req) {
       const rows = await getRows(sheets, type)
       const nextRow = rows.length + 2
       const id = uid()
-      const created = { ...body, id, createdAt: new Date().toISOString(), creationDate: new Date().toISOString() }
+      const created = { ...body, id, createdAt: body.createdAt || new Date().toISOString(), creationDate: new Date().toISOString() }
       await sheets.spreadsheets.values.update({
         spreadsheetId: SID(), range: rangeForRow(cfg, nextRow),
         valueInputOption: 'RAW',

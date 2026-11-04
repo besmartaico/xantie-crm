@@ -90,7 +90,7 @@ export default function SalesCrmPage() {
   function openAdd(type) {
     setModalType(type)
     setEditId(null)
-    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : {})
+    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : type==='contacts' ? {createdAt: new Date().toISOString()} : {})
     setShowModal(true)
     setActiveCard(null)
   }
@@ -286,28 +286,55 @@ export default function SalesCrmPage() {
           const s = search.toLowerCase()
           return ['name','url','notes'].some(k => (c[k]||'').toLowerCase().includes(s))
         })
+        // newest first
+        const sorted = [...filteredContacts].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''))
+        // counts by day (overview)
+        const byDay = {}
+        sorted.forEach(c => { const day = (c.createdAt||'').slice(0,10); if (!day) return; if (!byDay[day]) byDay[day] = { count:0, iso:c.createdAt }; byDay[day].count++ })
+        const dayKeys = Object.keys(byDay).sort().reverse()
+        const maxCount = Math.max(1, ...dayKeys.map(k => byDay[k].count))
         return (
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px',gap:'10px',flexWrap:'wrap'}}>
               <input placeholder="Search contacts..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,width:'auto',minWidth:'200px'}}/>
               <button onClick={()=>openAdd('contacts')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ New Contact</button>
             </div>
+
+            {/* Overview: contacts by day */}
+            {dayKeys.length > 0 && (
+              <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'14px'}}>
+                <h3 style={{fontSize:'11px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Contacts by day</h3>
+                <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                  {dayKeys.map(k => (
+                    <div key={k} style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                      <div style={{width:'140px',fontSize:'12px',color:'#9ca3af',flexShrink:0}}>{fmtDate(byDay[k].iso)}</div>
+                      <div style={{flex:1,height:'8px',background:'#1a1a1a',borderRadius:'4px',overflow:'hidden'}}>
+                        <div style={{height:'100%',width:(byDay[k].count/maxCount*100)+'%',background:'#8DC63F',borderRadius:'4px'}}/>
+                      </div>
+                      <div style={{width:'34px',textAlign:'right',fontSize:'13px',fontWeight:700,color:'#8DC63F'}}>{byDay[k].count}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {filteredContacts.length === 0 && (
               <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center',color:'#6b7280'}}>No contacts {search?'matching your search':'yet'}. Add a contact with a name and a link.</div>
             )}
             <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              {filteredContacts.map(c => (
+              {sorted.map(c => (
                 <div key={c.id} onClick={()=>setActiveCard({type:'contacts',data:c})}
                   style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'14px 16px',cursor:'pointer'}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
                   onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}>
                   <div style={{display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
-                    <div style={{flex:'1 1 200px',minWidth:0}}>
+                    <div style={{flex:'1 1 180px',minWidth:0}}>
                       <div style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</div>
                       {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
                     </div>
                     {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'280px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🔗 {c.url}</a>}
+                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'240px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🔗 {c.url}</a>}
+                    <div style={{fontSize:'11px',color:'#6b7280',whiteSpace:'nowrap',minWidth:'92px',textAlign:'right'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
                   </div>
                 </div>
               ))}
@@ -513,7 +540,10 @@ export default function SalesCrmPage() {
 
             {modalType==='contacts' && (
               <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'18px'}}>
-                <div><label style={lbl}>Contact Name *</label><input autoFocus value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} style={inp}/></div>
+                <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+                  <div style={{flex:'1 1 200px'}}><label style={lbl}>Contact Name *</label><input autoFocus value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} style={inp}/></div>
+                  <div style={{flex:'0 1 170px'}}><label style={lbl}>Date</label><input type="date" value={dateInputVal(form.createdAt)} onChange={e=>setForm({...form, createdAt: e.target.value ? new Date(e.target.value+'T12:00:00').toISOString() : ''})} style={{...inp,colorScheme:'dark'}}/></div>
+                </div>
                 <div><label style={lbl}>URL</label><input value={form.url||''} onChange={e=>setForm({...form,url:e.target.value})} placeholder="https://..." style={inp}/></div>
                 <div><label style={lbl}>Notes <span style={{textTransform:'none',letterSpacing:0,color:'#4b5563'}}>(optional)</span></label><textarea rows={3} value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="How you know them, context…" style={{...inp,resize:'vertical'}}/></div>
               </div>
