@@ -41,6 +41,14 @@ function normalizeUrl(u) {
   return /^https?:\/\//i.test(u) ? u : 'https://' + u
 }
 
+// Calendar heatmap: a stable color per partner; opacity scales toward the daily target.
+const PARTNER_PALETTE = ['#8DC63F', '#60a5fa', '#f472b6', '#fbbf24', '#a78bfa', '#34d399']
+const CONTACT_TARGET = 10
+function hexA(hex, op) {
+  const a = Math.round(Math.max(0, Math.min(1, op)) * 255).toString(16).padStart(2, '0')
+  return hex + a
+}
+
 function StageBadge({ stage }) {
   const s = STAGES.find(x=>x.value===stage)
   if (!s) return <span style={{color:'#6b7280',fontSize:'11px'}}>—</span>
@@ -64,6 +72,9 @@ export default function SalesCrmPage() {
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('')
   const [currentUser, setCurrentUser] = useState({})
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') })
+  const [dayPopup, setDayPopup] = useState(null)
+  const [showAllContacts, setShowAllContacts] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -288,84 +299,74 @@ export default function SalesCrmPage() {
           const s = search.toLowerCase()
           return ['name','url','notes'].some(k => (c[k]||'').toLowerCase().includes(s))
         })
-        // newest first
-        const sorted = [...filteredContacts].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''))
-        // per-partner, per-day breakdown
         const partnerOf = c => (c.createdBy && c.createdBy.trim()) ? c.createdBy.trim() : 'Unknown'
+        const partners = [...new Set(contacts.map(partnerOf))].sort((a,b) => a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
+        const realPartners = partners.filter(p => p !== 'Unknown')
+        const colorFor = p => p==='Unknown' ? '#6b7280' : PARTNER_PALETTE[realPartners.indexOf(p) % PARTNER_PALETTE.length]
+        // group filtered contacts by day (YYYY-MM-DD)
         const byDay = {}
-        const partnerSet = new Set()
-        sorted.forEach(c => {
-          const day = (c.createdAt||'').slice(0,10); if (!day) return
-          const p = partnerOf(c); partnerSet.add(p)
-          if (!byDay[day]) byDay[day] = { iso:c.createdAt, byPartner:{}, total:0 }
-          byDay[day].byPartner[p] = (byDay[day].byPartner[p]||0) + 1
-          byDay[day].total++
-        })
-        const dayKeys = Object.keys(byDay).sort().reverse()
-        const partners = [...partnerSet].sort((a,b) => a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
-        const partnerTotals = {}
-        partners.forEach(p => { partnerTotals[p] = dayKeys.reduce((s,d) => s + (byDay[d].byPartner[p]||0), 0) })
-        const grandTotal = dayKeys.reduce((s,d) => s + byDay[d].total, 0)
+        filteredContacts.forEach(c => { const day=(c.createdAt||'').slice(0,10); if(!day) return; (byDay[day]=byDay[day]||[]).push(c) })
+        // month grid (6 weeks)
+        const [cy, cm] = calMonth.split('-').map(Number)
+        const first = new Date(cy, cm-1, 1)
+        const gridStart = new Date(cy, cm-1, 1 - first.getDay())
+        const cells = Array.from({length:42}, (_,i) => { const d=new Date(gridStart); d.setDate(d.getDate()+i); return d })
+        const monthLabel = first.toLocaleDateString('en-US',{month:'long',year:'numeric'})
+        const shiftMonth = n => { const d=new Date(cy, cm-1+n, 1); setCalMonth(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')) }
         return (
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px',gap:'10px',flexWrap:'wrap'}}>
               <input placeholder="Search contacts..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,width:'auto',minWidth:'200px'}}/>
-              <button onClick={()=>openAdd('contacts')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ New Contact</button>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button onClick={()=>setShowAllContacts(true)} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>View all contacts</button>
+                <button onClick={()=>openAdd('contacts')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ New Contact</button>
+              </div>
             </div>
 
-            {/* Overview: contacts by day, broken out by partner */}
-            {dayKeys.length > 0 && (
-              <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'14px',overflowX:'auto'}}>
-                <h3 style={{fontSize:'11px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Contacts by day · by partner</h3>
-                <table style={{borderCollapse:'collapse',width:'100%',minWidth:(170 + partners.length*70 + 60)+'px'}}>
-                  <thead>
-                    <tr>
-                      <th style={{textAlign:'left',padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Day</th>
-                      {partners.map(p => <th key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'11px',color:'#9ca3af',fontWeight:700,whiteSpace:'nowrap'}}>{p}</th>)}
-                      <th style={{textAlign:'right',padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dayKeys.map(d => (
-                      <tr key={d} style={{borderTop:'1px solid #1a1a1a'}}>
-                        <td style={{padding:'6px 8px',fontSize:'12px',color:'#d1d5db',whiteSpace:'nowrap'}}>{fmtDate(byDay[d].iso)}</td>
-                        {partners.map(p => <td key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'13px',color: byDay[d].byPartner[p]?'#fff':'#3a3a3a'}}>{byDay[d].byPartner[p]||'·'}</td>)}
-                        <td style={{textAlign:'right',padding:'6px 8px',fontSize:'13px',fontWeight:700,color:'#8DC63F'}}>{byDay[d].total}</td>
-                      </tr>
-                    ))}
-                    <tr style={{borderTop:'2px solid #252525'}}>
-                      <td style={{padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Total</td>
-                      {partners.map(p => <td key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'13px',fontWeight:700,color:'#9ca3af'}}>{partnerTotals[p]}</td>)}
-                      <td style={{textAlign:'right',padding:'6px 8px',fontSize:'14px',fontWeight:800,color:'#8DC63F'}}>{grandTotal}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {filteredContacts.length === 0 && (
-              <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center',color:'#6b7280'}}>No contacts {search?'matching your search':'yet'}. Add a contact with a name and a link.</div>
-            )}
-            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              {sorted.map(c => (
-                <div key={c.id} onClick={()=>setActiveCard({type:'contacts',data:c})}
-                  style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'14px 16px',cursor:'pointer'}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}>
-                  <div style={{display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
-                    <div style={{flex:'1 1 180px',minWidth:0}}>
-                      <div style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</div>
-                      {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
-                    </div>
-                    {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
-                    <div style={{whiteSpace:'nowrap',minWidth:'110px',textAlign:'right'}}>
-                      {c.createdBy && <div style={{fontSize:'11px',color:'#9ca3af',fontWeight:600}}>{c.createdBy}</div>}
-                      <div style={{fontSize:'11px',color:'#6b7280'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
-                    </div>
-                  </div>
-                </div>
+            {/* Legend */}
+            <div style={{display:'flex',gap:'14px',flexWrap:'wrap',alignItems:'center',marginBottom:'12px'}}>
+              {partners.map(p => (
+                <span key={p} style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#d1d5db'}}>
+                  <span style={{width:'12px',height:'12px',borderRadius:'3px',background:colorFor(p)}}/>{p}
+                </span>
               ))}
+              <span style={{fontSize:'11px',color:'#6b7280'}}>Darker = closer to {CONTACT_TARGET}/day · click a day for details</span>
+            </div>
+
+            {/* Calendar heatmap, each day partitioned by partner */}
+            <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
+                <button onClick={()=>shiftMonth(-1)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',cursor:'pointer'}}>← Prev</button>
+                <span style={{fontSize:'15px',color:'#fff',fontWeight:700}}>{monthLabel}</span>
+                <button onClick={()=>shiftMonth(1)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'6px 12px',fontSize:'13px',cursor:'pointer'}}>Next →</button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px'}}>
+                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} style={{textAlign:'center',fontSize:'10px',color:'#6b7280',fontWeight:700,textTransform:'uppercase',paddingBottom:'2px'}}>{d}</div>)}
+                {cells.map((d, i) => {
+                  const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+                  const inMonth = d.getMonth() === cm-1
+                  const dayContacts = byDay[key] || []
+                  const counts = {}
+                  dayContacts.forEach(c => { const p=partnerOf(c); counts[p]=(counts[p]||0)+1 })
+                  const total = dayContacts.length
+                  return (
+                    <div key={i} onClick={()=> total>0 && setDayPopup(key)}
+                      style={{minHeight:'60px',border:'1px solid '+(inMonth?'#232323':'#161616'),borderRadius:'8px',padding:'5px',display:'flex',flexDirection:'column',cursor: total>0?'pointer':'default',opacity: inMonth?1:0.45}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:'11px',color:inMonth?'#9ca3af':'#4b5563',fontWeight:600}}>{d.getDate()}</span>
+                        {total>0 && <span style={{fontSize:'10px',color:'#6b7280'}}>{total}</span>}
+                      </div>
+                      <div style={{flex:1,display:'flex',gap:'2px',marginTop:'4px'}}>
+                        {partners.map(p => {
+                          const cnt = counts[p]||0
+                          const op = cnt>0 ? Math.min(1, Math.max(0.2, cnt/CONTACT_TARGET)) : 0
+                          return <div key={p} title={p+': '+cnt} style={{flex:1,borderRadius:'3px',background: cnt>0 ? hexA(colorFor(p), op) : '#1a1a1a'}}/>
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )
@@ -588,6 +589,77 @@ export default function SalesCrmPage() {
           </div>
         </div>
       )}
+
+      {/* DAY DETAIL POPUP */}
+      {dayPopup && (() => {
+        const dayContacts = contacts.filter(c => (c.createdAt||'').slice(0,10) === dayPopup)
+        const label = new Date(dayPopup+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
+        const groups = {}
+        dayContacts.forEach(c => { const p=(c.createdBy&&c.createdBy.trim())||'Unknown'; (groups[p]=groups[p]||[]).push(c) })
+        const gkeys = Object.keys(groups).sort((a,b)=> a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
+        return (
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1050,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>setDayPopup(null)}>
+            <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'560px',maxWidth:'100%',maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'4px'}}>
+                <h2 style={{fontSize:'17px',fontWeight:700,margin:0}}>{label}</h2>
+                <button onClick={()=>setDayPopup(null)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1}}>✕</button>
+              </div>
+              <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 16px'}}>{dayContacts.length} contact{dayContacts.length===1?'':'s'}</p>
+              {gkeys.map(p => (
+                <div key={p} style={{marginBottom:'14px'}}>
+                  <div style={{fontSize:'12px',fontWeight:700,color:'#9ca3af',marginBottom:'6px'}}>{p} · {groups[p].length}</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    {groups[p].map(c => (
+                      <div key={c.id} onClick={()=>{setActiveCard({type:'contacts',data:c});setDayPopup(null)}}
+                        style={{background:'#0f0f0f',borderRadius:'8px',padding:'10px 12px',cursor:'pointer',display:'flex',justifyContent:'space-between',gap:'10px',alignItems:'center'}}>
+                        <span style={{fontSize:'13px',color:'#fff',fontWeight:500}}>{c.name}</span>
+                        {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'12px',color:'#8DC63F',textDecoration:'none',maxWidth:'260px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ALL CONTACTS */}
+      {showAllContacts && (() => {
+        const all = [...contacts]
+          .filter(c => { if (!search) return true; const s=search.toLowerCase(); return ['name','url','notes','createdBy'].some(k => (c[k]||'').toLowerCase().includes(s)) })
+          .sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''))
+        return (
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1050,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>setShowAllContacts(false)}>
+            <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'680px',maxWidth:'100%',maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px',gap:'10px',flexWrap:'wrap'}}>
+                <h2 style={{fontSize:'17px',fontWeight:700,margin:0}}>All contacts ({all.length})</h2>
+                <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                  <input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,width:'auto',minWidth:'160px'}}/>
+                  <button onClick={()=>setShowAllContacts(false)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1}}>✕</button>
+                </div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                {all.length===0 && <p style={{color:'#6b7280',margin:0}}>No contacts.</p>}
+                {all.map(c => (
+                  <div key={c.id} onClick={()=>{setActiveCard({type:'contacts',data:c});setShowAllContacts(false)}}
+                    style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'12px 14px',cursor:'pointer',display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
+                    <div style={{flex:'1 1 180px',minWidth:0}}>
+                      <div style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</div>
+                      {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
+                    </div>
+                    {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
+                    <div style={{whiteSpace:'nowrap',minWidth:'110px',textAlign:'right'}}>
+                      {c.createdBy && <div style={{fontSize:'11px',color:'#9ca3af',fontWeight:600}}>{c.createdBy}</div>}
+                      <div style={{fontSize:'11px',color:'#6b7280'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {confirmDelete && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
