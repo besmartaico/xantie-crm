@@ -236,14 +236,16 @@ export default function HealthPage() {
                         <div style={{fontSize:'11px',color:'#9ca3af'}}>{d.slice(5)}</div>
                       </th>
                     ))}
-                    <th style={{padding:'8px',textAlign:'right',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Days</th>
+                    <th style={{padding:'8px',textAlign:'right',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Days · %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {participants.map(p => {
+                  {[...participants].sort((a,b) => completedDays(b) - completedDays(a)).map(p => {
                     const assigned = elements.filter(e => p.elementIds.includes(e.id))
                     const total = assigned.length
                     const mine = p.email === email
+                    const pot = potentialDays()
+                    const pct = (pot && pot > 0) ? Math.round(completedDays(p) / pot * 100) : null
                     return (
                       <tr key={p.id} style={{borderTop:'1px solid #1a1a1a', background: mine?'rgba(141,198,63,0.05)':'transparent'}}>
                         <td style={{padding:'8px',fontSize:'13px',color:'#fff',fontWeight:500,position:'sticky',left:0,background: mine?'#182215':'#141414'}}>{p.name||p.email}{mine && <span style={{fontSize:'10px',color:LIME,marginLeft:'5px'}}>(you)</span>}</td>
@@ -259,7 +261,7 @@ export default function HealthPage() {
                             </td>
                           )
                         })}
-                        <td style={{padding:'8px',textAlign:'right',fontSize:'15px',fontWeight:800,color:LIME}}>{completedDays(p)}</td>
+                        <td style={{padding:'8px',textAlign:'right',fontSize:'15px',fontWeight:800,color:LIME,whiteSpace:'nowrap'}}>{completedDays(p)}{pct!=null && <span style={{fontSize:'12px',color:'#6b7280',fontWeight:700}}> · {pct}%</span>}</td>
                       </tr>
                     )
                   })}
