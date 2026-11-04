@@ -13,9 +13,37 @@ const HIRE_OPTIONS = [
   { value:'Hired', label:'Hired', color:'#8DC63F', bg:'rgba(141,198,63,0.18)' },
 ]
 
+const ROLE_TYPES = ['Full-time','Contract','Either']
+
+const STAGES = [
+  { value:'Sourced',      color:'#60a5fa' },
+  { value:'Contacted',    color:'#a78bfa' },
+  { value:'Screening',    color:'#fbbf24' },
+  { value:'Interviewing', color:'#f59e0b' },
+  { value:'Submitted',    color:'#34d399' },
+  { value:'Placed',       color:'#8DC63F' },
+  { value:'Passed',       color:'#6b7280' },
+]
+const stageColor = (s) => (STAGES.find(x=>x.value===s)||{}).color || '#6b7280'
+const stageOf = (c) => c.stage || 'Sourced'
+
 function HireBadge({ value }) {
   const o = HIRE_OPTIONS.find(x=>x.value===value) || HIRE_OPTIONS[0]
   return <span style={{background:o.bg,color:o.color,fontSize:'11px',fontWeight:700,padding:'3px 9px',borderRadius:'5px'}}>{o.label}</span>
+}
+
+function StagePill({ value }) {
+  const s = value || 'Sourced'
+  const c = stageColor(s)
+  return <span style={{background:c+'22',color:c,fontSize:'11px',fontWeight:700,padding:'3px 9px',borderRadius:'5px',border:'1px solid '+c+'44'}}>{s}</span>
+}
+
+function scoreColor(s) {
+  const n = parseInt(s, 10)
+  if (isNaN(n)) return null
+  if (n >= 80) return '#8DC63F'
+  if (n >= 60) return '#fbbf24'
+  return '#f87171'
 }
 
 function fmtDate(iso) {
@@ -41,6 +69,9 @@ export default function CandidatesPage() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterHire, setFilterHire] = useState('')
+  const [filterStage, setFilterStage] = useState('')
+  const [filterRole, setFilterRole] = useState('')
+  const [sortBy, setSortBy] = useState('none')
   const [activeCard, setActiveCard] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [showImport, setShowImport] = useState(false)
@@ -48,6 +79,23 @@ export default function CandidatesPage() {
   const [importFileName, setImportFileName] = useState('')
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState('')
+  const [me, setMe] = useState({ name:'', email:'' })
+
+  // recruiting-target role used for AI scoring + outreach
+  const [roleTarget, setRoleTarget] = useState('')
+  // scoring
+  const [scoringId, setScoringId] = useState(null)
+  const [aiBanner, setAiBanner] = useState('')
+  // outreach
+  const [outreachCard, setOutreachCard] = useState(null)
+  const [draft, setDraft] = useState({ subject:'', body:'' })
+  const [draftLoading, setDraftLoading] = useState(false)
+  const [draftUsedAI, setDraftUsedAI] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [outreachErr, setOutreachErr] = useState('')
+  // application link
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -55,8 +103,15 @@ export default function CandidatesPage() {
       window.location.href = '/admin/dashboard'
       return
     }
+    setMe({ name: u.name || '', email: u.email || '' })
+    try { const r = localStorage.getItem('xantie_role_target'); if (r) setRoleTarget(r) } catch(e) {}
     load()
   }, [])
+
+  function saveRoleTarget(v) {
+    setRoleTarget(v)
+    try { localStorage.setItem('xantie_role_target', v) } catch(e) {}
+  }
 
   async function load() {
     setLoading(true)
@@ -69,7 +124,7 @@ export default function CandidatesPage() {
 
   function openAdd() {
     setEditId(null)
-    setForm({wouldHire:''})
+    setForm({ wouldHire:'', roleType:'Either', stage:'Sourced' })
     setShowModal(true)
   }
 
@@ -85,6 +140,7 @@ export default function CandidatesPage() {
     setSaving(true)
     const body = { action: editId ? 'update' : 'add', ...form }
     if (editId) body.id = editId
+    else body.addedBy = me.name || me.email || ''
     await fetch('/api/candidates', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
     setShowModal(false)
     setSaving(false)
@@ -98,15 +154,84 @@ export default function CandidatesPage() {
     load()
   }
 
-  const filtered = candidates.filter(c => {
+  // ── AI SCORING ──
+  async function scoreOne(c) {
+    setScoringId(c.id)
+    setAiBanner('')
+    try {
+      const res = await fetch('/api/candidates/score', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id: c.id, candidate: c, role: roleTarget })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCandidates(prev => prev.map(x => x.id===c.id ? { ...x, score:String(data.score), scoreReason:data.scoreReason } : x))
+        if (activeCard && activeCard.id === c.id) setActiveCard(a => ({ ...a, score:String(data.score), scoreReason:data.scoreReason }))
+      } else if (data.error === 'not_configured') {
+        setAiBanner(data.message || 'AI scoring is off. Add ANTHROPIC_API_KEY to enable it.')
+      } else {
+        setAiBanner(data.message || 'Scoring failed.')
+      }
+    } catch(e) { setAiBanner('Scoring failed: ' + e.message) }
+    setScoringId(null)
+  }
+
+  // ── AI OUTREACH ──
+  async function openOutreach(c) {
+    setOutreachCard(c)
+    setActiveCard(null)
+    setDraft({ subject:'', body:'' })
+    setDraftUsedAI(false)
+    setSent(false)
+    setOutreachErr('')
+    setDraftLoading(true)
+    try {
+      const res = await fetch('/api/candidates/outreach', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mode:'draft', candidate:c, role:roleTarget, sender: me.name || 'The Xantie Team' })
+      })
+      const data = await res.json()
+      if (data.success) { setDraft({ subject:data.subject||'', body:data.body||'' }); setDraftUsedAI(!!data.usedAI) }
+      else setOutreachErr(data.error || 'Could not draft a message.')
+    } catch(e) { setOutreachErr('Draft failed: ' + e.message) }
+    setDraftLoading(false)
+  }
+
+  async function sendOutreach() {
+    if (!outreachCard) return
+    if (!outreachCard.email) { setOutreachErr('This candidate has no email address.'); return }
+    setSending(true); setOutreachErr('')
+    try {
+      const res = await fetch('/api/candidates/outreach', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mode:'send', id: outreachCard.id, candidate: outreachCard, email: outreachCard.email, subject: draft.subject, body: draft.body })
+      })
+      const data = await res.json()
+      if (data.success) { setSent(true); load() }
+      else setOutreachErr(data.error || 'Send failed.')
+    } catch(e) { setOutreachErr('Send failed: ' + e.message) }
+    setSending(false)
+  }
+
+  function copyApplyLink() {
+    const url = (typeof window !== 'undefined' ? window.location.origin : 'https://crm.xantie.com') + '/apply'
+    try { navigator.clipboard.writeText(url); setCopied(true); setTimeout(()=>setCopied(false), 1800) } catch(e) {}
+  }
+
+  let filtered = candidates.filter(c => {
     if (filterHire && c.wouldHire !== filterHire) return false
+    if (filterStage && stageOf(c) !== filterStage) return false
+    if (filterRole && (c.roleType || 'Either') !== filterRole) return false
     if (search) {
       const s = search.toLowerCase()
-      const match = ['name','email','location','skillset','source','notes','certifications'].some(k => (c[k]||'').toLowerCase().includes(s))
+      const match = ['name','email','location','skillset','source','notes','certifications','roleType','stage'].some(k => (c[k]||'').toLowerCase().includes(s))
       if (!match) return false
     }
     return true
   })
+  if (sortBy === 'score') {
+    filtered = [...filtered].sort((a,b) => (parseInt(b.score,10)||-1) - (parseInt(a.score,10)||-1))
+  }
 
   // ── IMPORT HELPERS ──
   function loadSheetJS() {
@@ -124,46 +249,32 @@ export default function CandidatesPage() {
     return String(k||'').toLowerCase().replace(/[^a-z0-9]/g,'')
   }
 
-  // Map header text variants → our internal field names
   const HEADER_MAP = {
-    name: 'name',
-    fullname: 'name',
-    email: 'email',
-    emailaddress: 'email',
-    contactlocation: 'location',
-    location: 'location',
-    skillset: 'skillset',
-    skills: 'skillset',
-    link: 'linkedin',
-    linkedin: 'linkedin',
-    linkedinurl: 'linkedin',
-    resume: 'resume',
-    resumeurl: 'resume',
-    contactsource: 'source',
-    source: 'source',
+    name: 'name', fullname: 'name',
+    email: 'email', emailaddress: 'email',
+    phone: 'phone', phonenumber: 'phone',
+    contactlocation: 'location', location: 'location',
+    skillset: 'skillset', skills: 'skillset',
+    link: 'linkedin', linkedin: 'linkedin', linkedinurl: 'linkedin',
+    resume: 'resume', resumeurl: 'resume',
+    contactsource: 'source', source: 'source',
+    roletype: 'roleType', type: 'roleType', fulltimeorcontract: 'roleType',
+    stage: 'stage', pipeline: 'stage', pipelinestage: 'stage',
     firstcontactdate: 'firstContactDate',
     firstcontactmethod: 'firstContactMethod',
-    dateinterviewed: 'dateInterviewed',
-    interviewdate: 'dateInterviewed',
-    dateavailable: 'dateAvailable',
-    datehired: 'dateHired',
+    dateinterviewed: 'dateInterviewed', interviewdate: 'dateInterviewed',
+    dateavailable: 'dateAvailable', datehired: 'dateHired',
     wouldhire: 'wouldHire',
-    salaryrequirement: 'salaryRequirement',
-    salary: 'salaryRequirement',
+    salaryrequirement: 'salaryRequirement', salary: 'salaryRequirement', rate: 'salaryRequirement',
     notes: 'notes',
-    experienceyears: 'experienceYears',
-    experience: 'experienceYears',
-    yearsofexperience: 'experienceYears',
-    yearsexperience: 'experienceYears',
-    certifications: 'certifications',
-    certs: 'certifications',
+    experienceyears: 'experienceYears', experience: 'experienceYears', yearsofexperience: 'experienceYears', yearsexperience: 'experienceYears',
+    certifications: 'certifications', certs: 'certifications',
   }
 
   function excelDateToISO(val) {
     if (val === null || val === undefined || val === '') return ''
     if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().split('T')[0]
     if (typeof val === 'number') {
-      // Excel serial date
       const d = new Date(Math.round((val - 25569) * 86400 * 1000))
       if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
     }
@@ -183,15 +294,10 @@ export default function CandidatesPage() {
       const XLSX = await loadSheetJS()
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf, { cellDates: true })
-      // Prefer the "Candidates" sheet, otherwise the first one
       const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'candidates') || wb.SheetNames[0]
       const ws = wb.Sheets[sheetName]
       const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' })
-      if (!json.length) {
-        setImportError('No rows found in the file')
-        return
-      }
-      // Map columns
+      if (!json.length) { setImportError('No rows found in the file'); return }
       const mapped = json.map(row => {
         const c = {}
         for (const [k, v] of Object.entries(row)) {
@@ -203,8 +309,9 @@ export default function CandidatesPage() {
             c[internal] = v === null || v === undefined ? '' : String(v).trim()
           }
         }
+        if (c.addedBy === undefined) c.addedBy = (me.name || me.email || '') + ' (import)'
         return c
-      }).filter(c => c.name)  // require name
+      }).filter(c => c.name)
       setImportPreview(mapped)
     } catch(e) {
       setImportError('Failed to parse file: ' + e.message)
@@ -219,30 +326,26 @@ export default function CandidatesPage() {
         body: JSON.stringify({ action:'bulk_add', candidates: importPreview })})
       const data = await res.json()
       if (data.success) {
-        setShowImport(false)
-        setImportPreview([])
-        setImportFileName('')
-        load()
-      } else {
-        setImportError(data.error || 'Import failed')
-      }
-    } catch(e) {
-      setImportError(e.message)
-    }
+        setShowImport(false); setImportPreview([]); setImportFileName(''); load()
+      } else { setImportError(data.error || 'Import failed') }
+    } catch(e) { setImportError(e.message) }
     setImporting(false)
   }
 
-  // Group counts
-  const counts = HIRE_OPTIONS.slice(1).map(o => ({...o, count: candidates.filter(c => c.wouldHire === o.value).length }))
+  // Stage pipeline counts
+  const stageCounts = STAGES.map(s => ({ ...s, count: candidates.filter(c => stageOf(c) === s.value).length }))
 
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px',flexWrap:'wrap',gap:'12px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'12px'}}>
         <div>
           <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Candidates</h1>
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Recruiting pipeline · {candidates.length} total</p>
         </div>
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+          <button onClick={copyApplyLink} style={{background:'#1e1e1e',color:copied?'#8DC63F':'#9ca3af',border:'1px solid '+(copied?'#8DC63F':'#252525'),borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+            {copied ? 'Link copied' : 'Application link'}
+          </button>
           <a href="/admin/candidates/dashboard" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
             Dashboard
           </a>
@@ -255,23 +358,51 @@ export default function CandidatesPage() {
         </div>
       </div>
 
-      {/* Pipeline counts */}
-      <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}}>
-        {counts.map(o => (
-          <button key={o.value} onClick={()=>setFilterHire(filterHire===o.value?'':o.value)}
-            style={{background:filterHire===o.value?o.bg:'#141414',border:'1px solid '+(filterHire===o.value?o.color:'#1e1e1e'),color:filterHire===o.value?o.color:'#9ca3af',borderRadius:'10px',padding:'10px 14px',fontSize:'12px',fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'}}>
-            <span>{o.label}</span>
-            <span style={{background:'rgba(0,0,0,0.4)',padding:'2px 8px',borderRadius:'10px',fontSize:'11px'}}>{o.count}</span>
+      {/* Role target for AI */}
+      <div style={{background:'#111',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'12px 14px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+        <span style={{color:'#6b7280',fontSize:'12px',fontWeight:600,whiteSpace:'nowrap'}}>Role target</span>
+        <input value={roleTarget} onChange={e=>saveRoleTarget(e.target.value)} placeholder="Data Engineer — full-time or contract (default). Add specifics: Snowflake + dbt, senior, remote..."
+          style={{...inp, flex:'1 1 320px', width:'auto', background:'#0f0f0f'}}/>
+        <span style={{color:'#4b5563',fontSize:'11px'}}>Used for AI scoring &amp; outreach</span>
+      </div>
+
+      {aiBanner && (
+        <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',color:'#fbbf24',borderRadius:'8px',padding:'10px 14px',marginBottom:'16px',fontSize:'13px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px'}}>
+          <span>{aiBanner}</span>
+          <button onClick={()=>setAiBanner('')} style={{background:'none',border:'none',color:'#fbbf24',cursor:'pointer',fontSize:'16px'}}>✕</button>
+        </div>
+      )}
+
+      {/* Stage pipeline */}
+      <div style={{display:'flex',gap:'6px',marginBottom:'14px',flexWrap:'wrap'}}>
+        {stageCounts.map(s => (
+          <button key={s.value} onClick={()=>setFilterStage(filterStage===s.value?'':s.value)}
+            style={{background:filterStage===s.value?s.color+'22':'#141414',border:'1px solid '+(filterStage===s.value?s.color:'#1e1e1e'),color:filterStage===s.value?s.color:'#9ca3af',borderRadius:'10px',padding:'9px 13px',fontSize:'12px',fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:'7px'}}>
+            <span style={{width:'7px',height:'7px',borderRadius:'50%',background:s.color}}/>
+            <span>{s.value}</span>
+            <span style={{background:'rgba(0,0,0,0.4)',padding:'1px 7px',borderRadius:'10px',fontSize:'11px'}}>{s.count}</span>
           </button>
         ))}
       </div>
 
-      {/* Search */}
+      {/* Controls */}
       <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'20px',alignItems:'center'}}>
         <input placeholder="Search name, email, skills, notes..." value={search} onChange={e=>setSearch(e.target.value)}
-          style={{...inp, width:'auto', flex:'1 1 280px'}}/>
-        {(search||filterHire) && (
-          <button onClick={()=>{setSearch('');setFilterHire('')}}
+          style={{...inp, width:'auto', flex:'1 1 240px'}}/>
+        <select value={filterRole} onChange={e=>setFilterRole(e.target.value)} style={{...inp,width:'auto',cursor:'pointer'}}>
+          <option value="">All types</option>
+          {ROLE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select value={filterHire} onChange={e=>setFilterHire(e.target.value)} style={{...inp,width:'auto',cursor:'pointer'}}>
+          <option value="">All verdicts</option>
+          {HIRE_OPTIONS.slice(1).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{...inp,width:'auto',cursor:'pointer'}}>
+          <option value="none">Sort: default</option>
+          <option value="score">Sort: AI score</option>
+        </select>
+        {(search||filterHire||filterStage||filterRole||sortBy!=='none') && (
+          <button onClick={()=>{setSearch('');setFilterHire('');setFilterStage('');setFilterRole('');setSortBy('none')}}
             style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'9px 14px',fontSize:'12px',cursor:'pointer'}}>Clear</button>
         )}
         <span style={{color:'#6b7280',fontSize:'12px'}}>{filtered.length} shown</span>
@@ -281,31 +412,38 @@ export default function CandidatesPage() {
 
       {!loading && candidates.length === 0 && (
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'48px',textAlign:'center'}}>
-          <p style={{color:'#6b7280',margin:'0 0 16px'}}>No candidates yet. Add the first one to start tracking.</p>
+          <p style={{color:'#6b7280',margin:'0 0 16px'}}>No candidates yet. Add one, import a list, or share your application link.</p>
           <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ Add First Candidate</button>
         </div>
       )}
 
       {!loading && filtered.length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-          {filtered.map(c => (
+          {filtered.map(c => {
+            const sc = scoreColor(c.score)
+            return (
             <div key={c.id} onClick={()=>setActiveCard(c)}
               style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'14px 16px',cursor:'pointer',transition:'border-color 0.15s'}}
               onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
               onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}>
               <div style={{display:'flex',alignItems:'flex-start',gap:'12px',flexWrap:'wrap'}}>
                 <div style={{flex:'1 1 220px', minWidth:0}}>
-                  <div style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                    <span style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</span>
+                    {c.roleType && c.roleType!=='Either' && <span style={{fontSize:'10px',color:'#9ca3af',border:'1px solid #2a2a2a',borderRadius:'5px',padding:'1px 6px'}}>{c.roleType}</span>}
+                  </div>
                   <div style={{fontSize:'12px',color:'#6b7280',marginTop:'2px'}}>{c.email||'—'} {c.location?'· '+c.location:''}</div>
                   {c.skillset && <div style={{fontSize:'12px',color:'#9ca3af',marginTop:'4px',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:1,WebkitBoxOrient:'vertical'}}>{c.skillset}</div>}
                 </div>
-                <div style={{display:'flex',gap:'10px',alignItems:'center',flexShrink:0}}>
+                <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                  {sc && <span title={c.scoreReason||''} style={{background:sc+'22',color:sc,border:'1px solid '+sc+'55',fontSize:'11px',fontWeight:800,padding:'3px 8px',borderRadius:'5px'}}>{c.score}</span>}
                   {c.experienceYears && <span style={{fontSize:'11px',color:'#6b7280'}}>{c.experienceYears} yrs</span>}
+                  <StagePill value={stageOf(c)}/>
                   <HireBadge value={c.wouldHire}/>
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 
@@ -324,9 +462,27 @@ export default function CandidatesPage() {
             </div>
 
             <div style={{display:'flex',gap:'10px',alignItems:'center',marginBottom:'16px',flexWrap:'wrap'}}>
+              <StagePill value={stageOf(activeCard)}/>
+              {activeCard.roleType && <span style={{color:'#9ca3af',fontSize:'12px',border:'1px solid #2a2a2a',borderRadius:'5px',padding:'2px 8px'}}>{activeCard.roleType}</span>}
               <HireBadge value={activeCard.wouldHire}/>
-              {activeCard.experienceYears && <span style={{color:'#9ca3af',fontSize:'12px'}}>{activeCard.experienceYears} years experience</span>}
+              {activeCard.experienceYears && <span style={{color:'#9ca3af',fontSize:'12px'}}>{activeCard.experienceYears} yrs</span>}
               {activeCard.salaryRequirement && <span style={{color:'#9ca3af',fontSize:'12px'}}>${activeCard.salaryRequirement}</span>}
+            </div>
+
+            {/* AI score block */}
+            <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'12px 14px',marginBottom:'14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+              {scoreColor(activeCard.score) ? (
+                <>
+                  <span style={{background:scoreColor(activeCard.score)+'22',color:scoreColor(activeCard.score),border:'1px solid '+scoreColor(activeCard.score)+'55',fontSize:'15px',fontWeight:800,padding:'4px 12px',borderRadius:'8px'}}>{activeCard.score}</span>
+                  <span style={{flex:1,minWidth:'160px',color:'#9ca3af',fontSize:'12px'}}>{activeCard.scoreReason||'AI fit score'}</span>
+                </>
+              ) : (
+                <span style={{flex:1,minWidth:'160px',color:'#6b7280',fontSize:'12px'}}>Not scored yet</span>
+              )}
+              <button onClick={()=>scoreOne(activeCard)} disabled={scoringId===activeCard.id}
+                style={{background:'#1e1e1e',border:'1px solid #2a2a2a',color:'#8DC63F',borderRadius:'8px',padding:'7px 14px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+                {scoringId===activeCard.id ? 'Scoring...' : (scoreColor(activeCard.score) ? 'Re-score' : 'Score fit')}
+              </button>
             </div>
 
             {activeCard.skillset && (
@@ -338,7 +494,9 @@ export default function CandidatesPage() {
 
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'10px',marginBottom:'14px'}}>
               {activeCard.source && <div><label style={lbl}>Source</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{activeCard.source}</div></div>}
+              {activeCard.addedBy && <div><label style={lbl}>Added by</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{activeCard.addedBy}</div></div>}
               {activeCard.firstContactDate && <div><label style={lbl}>First Contact</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.firstContactDate)} {activeCard.firstContactMethod?'· '+activeCard.firstContactMethod:''}</div></div>}
+              {activeCard.lastContactedAt && <div><label style={lbl}>Last Contacted</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.lastContactedAt)}</div></div>}
               {activeCard.dateInterviewed && <div><label style={lbl}>Interviewed</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.dateInterviewed)}</div></div>}
               {activeCard.dateAvailable && <div><label style={lbl}>Available</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.dateAvailable)}</div></div>}
               {activeCard.dateHired && <div><label style={lbl}>Hired</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.dateHired)}</div></div>}
@@ -361,8 +519,63 @@ export default function CandidatesPage() {
 
             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'18px',flexWrap:'wrap'}}>
               <button onClick={()=>setConfirmDelete(activeCard.id)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:'pointer'}}>Delete</button>
+              <button onClick={()=>openOutreach(activeCard)} disabled={!activeCard.email} title={activeCard.email?'':'No email on file'}
+                style={{background:activeCard.email?'#1e1e1e':'#161616',border:'1px solid #252525',color:activeCard.email?'#8DC63F':'#4b5563',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,cursor:activeCard.email?'pointer':'not-allowed'}}>Draft outreach</button>
               <button onClick={()=>openEdit(activeCard)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Edit</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Outreach Modal */}
+      {outreachCard && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1150,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
+          onClick={()=>setOutreachCard(null)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'620px',maxWidth:'100%',maxHeight:'92vh',overflowY:'auto'}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6px',gap:'10px'}}>
+              <h2 style={{fontSize:'18px',fontWeight:700,margin:0}}>Outreach to {outreachCard.name}</h2>
+              <button onClick={()=>setOutreachCard(null)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1}}>✕</button>
+            </div>
+            <p style={{fontSize:'12px',color:'#6b7280',margin:'0 0 16px'}}>
+              To: {outreachCard.email} · {draftUsedAI ? 'AI-personalized draft' : 'Template draft'} · review before sending
+            </p>
+
+            {sent ? (
+              <div style={{background:'rgba(141,198,63,0.1)',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'10px',padding:'24px',textAlign:'center'}}>
+                <div style={{color:'#8DC63F',fontSize:'15px',fontWeight:700,marginBottom:'4px'}}>Email sent ✓</div>
+                <div style={{color:'#9ca3af',fontSize:'13px'}}>{outreachCard.name} was moved to “Contacted”.</div>
+                <button onClick={()=>setOutreachCard(null)} style={{marginTop:'16px',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Done</button>
+              </div>
+            ) : (
+              <>
+                {draftLoading ? (
+                  <div style={{color:'#6b7280',textAlign:'center',padding:'40px'}}>Drafting message...</div>
+                ) : (
+                  <>
+                    <div style={{marginBottom:'12px'}}>
+                      <label style={lbl}>Subject</label>
+                      <input value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})} style={inp}/>
+                    </div>
+                    <div style={{marginBottom:'14px'}}>
+                      <label style={lbl}>Message</label>
+                      <textarea rows={10} value={draft.body} onChange={e=>setDraft({...draft,body:e.target.value})} style={{...inp,resize:'vertical',lineHeight:1.6}}/>
+                    </div>
+                    {outreachErr && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{outreachErr}</div>}
+                    <div style={{display:'flex',gap:'8px',justifyContent:'space-between',flexWrap:'wrap'}}>
+                      <button onClick={()=>openOutreach(outreachCard)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',cursor:'pointer'}}>Re-draft</button>
+                      <div style={{display:'flex',gap:'8px'}}>
+                        <button onClick={()=>setOutreachCard(null)} style={{background:'#252525',border:'none',color:'#9ca3af',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+                        <button onClick={sendOutreach} disabled={sending||!draft.subject||!draft.body}
+                          style={{background:(draft.subject&&draft.body)?'#8DC63F':'#2a2a2a',color:(draft.subject&&draft.body)?'#0a0a0a':'#4b5563',border:'none',borderRadius:'8px',padding:'10px 20px',fontSize:'13px',fontWeight:700,cursor:(draft.subject&&draft.body)?'pointer':'not-allowed'}}>
+                          {sending?'Sending...':'Send email'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -378,13 +591,29 @@ export default function CandidatesPage() {
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
               <div><label style={lbl}>Name *</label><input value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} style={inp}/></div>
               <div><label style={lbl}>Email</label><input value={form.email||''} onChange={e=>setForm({...form,email:e.target.value})} style={inp}/></div>
+              <div><label style={lbl}>Phone</label><input value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})} style={inp}/></div>
               <div><label style={lbl}>Location</label><input value={form.location||''} onChange={e=>setForm({...form,location:e.target.value})} style={inp}/></div>
-              <div><label style={lbl}>Source</label><input placeholder="LinkedIn, Indeed, Referral..." value={form.source||''} onChange={e=>setForm({...form,source:e.target.value})} style={inp}/></div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',marginBottom:'12px'}}>
+              <div>
+                <label style={lbl}>Role Type</label>
+                <select value={form.roleType||'Either'} onChange={e=>setForm({...form,roleType:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                  {ROLE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Stage</label>
+                <select value={form.stage||'Sourced'} onChange={e=>setForm({...form,stage:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                  {STAGES.map(s => <option key={s.value} value={s.value}>{s.value}</option>)}
+                </select>
+              </div>
+              <div><label style={lbl}>Source</label><input placeholder="LinkedIn, Referral..." value={form.source||''} onChange={e=>setForm({...form,source:e.target.value})} style={inp}/></div>
             </div>
 
             <div style={{marginBottom:'12px'}}>
               <label style={lbl}>Skills</label>
-              <textarea rows={2} value={form.skillset||''} onChange={e=>setForm({...form,skillset:e.target.value})} placeholder="SQL, Python, Tableau, Power BI..." style={{...inp,resize:'vertical'}}/>
+              <textarea rows={2} value={form.skillset||''} onChange={e=>setForm({...form,skillset:e.target.value})} placeholder="SQL, Python, Spark, dbt, Airflow, Snowflake..." style={{...inp,resize:'vertical'}}/>
             </div>
 
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
@@ -408,7 +637,7 @@ export default function CandidatesPage() {
 
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'12px'}}>
               <div><label style={lbl}>Experience (Years)</label><input type="number" value={form.experienceYears||''} onChange={e=>setForm({...form,experienceYears:e.target.value})} style={inp}/></div>
-              <div><label style={lbl}>Salary Requirement</label><input value={form.salaryRequirement||''} onChange={e=>setForm({...form,salaryRequirement:e.target.value})} placeholder="120000 or 120k-140k" style={inp}/></div>
+              <div><label style={lbl}>Salary / Rate</label><input value={form.salaryRequirement||''} onChange={e=>setForm({...form,salaryRequirement:e.target.value})} placeholder="120000 or $90/hr" style={inp}/></div>
             </div>
 
             <div style={{marginBottom:'12px'}}>
@@ -448,7 +677,7 @@ export default function CandidatesPage() {
                 {importFileName ? '' + importFileName : 'Choose file...'}
               </label>
               <div style={{fontSize:'11px',color:'#6b7280',marginTop:'8px'}}>
-                Recognized columns: Name, Email, Location, Skillset, LinkedIn (Link), Resume, Source, Date fields, Would Hire, Salary, Notes, Experience, Certifications
+                Recognized columns: Name, Email, Phone, Location, Skillset, LinkedIn, Resume, Source, Role Type, Stage, Date fields, Would Hire, Salary/Rate, Notes, Experience, Certifications
               </div>
             </div>
 
@@ -470,7 +699,7 @@ export default function CandidatesPage() {
                       <div key={i} style={{padding:'10px 14px',borderBottom: i < 4 ? '1px solid #1e1e1e' : 'none'}}>
                         <div style={{fontSize:'13px',fontWeight:600,color:'#fff'}}>{c.name}</div>
                         <div style={{fontSize:'11px',color:'#6b7280',marginTop:'2px'}}>
-                          {c.email||'no email'} {c.location?'· '+c.location:''} {c.wouldHire?'· '+c.wouldHire:''}
+                          {c.email||'no email'} {c.location?'· '+c.location:''} {c.roleType?'· '+c.roleType:''}
                         </div>
                         {c.skillset && <div style={{fontSize:'11px',color:'#9ca3af',marginTop:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.skillset}</div>}
                       </div>

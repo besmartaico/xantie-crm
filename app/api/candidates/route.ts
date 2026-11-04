@@ -15,14 +15,31 @@ function getSheets() {
 const SID = () => process.env.GOOGLE_SHEETS_ID
 function uid() { return Date.now().toString(36)+Math.random().toString(36).substr(2,5) }
 
-const COLS = ['id','name','email','location','skillset','linkedin','resume','source','firstContactDate','firstContactMethod','dateInterviewed','dateAvailable','dateHired','wouldHire','salaryRequirement','notes','experienceYears','certifications','status','createdAt']
+// Spreadsheet column letter for a 1-based index (1->A, 26->Z, 27->AA).
+function colLetter(n) {
+  let s = ''
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26) }
+  return s
+}
+
+// IMPORTANT: new fields are APPENDED after the original 20 columns so existing
+// rows (written with the A..T layout) are not shifted. Reads are position-based.
+const COLS = [
+  'id','name','email','location','skillset','linkedin','resume','source',
+  'firstContactDate','firstContactMethod','dateInterviewed','dateAvailable','dateHired',
+  'wouldHire','salaryRequirement','notes','experienceYears','certifications','status','createdAt',
+  // ── appended (recruiting automation) ──
+  'roleType','stage','phone','score','scoreReason','addedBy','lastContactedAt',
+]
+const LAST = colLetter(COLS.length)
+const SHEET = 'Candidates'
 
 async function ensureSheet(sheets) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
-  if (!meta.data.sheets.find(s=>s.properties.title==='Candidates')) {
-    await sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests:[{ addSheet:{ properties:{ title:'Candidates' } } }] } })
+  if (!meta.data.sheets.find(s=>s.properties.title===SHEET)) {
+    await sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests:[{ addSheet:{ properties:{ title:SHEET } } }] } })
     await sheets.spreadsheets.values.update({
-      spreadsheetId: SID(), range: "'Candidates'!A1:T1",
+      spreadsheetId: SID(), range: `'${SHEET}'!A1:${LAST}1`,
       valueInputOption: 'RAW', requestBody: { values: [COLS] }
     })
   }
@@ -30,7 +47,7 @@ async function ensureSheet(sheets) {
 
 async function getRows(sheets) {
   try {
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: "'Candidates'!A2:T200000" })
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `'${SHEET}'!A2:${LAST}200000` })
     return r.data.values || []
   } catch(e) { return [] }
 }
@@ -44,6 +61,8 @@ function rowToObj(r) {
 function objToRow(o) {
   return COLS.map(c => o[c] ?? '')
 }
+
+function rowRange(rowNum) { return `'${SHEET}'!A${rowNum}:${LAST}${rowNum}` }
 
 export async function GET() {
   try {
@@ -68,10 +87,15 @@ export async function POST(req) {
       const rows = await getRows(sheets)
       const startRow = rows.length + 2
       const now = new Date().toISOString()
-      const newRows = incoming.map(c => objToRow({ ...c, id: uid(), status: c.status||'active', createdAt: now }))
+      const newRows = incoming.map(c => objToRow({
+        ...c, id: uid(),
+        status: c.status||'active',
+        stage: c.stage || 'Sourced',
+        createdAt: now,
+      }))
       const endRow = startRow + newRows.length - 1
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `'Candidates'!A${startRow}:T${endRow}`,
+        spreadsheetId: SID(), range: `'${SHEET}'!A${startRow}:${LAST}${endRow}`,
         valueInputOption: 'RAW',
         requestBody: { values: newRows }
       })
@@ -82,9 +106,14 @@ export async function POST(req) {
       const rows = await getRows(sheets)
       const nextRow = rows.length + 2
       const id = uid()
-      const newCandidate = { ...body, id, status: body.status||'active', createdAt: new Date().toISOString() }
+      const newCandidate = {
+        ...body, id,
+        status: body.status||'active',
+        stage: body.stage || 'Sourced',
+        createdAt: new Date().toISOString(),
+      }
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `'Candidates'!A${nextRow}:T${nextRow}`,
+        spreadsheetId: SID(), range: rowRange(nextRow),
         valueInputOption: 'RAW',
         requestBody: { values: [objToRow(newCandidate)] }
       })
@@ -99,7 +128,27 @@ export async function POST(req) {
       const cur = rowToObj(rows[idx])
       const merged = { ...cur, ...body, id: cur.id, createdAt: cur.createdAt }
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SID(), range: `'Candidates'!A${rowNum}:T${rowNum}`,
+        spreadsheetId: SID(), range: rowRange(rowNum),
+        valueInputOption: 'RAW',
+        requestBody: { values: [objToRow(merged)] }
+      })
+      return NextResponse.json({ success: true })
+    }
+
+    // Record that a candidate was contacted; optionally advance the pipeline stage.
+    if (body.action === 'log_contact') {
+      const rows = await getRows(sheets)
+      const idx = rows.findIndex(r => r[0] === body.id)
+      if (idx === -1) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+      const rowNum = idx + 2
+      const cur = rowToObj(rows[idx])
+      const merged = {
+        ...cur,
+        lastContactedAt: new Date().toISOString(),
+        stage: (cur.stage === '' || cur.stage === 'Sourced') ? 'Contacted' : cur.stage,
+      }
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SID(), range: rowRange(rowNum),
         valueInputOption: 'RAW',
         requestBody: { values: [objToRow(merged)] }
       })
@@ -111,7 +160,7 @@ export async function POST(req) {
       const idx = rows.findIndex(r => r[0] === body.id)
       if (idx === -1) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
       const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
-      const sheetId = meta.data.sheets.find(s=>s.properties.title==='Candidates').properties.sheetId
+      const sheetId = meta.data.sheets.find(s=>s.properties.title===SHEET).properties.sheetId
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SID(),
         requestBody: { requests: [{ deleteDimension: { range: { sheetId, dimension:'ROWS', startIndex: idx+1, endIndex: idx+2 } } }] }
