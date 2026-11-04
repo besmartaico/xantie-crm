@@ -63,6 +63,7 @@ export default function SalesCrmPage() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('')
+  const [currentUser, setCurrentUser] = useState({})
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -70,6 +71,7 @@ export default function SalesCrmPage() {
       window.location.href = '/admin/dashboard'
       return
     }
+    setCurrentUser(u)
     load()
   }, [])
 
@@ -90,7 +92,7 @@ export default function SalesCrmPage() {
   function openAdd(type) {
     setModalType(type)
     setEditId(null)
-    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : type==='contacts' ? {createdAt: new Date().toISOString()} : {})
+    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : type==='contacts' ? {createdAt: new Date().toISOString(), createdBy: currentUser.name || currentUser.email || ''} : {})
     setShowModal(true)
     setActiveCard(null)
   }
@@ -288,11 +290,22 @@ export default function SalesCrmPage() {
         })
         // newest first
         const sorted = [...filteredContacts].sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''))
-        // counts by day (overview)
+        // per-partner, per-day breakdown
+        const partnerOf = c => (c.createdBy && c.createdBy.trim()) ? c.createdBy.trim() : 'Unknown'
         const byDay = {}
-        sorted.forEach(c => { const day = (c.createdAt||'').slice(0,10); if (!day) return; if (!byDay[day]) byDay[day] = { count:0, iso:c.createdAt }; byDay[day].count++ })
+        const partnerSet = new Set()
+        sorted.forEach(c => {
+          const day = (c.createdAt||'').slice(0,10); if (!day) return
+          const p = partnerOf(c); partnerSet.add(p)
+          if (!byDay[day]) byDay[day] = { iso:c.createdAt, byPartner:{}, total:0 }
+          byDay[day].byPartner[p] = (byDay[day].byPartner[p]||0) + 1
+          byDay[day].total++
+        })
         const dayKeys = Object.keys(byDay).sort().reverse()
-        const maxCount = Math.max(1, ...dayKeys.map(k => byDay[k].count))
+        const partners = [...partnerSet].sort((a,b) => a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
+        const partnerTotals = {}
+        partners.forEach(p => { partnerTotals[p] = dayKeys.reduce((s,d) => s + (byDay[d].byPartner[p]||0), 0) })
+        const grandTotal = dayKeys.reduce((s,d) => s + byDay[d].total, 0)
         return (
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px',gap:'10px',flexWrap:'wrap'}}>
@@ -300,21 +313,33 @@ export default function SalesCrmPage() {
               <button onClick={()=>openAdd('contacts')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ New Contact</button>
             </div>
 
-            {/* Overview: contacts by day */}
+            {/* Overview: contacts by day, broken out by partner */}
             {dayKeys.length > 0 && (
-              <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'14px'}}>
-                <h3 style={{fontSize:'11px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Contacts by day</h3>
-                <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
-                  {dayKeys.map(k => (
-                    <div key={k} style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                      <div style={{width:'140px',fontSize:'12px',color:'#9ca3af',flexShrink:0}}>{fmtDate(byDay[k].iso)}</div>
-                      <div style={{flex:1,height:'8px',background:'#1a1a1a',borderRadius:'4px',overflow:'hidden'}}>
-                        <div style={{height:'100%',width:(byDay[k].count/maxCount*100)+'%',background:'#8DC63F',borderRadius:'4px'}}/>
-                      </div>
-                      <div style={{width:'34px',textAlign:'right',fontSize:'13px',fontWeight:700,color:'#8DC63F'}}>{byDay[k].count}</div>
-                    </div>
-                  ))}
-                </div>
+              <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'16px',marginBottom:'14px',overflowX:'auto'}}>
+                <h3 style={{fontSize:'11px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'0 0 12px'}}>Contacts by day · by partner</h3>
+                <table style={{borderCollapse:'collapse',width:'100%',minWidth:(170 + partners.length*70 + 60)+'px'}}>
+                  <thead>
+                    <tr>
+                      <th style={{textAlign:'left',padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Day</th>
+                      {partners.map(p => <th key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'11px',color:'#9ca3af',fontWeight:700,whiteSpace:'nowrap'}}>{p}</th>)}
+                      <th style={{textAlign:'right',padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dayKeys.map(d => (
+                      <tr key={d} style={{borderTop:'1px solid #1a1a1a'}}>
+                        <td style={{padding:'6px 8px',fontSize:'12px',color:'#d1d5db',whiteSpace:'nowrap'}}>{fmtDate(byDay[d].iso)}</td>
+                        {partners.map(p => <td key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'13px',color: byDay[d].byPartner[p]?'#fff':'#3a3a3a'}}>{byDay[d].byPartner[p]||'·'}</td>)}
+                        <td style={{textAlign:'right',padding:'6px 8px',fontSize:'13px',fontWeight:700,color:'#8DC63F'}}>{byDay[d].total}</td>
+                      </tr>
+                    ))}
+                    <tr style={{borderTop:'2px solid #252525'}}>
+                      <td style={{padding:'6px 8px',fontSize:'11px',color:'#6b7280',fontWeight:700,textTransform:'uppercase'}}>Total</td>
+                      {partners.map(p => <td key={p} style={{textAlign:'center',padding:'6px 8px',fontSize:'13px',fontWeight:700,color:'#9ca3af'}}>{partnerTotals[p]}</td>)}
+                      <td style={{textAlign:'right',padding:'6px 8px',fontSize:'14px',fontWeight:800,color:'#8DC63F'}}>{grandTotal}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
 
@@ -333,8 +358,11 @@ export default function SalesCrmPage() {
                       {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
                     </div>
                     {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'240px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
-                    <div style={{fontSize:'11px',color:'#6b7280',whiteSpace:'nowrap',minWidth:'92px',textAlign:'right'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
+                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
+                    <div style={{whiteSpace:'nowrap',minWidth:'110px',textAlign:'right'}}>
+                      {c.createdBy && <div style={{fontSize:'11px',color:'#9ca3af',fontWeight:600}}>{c.createdBy}</div>}
+                      <div style={{fontSize:'11px',color:'#6b7280'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -455,6 +483,10 @@ export default function SalesCrmPage() {
 
             {activeCard.type==='contacts' && (
               <div style={{marginBottom:'12px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'10px',marginBottom:'12px'}}>
+                  {activeCard.data.createdBy && <div><label style={lbl}>Added by</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{activeCard.data.createdBy}</div></div>}
+                  {activeCard.data.createdAt && <div><label style={lbl}>Date</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.data.createdAt)}</div></div>}
+                </div>
                 {activeCard.data.url && <div style={{marginBottom:'12px'}}><label style={lbl}>URL</label><a href={normalizeUrl(activeCard.data.url)} target="_blank" rel="noopener noreferrer" style={{color:'#8DC63F',fontSize:'13px',wordBreak:'break-all'}}>{activeCard.data.url}</a></div>}
                 {activeCard.data.notes && <div><label style={lbl}>Notes</label><div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'10px 14px',color:'#d1d5db',fontSize:'13px',whiteSpace:'pre-wrap'}}>{activeCard.data.notes}</div></div>}
               </div>

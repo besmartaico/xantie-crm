@@ -18,13 +18,14 @@ function uid() { return Date.now().toString(36)+Math.random().toString(36).subst
 const FUNNEL_COLS = ['id','companyName','contactName','contactEmail','billingContact','projectDetails','notes','anticipatedRate','stage','duration','probability','resource','expectedRevenue','creationDate','lastInteractedOn','nextStep']
 const PROJECTS_COLS = ['id','billingCustomer','customerName','customerType','salesContact','salesEmail','invoicingEmail','startDate','endDate','rate','resource','notes','status','createdAt']
 const BENCH_COLS = ['id','name','status','rate','availabilityStart','notes','createdAt']
-const CONTACTS_COLS = ['id','name','url','notes','createdAt']
+// createdBy appended at the end so existing 5-column rows aren't shifted.
+const CONTACTS_COLS = ['id','name','url','notes','createdAt','createdBy']
 
 const SHEETS_CONFIG = {
   funnel:   { sheet:'Sales_Funnel',     cols: FUNNEL_COLS,   range: 'A2:P200000', headerRange: 'A1:P1' },
   projects: { sheet:'Current_Projects', cols: PROJECTS_COLS, range: 'A2:N200000', headerRange: 'A1:N1' },
   bench:    { sheet:'Bench',            cols: BENCH_COLS,    range: 'A2:G200000', headerRange: 'A1:G1' },
-  contacts: { sheet:'Sales_Contacts',   cols: CONTACTS_COLS, range: 'A2:E200000', headerRange: 'A1:E1' },
+  contacts: { sheet:'Sales_Contacts',   cols: CONTACTS_COLS, range: 'A2:F200000', headerRange: 'A1:F1' },
 }
 
 async function ensureSheet(sheets, key) {
