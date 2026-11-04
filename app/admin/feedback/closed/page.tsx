@@ -6,8 +6,8 @@ const inp = { width:'100%', background:'#111', border:'1px solid #252525', borde
 const lbl = { display:'block', color:'#6b7280', fontSize:'11px', fontWeight:600, marginBottom:'6px', textTransform:'uppercase', letterSpacing:'0.07em' }
 
 const TYPES = [
-  { value:'bug', label:'🐛 Bug' },
-  { value:'feature', label:'💡 Feature Request' },
+  { value:'bug', label:'Bug' },
+  { value:'feature', label:'Feature Request' },
 ]
 const PRIORITIES = [
   { value:'low', label:'Low', color:'#9ca3af' },
@@ -209,7 +209,7 @@ export default function ClosedFeedbackPage() {
 
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'18px'}}>
               {isAdmin && !editing && (
-                <button onClick={()=>setEditing(true)} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',cursor:'pointer'}}>✎ Edit</button>
+                <button onClick={()=>setEditing(true)} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',cursor:'pointer'}}>Edit</button>
               )}
               {editing && (
                 <>

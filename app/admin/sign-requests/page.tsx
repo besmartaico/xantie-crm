@@ -93,11 +93,11 @@ export default function SignRequestsListPage() {
                 </div>
               </div>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                <a href={'/admin/sign-requests/' + r.id} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📋 Log</a>
+                <a href={'/admin/sign-requests/' + r.id} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>Log</a>
                 {(r.status === 'ready_to_finalize' || r.status === 'pending_admin_post') && <a href={'/admin/sign-requests/' + r.id + '/finish'} style={{background:'#f97316',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Consolidate & finalize →</a>}
                 {r.status === 'pending_user' && <a href={'/sign/' + r.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>View signer link</a>}
-                {r.status === 'complete' && <a href={'/admin/sign-requests/' + r.id + '/finish'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>✎ Edit fields</a>}
-                {r.status === 'complete' && r.signedPdfUrl && <a href={r.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>⬇ Download</a>}
+                {r.status === 'complete' && <a href={'/admin/sign-requests/' + r.id + '/finish'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>Edit fields</a>}
+                {r.status === 'complete' && r.signedPdfUrl && <a href={r.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Download</a>}
                 <button onClick={()=>setConfirmDelete(r)} style={{background:'none',border:'none',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Delete</button>
               </div>
             </div>

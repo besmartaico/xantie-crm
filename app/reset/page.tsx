@@ -90,7 +90,7 @@ function ResetInner() {
         <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'28px'}}>
           {done ? (
             <div style={{textAlign:'center',padding:'16px 0'}}>
-              <div style={{fontSize:'40px',marginBottom:'12px'}}>✅</div>
+              <div style={{fontSize:'40px',marginBottom:'12px'}}></div>
               <h2 style={{margin:'0 0 8px',fontSize:'18px'}}>Password Updated</h2>
               <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 24px'}}>Your password has been set successfully.</p>
               <button onClick={()=>router.push('/login')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 24px',fontSize:'14px',fontWeight:700,cursor:'pointer',width:'100%'}}>

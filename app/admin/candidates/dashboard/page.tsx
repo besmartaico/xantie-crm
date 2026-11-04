@@ -335,8 +335,8 @@ export default function CandidateDashboard() {
                         <td style={{...td,textAlign:'right'}}>{c.experienceYears||''}</td>
                         <td style={td}>{c.location||''}</td>
                         <td style={td}>{fmtDate(c.dateInterviewed)}</td>
-                        <td style={{...td,textAlign:'center'}}>{c.linkedin?<a href={c.linkedin} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}>🔗</a>:''}</td>
-                        <td style={{...td,textAlign:'center'}}>{c.resume?<a href={c.resume} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}>📄</a>:''}</td>
+                        <td style={{...td,textAlign:'center'}}>{c.linkedin?<a href={c.linkedin} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}></a>:''}</td>
+                        <td style={{...td,textAlign:'center'}}>{c.resume?<a href={c.resume} target="_blank" rel="noopener" onClick={e=>e.stopPropagation()} style={{color:'#60a5fa',textDecoration:'none'}}></a>:''}</td>
                       </tr>
                     )
                   })}

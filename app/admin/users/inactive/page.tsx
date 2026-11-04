@@ -50,7 +50,7 @@ export default function InactiveUsersPage() {
 
       {!loading && users.length === 0 && (
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'56px',textAlign:'center'}}>
-          <div style={{fontSize:'36px',marginBottom:'12px'}}>✅</div>
+          <div style={{fontSize:'36px',marginBottom:'12px'}}></div>
           <p style={{color:'#6b7280',margin:0,fontSize:'15px'}}>No inactive users.</p>
         </div>
       )}

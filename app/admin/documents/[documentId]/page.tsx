@@ -78,7 +78,7 @@ export default function DocumentDetailPage({ params }) {
           ) : (
             <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px',flexWrap:'wrap'}}>
               <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>{doc.name}</h1>
-              <button onClick={()=>{setEditingName(true);setNameValue((doc.name||'').replace(/\.pdf$/i,''));setNameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'6px',padding:'4px 10px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>✎ Rename</button>
+              <button onClick={()=>{setEditingName(true);setNameValue((doc.name||'').replace(/\.pdf$/i,''));setNameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'6px',padding:'4px 10px',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>Rename</button>
             </div>
           )}
           {nameError && <div style={{color:'#f87171',fontSize:'12px',margin:'0 0 6px'}}>{nameError}</div>}
@@ -86,21 +86,21 @@ export default function DocumentDetailPage({ params }) {
 
           {fields.length === 0 && (
             <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'10px',padding:'14px 18px',marginBottom:'18px'}}>
-              <p style={{color:'#fbbf24',margin:'0 0 8px',fontSize:'13px',fontWeight:600}}>⚠ No fields placed yet</p>
+              <p style={{color:'#fbbf24',margin:'0 0 8px',fontSize:'13px',fontWeight:600}}>No fields placed yet</p>
               <p style={{color:'#9ca3af',fontSize:'12px',margin:0}}>You need to add signature, initials, text, or date fields before sending this document for signing.</p>
             </div>
           )}
 
           <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'24px'}}>
             <a href={'/admin/documents/' + resolvedParams.documentId + '/place-fields'}
-              style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>📍 Place / Edit Fields</a>
+              style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>Place / Edit Fields</a>
             {fields.length > 0 ? (
               <a href={'/admin/documents/' + resolvedParams.documentId + '/start'}
-                style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>🚀 Start signing process</a>
+                style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Start signing process</a>
             ) : (
-              <span style={{background:'#2a2a2a',color:'#4b5563',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700}}>🚀 Start signing process</span>
+              <span style={{background:'#2a2a2a',color:'#4b5563',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700}}>Start signing process</span>
             )}
-            <a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>📋 All sign requests</a>
+            <a href="/admin/sign-requests" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>All sign requests</a>
           </div>
 
           {fields.length > 0 && (

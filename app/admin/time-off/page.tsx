@@ -122,7 +122,7 @@ export default function TimeOffPage() {
         <div style={{maxWidth:'520px'}}>
           {submitted ? (
             <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'16px',padding:'40px',textAlign:'center'}}>
-              <div style={{fontSize:'44px',marginBottom:'14px'}}>✅</div>
+              <div style={{fontSize:'44px',marginBottom:'14px'}}></div>
               <h2 style={{margin:'0 0 10px',fontSize:'20px'}}>Request Submitted</h2>
               <p style={{color:'#9ca3af',fontSize:'14px',margin:'0 0 24px'}}>Jeff and Jared have been notified. You'll hear back soon.</p>
               <button onClick={()=>setSubmitted(false)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'11px 24px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
@@ -146,7 +146,7 @@ export default function TimeOffPage() {
 
               {startDate && endDate && (
                 <div style={{background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:'8px',padding:'10px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}>
-                  <span style={{fontSize:'20px'}}>📅</span>
+                  <span style={{fontSize:'20px'}}></span>
                   <span style={{fontSize:'14px',color:'#8DC63F',fontWeight:600}}>
                     {days} day{days!==1?'s':''} — {formatDate(startDate)}{startDate!==endDate?' to '+formatDate(endDate):''}
                   </span>
@@ -178,7 +178,7 @@ export default function TimeOffPage() {
           {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
           {!loading && myRequests.length===0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'56px',textAlign:'center'}}>
-              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}></div>
               <p style={{color:'#6b7280',margin:0}}>You haven't submitted any time off requests yet.</p>
             </div>
           )}
@@ -214,7 +214,7 @@ export default function TimeOffPage() {
           {loading && <div style={{color:'#6b7280',padding:'32px',textAlign:'center'}}>Loading...</div>}
           {!loading && allRequests.length===0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'56px',textAlign:'center'}}>
-              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}></div>
               <p style={{color:'#6b7280',margin:0}}>No time off requests yet.</p>
             </div>
           )}

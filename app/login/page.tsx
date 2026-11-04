@@ -212,7 +212,7 @@ export default function Login() {
           {mode === 'register' && regStep === '2a' && (
             <>
               <div style={{textAlign:'center',marginBottom:'20px'}}>
-                <div style={{fontSize:'32px',marginBottom:'12px'}}>👤</div>
+                <div style={{fontSize:'32px',marginBottom:'12px'}}></div>
                 <h3 style={{margin:'0 0 8px',fontSize:'17px'}}>Account Already Exists</h3>
                 <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 4px'}}>An account already exists for</p>
                 <p style={{color:'#fff',fontWeight:600,fontSize:'14px',margin:0}}>{regEmail}</p>
@@ -262,7 +262,7 @@ export default function Login() {
           {/* Step 3: Done (verification or reset sent) */}
           {mode === 'register' && regStep === 3 && (
             <div style={{textAlign:'center',padding:'8px 0'}}>
-              <div style={{fontSize:'40px',marginBottom:'14px'}}>✉️</div>
+              <div style={{fontSize:'40px',marginBottom:'14px'}}></div>
               <h3 style={{margin:'0 0 10px',fontSize:'18px'}}>Check Your Email</h3>
               <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 28px',lineHeight:1.6}}>{regDoneMsg}</p>
               <button onClick={()=>switchMode('login')} style={{width:'100%',background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px',fontSize:'15px',fontWeight:800,cursor:'pointer',marginBottom:'10px'}}>
@@ -292,7 +292,7 @@ export default function Login() {
                 </>
               ) : (
                 <div style={{textAlign:'center',padding:'8px 0',marginBottom:'16px'}}>
-                  <div style={{fontSize:'36px',marginBottom:'12px'}}>✉️</div>
+                  <div style={{fontSize:'36px',marginBottom:'12px'}}></div>
                   <p style={{color:'#9ca3af',fontSize:'13px',margin:0}}>If that email exists in our system, a reset link has been sent. Check your inbox.</p>
                 </div>
               )}

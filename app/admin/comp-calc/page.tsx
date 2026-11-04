@@ -92,7 +92,7 @@ export default function ProfitSharePage() {
         {/* SALARY / CURRENT MODEL */}
         <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid #2a2a2a',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>💼 Salary Model</h2>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#fff'}}>Salary Model</h2>
             <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Employee paid base salary; Xantie keeps revenue</p>
           </div>
 
@@ -131,7 +131,7 @@ export default function ProfitSharePage() {
         {/* PROFIT SHARE / NEW MODEL */}
         <div style={{background:'#141414',border:'1px solid rgba(141,198,63,0.3)',borderRadius:'14px',padding:'20px'}}>
           <div style={{borderBottom:'2px solid rgba(141,198,63,0.3)',paddingBottom:'10px',marginBottom:'14px'}}>
-            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>🌱 Profit Share Model</h2>
+            <h2 style={{fontSize:'16px',fontWeight:700,margin:0,color:'#8DC63F'}}>Profit Share Model</h2>
             <p style={{fontSize:'12px',color:'#6b7280',margin:'2px 0 0'}}>Lower base + share of billable revenue</p>
           </div>
 

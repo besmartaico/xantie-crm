@@ -226,7 +226,7 @@ export default function AdminLayout({ children }) {
         {impersonating && (
           <div style={{background:'rgba(251,191,36,0.1)',borderBottom:'1px solid rgba(251,191,36,0.3)',padding:'10px 32px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <span style={{fontSize:'13px',color:'#fbbf24'}}>
-              👁 Viewing as <strong>{user.name}</strong> ({user.email}) — {user.role} view
+              Viewing as <strong>{user.name}</strong> ({user.email}) — {user.role} view
             </span>
             <button onClick={stopImpersonating}
               style={{background:'#fbbf24',color:'#0a0a0a',border:'none',borderRadius:'6px',padding:'5px 12px',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>

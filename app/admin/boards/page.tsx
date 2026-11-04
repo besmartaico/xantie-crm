@@ -103,7 +103,7 @@ export default function BoardsPage() {
 
       {!loading&&boards.length===0&&(
         <div style={{textAlign:'center',padding:'80px 20px',background:'#141414',borderRadius:'16px',border:'1px solid #1e1e1e'}}>
-          <div style={{fontSize:'48px',marginBottom:'16px'}}>📋</div>
+          <div style={{fontSize:'48px',marginBottom:'16px'}}></div>
           <h2 style={{margin:'0 0 8px',fontSize:'20px'}}>No boards yet</h2>
           <p style={{color:'#6b7280',margin:'0 0 24px'}}>Create your first board to get started</p>
           <button onClick={()=>setShowCreate(true)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 28px',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>

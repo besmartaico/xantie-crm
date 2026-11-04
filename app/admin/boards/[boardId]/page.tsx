@@ -240,8 +240,8 @@ export default function BoardPage() {
                       {card.description&&<div style={{fontSize:'11px',color:'#6b7280',marginBottom:'8px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{card.description}</div>}
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                         <PBadge p={card.priority}/>
-                        {card.recurrence&&<span style={{fontSize:'10px',fontWeight:700,color:'#8DC63F',background:'rgba(141,198,63,0.1)',padding:'2px 7px',borderRadius:'4px'}}>🔁 {recurLabel(card.recurrence)}</span>}
-                        {due&&<span style={{fontSize:'10px',fontWeight:600,color:due.overdue?'#f87171':due.soon?'#f59e0b':'#6b7280',background:due.overdue?'rgba(248,113,113,0.1)':due.soon?'rgba(245,158,11,0.1)':'#1e1e1e',padding:'2px 7px',borderRadius:'4px'}}>📅 {due.fmt}</span>}
+                        {card.recurrence&&<span style={{fontSize:'10px',fontWeight:700,color:'#8DC63F',background:'rgba(141,198,63,0.1)',padding:'2px 7px',borderRadius:'4px'}}>{recurLabel(card.recurrence)}</span>}
+                        {due&&<span style={{fontSize:'10px',fontWeight:600,color:due.overdue?'#f87171':due.soon?'#f59e0b':'#6b7280',background:due.overdue?'rgba(248,113,113,0.1)':due.soon?'rgba(245,158,11,0.1)':'#1e1e1e',padding:'2px 7px',borderRadius:'4px'}}>{due.fmt}</span>}
                         {card.assignedTo&&<span style={{fontSize:'10px',color:'#9ca3af',background:'#141414',padding:'2px 7px',borderRadius:'4px',border:'1px solid #252525'}}>{card.assignedTo.split(' ')[0]}</span>}
                       </div>
                     </div>

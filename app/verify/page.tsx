@@ -62,7 +62,7 @@ function VerifyInner() {
           )}
           {status === 'success' && (
             <>
-              <div style={{fontSize:'40px',marginBottom:'16px'}}>✅</div>
+              <div style={{fontSize:'40px',marginBottom:'16px'}}></div>
               <h2 style={{margin:'0 0 8px',fontSize:'18px'}}>Email Verified!</h2>
               <p style={{color:'#9ca3af',fontSize:'13px',margin:'0 0 24px'}}>Your account is active. Taking you to the dashboard...</p>
               <button onClick={()=>router.push('/admin')}
@@ -73,7 +73,7 @@ function VerifyInner() {
           )}
           {status === 'error' && (
             <>
-              <div style={{fontSize:'40px',marginBottom:'16px'}}>❌</div>
+              <div style={{fontSize:'40px',marginBottom:'16px'}}></div>
               <h2 style={{margin:'0 0 8px',fontSize:'18px'}}>Verification Failed</h2>
               <p style={{color:'#f87171',fontSize:'13px',margin:'0 0 24px'}}>{error}</p>
               <button onClick={()=>router.push('/login')}

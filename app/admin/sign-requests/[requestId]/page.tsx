@@ -11,27 +11,27 @@ const STATUS_META = {
 }
 
 const EVENT_ICONS = {
-  created: '🆕',
-  admin_prefilled: '✏️',
-  signer_emailed: '📧',
-  recipient_emailed: '📧',
-  signer_viewed: '👁',
+  created: '',
+  admin_prefilled: '',
+  signer_emailed: '',
+  recipient_emailed: '',
+  signer_viewed: '',
   signer_signed: '✓',
-  all_recipients_signed: '✅',
-  partial_pdf_generated: '📄',
-  partial_pdf_failed: '⚠️',
-  admin_notified: '🔔',
-  admin_notify_failed: '⚠️',
+  all_recipients_signed: '',
+  partial_pdf_generated: '',
+  partial_pdf_failed: '',
+  admin_notified: '',
+  admin_notify_failed: '',
   admin_completed: '✓',
-  admin_edited: '📝',
-  final_pdf_generated: '📑',
-  signer_emailed_final: '📧',
-  recipient_emailed_final: '📧',
-  admin_emailed_final: '📧',
-  final_email_failed: '⚠️',
-  email_failed: '⚠️',
-  consent_given: '🔏',
-  status_changed: '🔄',
+  admin_edited: '',
+  final_pdf_generated: '',
+  signer_emailed_final: '',
+  recipient_emailed_final: '',
+  admin_emailed_final: '',
+  final_email_failed: '',
+  email_failed: '',
+  consent_given: '',
+  status_changed: '',
 }
 
 function fmtDateLong(iso) {
@@ -128,9 +128,9 @@ export default function SignRequestDetailPage({ params }) {
       <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'18px'}}>
         {(req.status === 'ready_to_finalize' || req.status === 'pending_admin_post') && <a href={'/admin/sign-requests/' + req.id + '/finish'} style={{background:'#f97316',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>{Array.isArray(req.recipients) ? 'Consolidate & finalize →' : 'Complete signing →'}</a>}
         {req.status === 'pending_user' && <a href={'/sign/' + req.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>View signer link</a>}
-        {req.partialPdfUrl && <a href={req.partialPdfUrl} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>📄 Partial PDF</a>}
-        {req.status === 'complete' && <a href={'/admin/sign-requests/' + req.id + '/finish'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>✎ Edit fields</a>}
-        {req.signedPdfUrl && <a href={req.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>⬇ Download signed PDF</a>}
+        {req.partialPdfUrl && <a href={req.partialPdfUrl} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>Partial PDF</a>}
+        {req.status === 'complete' && <a href={'/admin/sign-requests/' + req.id + '/finish'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>Edit fields</a>}
+        {req.signedPdfUrl && <a href={req.signedPdfUrl} target="_blank" rel="noopener" style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',fontWeight:700,textDecoration:'none'}}>Download signed PDF</a>}
       </div>
 
       <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'12px',padding:'18px',marginBottom:'16px'}}>

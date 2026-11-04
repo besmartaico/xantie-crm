@@ -244,10 +244,10 @@ export default function CandidatesPage() {
         </div>
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
           <a href="/admin/candidates/dashboard" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>
-            📊 Dashboard
+            Dashboard
           </a>
           <button onClick={()=>setShowImport(true)} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
-            📥 Import
+            Import
           </button>
           <button onClick={openAdd} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>
             + New Candidate
@@ -325,8 +325,8 @@ export default function CandidatesPage() {
 
             <div style={{display:'flex',gap:'10px',alignItems:'center',marginBottom:'16px',flexWrap:'wrap'}}>
               <HireBadge value={activeCard.wouldHire}/>
-              {activeCard.experienceYears && <span style={{color:'#9ca3af',fontSize:'12px'}}>📅 {activeCard.experienceYears} years experience</span>}
-              {activeCard.salaryRequirement && <span style={{color:'#9ca3af',fontSize:'12px'}}>💰 ${activeCard.salaryRequirement}</span>}
+              {activeCard.experienceYears && <span style={{color:'#9ca3af',fontSize:'12px'}}>{activeCard.experienceYears} years experience</span>}
+              {activeCard.salaryRequirement && <span style={{color:'#9ca3af',fontSize:'12px'}}>${activeCard.salaryRequirement}</span>}
             </div>
 
             {activeCard.skillset && (
@@ -347,8 +347,8 @@ export default function CandidatesPage() {
 
             {(activeCard.linkedin || activeCard.resume) && (
               <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
-                {activeCard.linkedin && <a href={activeCard.linkedin} target="_blank" rel="noopener" style={{background:'#1e1e1e',border:'1px solid #252525',color:'#60a5fa',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',textDecoration:'none'}}>🔗 LinkedIn</a>}
-                {activeCard.resume && <a href={activeCard.resume} target="_blank" rel="noopener" style={{background:'#1e1e1e',border:'1px solid #252525',color:'#60a5fa',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',textDecoration:'none'}}>📄 Resume</a>}
+                {activeCard.linkedin && <a href={activeCard.linkedin} target="_blank" rel="noopener" style={{background:'#1e1e1e',border:'1px solid #252525',color:'#60a5fa',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',textDecoration:'none'}}>LinkedIn</a>}
+                {activeCard.resume && <a href={activeCard.resume} target="_blank" rel="noopener" style={{background:'#1e1e1e',border:'1px solid #252525',color:'#60a5fa',borderRadius:'8px',padding:'8px 14px',fontSize:'12px',textDecoration:'none'}}>Resume</a>}
               </div>
             )}
 
@@ -361,7 +361,7 @@ export default function CandidatesPage() {
 
             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'18px',flexWrap:'wrap'}}>
               <button onClick={()=>setConfirmDelete(activeCard.id)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:'pointer'}}>Delete</button>
-              <button onClick={()=>openEdit(activeCard)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>✎ Edit</button>
+              <button onClick={()=>openEdit(activeCard)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Edit</button>
             </div>
           </div>
         </div>
@@ -445,7 +445,7 @@ export default function CandidatesPage() {
               <input type="file" accept=".xlsx,.xls,.csv" onChange={e=>e.target.files[0] && handleFileUpload(e.target.files[0])}
                 style={{display:'none'}} id="cand-file-input"/>
               <label htmlFor="cand-file-input" style={{cursor:'pointer',display:'inline-block',background:'#1e1e1e',border:'1px solid #2a2a2a',borderRadius:'8px',padding:'10px 18px',color:'#9ca3af',fontSize:'13px',fontWeight:600}}>
-                {importFileName ? '📎 ' + importFileName : '📂 Choose file...'}
+                {importFileName ? '' + importFileName : 'Choose file...'}
               </label>
               <div style={{fontSize:'11px',color:'#6b7280',marginTop:'8px'}}>
                 Recognized columns: Name, Email, Location, Skillset, LinkedIn (Link), Resume, Source, Date fields, Would Hire, Salary, Notes, Experience, Certifications

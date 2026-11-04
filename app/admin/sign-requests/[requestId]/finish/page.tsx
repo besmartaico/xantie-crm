@@ -172,7 +172,7 @@ export default function FinishSignRequestPage({ params }) {
       {submitError && <div style={{background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',color:'#f87171',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px'}}>{submitError}</div>}
 
       <div style={{display:'flex',gap:'10px',marginBottom:'18px'}}>
-        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?(isComplete?'Saving…':'Finalizing…'):(isComplete?'💾 Save & regenerate PDF':(isMulti?'✓ Consolidate & finalize':'✓ Finalize & generate PDF'))}</button>
+        <button onClick={submit} disabled={submitting} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'12px 22px',fontSize:'14px',fontWeight:700,cursor:submitting?'wait':'pointer',opacity:submitting?0.7:1}}>{submitting?(isComplete?'Saving…':'Finalizing…'):(isComplete?'Save & regenerate PDF':(isMulti?'✓ Consolidate & finalize':'✓ Finalize & generate PDF'))}</button>
       </div>
 
       {loading && <div style={{color:'#6b7280',textAlign:'center',padding:'48px'}}>Loading...</div>}
@@ -219,7 +219,7 @@ function FieldModal({ field, fields, restrictedAssignee, currentValue, onClose, 
               if (!field.group) return null
               const linkedCount = fields.filter(f => f.id !== field.id && f.type === field.type && f.group === field.group && fieldMatchesScope(f)).length
               if (linkedCount === 0) return null
-              return <p style={{fontSize:'11px',color:'#8DC63F',margin:'4px 0 0'}}>🔗 Will also fill {linkedCount} linked field{linkedCount===1?'':'s'} in group "{field.group}"</p>
+              return <p style={{fontSize:'11px',color:'#8DC63F',margin:'4px 0 0'}}>Will also fill {linkedCount} linked field{linkedCount===1?'':'s'} in group "{field.group}"</p>
             })()}
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
@@ -282,10 +282,10 @@ function SignatureInput({ value, onChange, mode, setMode, drawOnly }) {
   return (
     <div>
       {drawOnly
-        ? <div style={{fontSize:'12px',color:'#8DC63F',marginBottom:'10px',fontWeight:600}}>✎ Please draw your signature (typing is disabled for this field)</div>
+        ? <div style={{fontSize:'12px',color:'#8DC63F',marginBottom:'10px',fontWeight:600}}>Please draw your signature (typing is disabled for this field)</div>
         : <div style={{display:'flex',gap:'6px',marginBottom:'10px'}}>
-            <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>✎ Draw</button>
-            <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>⌨ Type</button>
+            <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>Draw</button>
+            <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>Type</button>
           </div>}
       {(drawOnly || mode === 'draw') && SignatureCanvas && <SignatureCanvas value={value} onChange={onChange} height={150}/>}
       {(drawOnly || mode === 'draw') && !SignatureCanvas && <div style={{height:150,background:'#0f0f0f',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',color:'#6b7280'}}>Loading…</div>}

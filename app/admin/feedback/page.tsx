@@ -135,7 +135,7 @@ export default function FeedbackPage() {
             <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Bugs & Feature Requests</h1>
             <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>Report issues or suggest improvements to the system</p>
           </div>
-          <a href="/admin/feedback/closed" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',fontWeight:600,textDecoration:'none',whiteSpace:'nowrap'}}>📋 View Closed</a>
+          <a href="/admin/feedback/closed" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'8px 14px',fontSize:'13px',fontWeight:600,textDecoration:'none',whiteSpace:'nowrap'}}>View Closed</a>
         </div>
       </div>
 
@@ -159,7 +159,7 @@ export default function FeedbackPage() {
           <div style={{marginBottom:'16px'}}>
             <label style={lbl}>TYPE</label>
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}}>
-              {[{v:'bug',l:'🐛 Bug'},{v:'feature',l:'💡 Feature Request'}].map(t=>(
+              {[{v:'bug',l:'Bug'},{v:'feature',l:'Feature Request'}].map(t=>(
                 <button key={t.v} onClick={()=>setType(t.v)} type="button"
                   style={{background:type===t.v?'rgba(141,198,63,0.1)':'#0f0f0f',border:'1px solid '+(type===t.v?'#8DC63F':'#252525'),color:type===t.v?'#8DC63F':'#9ca3af',borderRadius:'8px',padding:'12px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
                   {t.l}
@@ -204,7 +204,7 @@ export default function FeedbackPage() {
                 onMouseEnter={e=>e.currentTarget.style.borderColor='#8DC63F'}
                 onMouseLeave={e=>e.currentTarget.style.borderColor='#1e1e1e'}>
                 <div style={{display:'flex',alignItems:'flex-start',gap:'10px',marginBottom:'8px',flexWrap:'wrap'}}>
-                  <span style={{fontSize:'16px',flexShrink:0}}>{item.type==='bug'?'🐛':'💡'}</span>
+                  <span style={{fontSize:'16px',flexShrink:0}}>{item.type==='bug'?'':''}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:'14px',fontWeight:600,color:'#fff',marginBottom:'2px',wordBreak:'break-word'}}>{item.title}</div>
                     <div style={{fontSize:'12px',color:'#6b7280'}}>{item.name} · {fmtDate(item.submittedAt)}</div>
@@ -235,7 +235,7 @@ export default function FeedbackPage() {
             {/* Header */}
             <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:'16px'}}>
               <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
-                <span style={{fontSize:'20px'}}>{activeItem.type==='bug'?'🐛':'💡'}</span>
+                <span style={{fontSize:'20px'}}>{activeItem.type==='bug'?'':''}</span>
                 <PriorityBadge priority={activeItem.priority}/>
                 <StatusBadge status={activeItem.status}/>
               </div>
@@ -274,8 +274,8 @@ export default function FeedbackPage() {
                 <div>
                   <label style={lbl}>Type</label>
                   <select value={editForm.type||'bug'} onChange={e=>setEditForm({...editForm,type:e.target.value})} style={{...inp,cursor:'pointer'}}>
-                    <option value="bug">🐛 Bug</option>
-                    <option value="feature">💡 Feature</option>
+                    <option value="bug">Bug</option>
+                    <option value="feature">Feature</option>
                   </select>
                 </div>
                 <div>
@@ -316,7 +316,7 @@ export default function FeedbackPage() {
                 ) : (
                   <button onClick={()=>setEditMode(true)}
                     style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
-                    ✎ Edit
+                    Edit
                   </button>
                 )}
               </div>

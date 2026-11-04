@@ -131,7 +131,7 @@ export default function DocumentsPage() {
           <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>PDF templates for signing · {docs.length} total</p>
         </div>
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-          <a href="/admin/documents/signed" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>📂 Signed PDFs</a>
+          <a href="/admin/documents/signed" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:600,textDecoration:'none'}}>Signed PDFs</a>
           <input ref={fileInputRef} type="file" accept="application/pdf,.pdf" style={{display:'none'}}
             onChange={e=>{ const f = e.target.files && e.target.files[0]; if (f) handleUpload(f) }}/>
           <button onClick={()=>fileInputRef.current && fileInputRef.current.click()} disabled={uploading}
@@ -164,8 +164,8 @@ export default function DocumentsPage() {
               </div>
             </div>
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-              <a href={'/api/documents/raw/' + d.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>👁 Preview</a>
-              <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>📍 Place fields</a>
+              <a href={'/api/documents/raw/' + d.id} target="_blank" rel="noopener" style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>Preview</a>
+              <a href={'/admin/documents/' + d.id + '/place-fields'} style={{background:'#1e1e1e',color:'#9ca3af',border:'1px solid #252525',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:600,textDecoration:'none'}}>Place fields</a>
               <a href={'/admin/documents/' + d.id} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'7px 12px',fontSize:'12px',fontWeight:700,textDecoration:'none'}}>Send to sign →</a>
               <button onClick={()=>doDuplicate(d)} disabled={duplicatingId===d.id} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',cursor:duplicatingId===d.id?'wait':'pointer',fontSize:'12px',fontWeight:600}}>{duplicatingId===d.id?'Duplicating…':'Duplicate'}</button>
               <button onClick={()=>{setRenameDoc(d);setRenameValue((d.name||'').replace(/\.pdf$/i,''));setRenameError('')}} style={{background:'none',border:'1px solid #252525',color:'#9ca3af',borderRadius:'8px',padding:'7px 12px',cursor:'pointer',fontSize:'12px',fontWeight:600}}>Rename</button>

@@ -312,7 +312,7 @@ export default function ImportPage() {
               onClick={()=>fileRef.current?.click()}
               style={{border:'2px dashed '+(dragOver?'#8DC63F':'#2a2a2a'),borderRadius:'16px',padding:'60px',textAlign:'center',cursor:'pointer',background:dragOver?'rgba(141,198,63,0.05)':'#141414',transition:'all 0.2s'}}>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)handleFile(f)}}/>
-              <div style={{fontSize:'40px',marginBottom:'14px'}}>📂</div>
+              <div style={{fontSize:'40px',marginBottom:'14px'}}></div>
               <p style={{fontSize:'16px',fontWeight:600,color:'#fff',margin:'0 0 6px'}}>Drop your file here or click to browse</p>
               <p style={{fontSize:'13px',color:'#6b7280',margin:0}}>Excel serial dates (e.g. 46128) are automatically converted</p>
             </div>
@@ -409,7 +409,7 @@ export default function ImportPage() {
           {/* Step 3: Done */}
           {step === 3 && result && (
             <div style={{textAlign:'center',padding:'48px 24px',background:'#141414',borderRadius:'16px',border:'1px solid #1e1e1e'}}>
-              <div style={{fontSize:'48px',marginBottom:'16px'}}>✅</div>
+              <div style={{fontSize:'48px',marginBottom:'16px'}}></div>
               <h2 style={{fontSize:'22px',fontWeight:700,margin:'0 0 12px'}}>Import Complete</h2>
               <p style={{color:'#8DC63F',fontSize:'18px',fontWeight:700,margin:'0 0 6px'}}>{result.count} time entries imported</p>
               {result.newProjects > 0 && <p style={{color:'#9ca3af',fontSize:'13px',margin:'4px 0'}}>{result.newProjects} new project{result.newProjects>1?'s':''} created</p>}
@@ -451,7 +451,7 @@ export default function ImportPage() {
 
           {!loadingDups && dupGroups.length === 0 && (
             <div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'14px',padding:'60px',textAlign:'center'}}>
-              <div style={{fontSize:'40px',marginBottom:'12px'}}>✅</div>
+              <div style={{fontSize:'40px',marginBottom:'12px'}}></div>
               <p style={{color:'#6b7280',margin:0,fontSize:'15px'}}>No duplicate records found.</p>
             </div>
           )}

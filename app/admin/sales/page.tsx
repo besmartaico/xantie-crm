@@ -333,7 +333,7 @@ export default function SalesCrmPage() {
                       {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
                     </div>
                     {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'240px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🔗 {c.url}</a>}
+                      style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'240px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
                     <div style={{fontSize:'11px',color:'#6b7280',whiteSpace:'nowrap',minWidth:'92px',textAlign:'right'}}>{c.createdAt ? fmtDate(c.createdAt) : ''}</div>
                   </div>
                 </div>
@@ -455,14 +455,14 @@ export default function SalesCrmPage() {
 
             {activeCard.type==='contacts' && (
               <div style={{marginBottom:'12px'}}>
-                {activeCard.data.url && <div style={{marginBottom:'12px'}}><label style={lbl}>URL</label><a href={normalizeUrl(activeCard.data.url)} target="_blank" rel="noopener noreferrer" style={{color:'#8DC63F',fontSize:'13px',wordBreak:'break-all'}}>🔗 {activeCard.data.url}</a></div>}
+                {activeCard.data.url && <div style={{marginBottom:'12px'}}><label style={lbl}>URL</label><a href={normalizeUrl(activeCard.data.url)} target="_blank" rel="noopener noreferrer" style={{color:'#8DC63F',fontSize:'13px',wordBreak:'break-all'}}>{activeCard.data.url}</a></div>}
                 {activeCard.data.notes && <div><label style={lbl}>Notes</label><div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'10px 14px',color:'#d1d5db',fontSize:'13px',whiteSpace:'pre-wrap'}}>{activeCard.data.notes}</div></div>}
               </div>
             )}
 
             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'18px',flexWrap:'wrap'}}>
               <button onClick={()=>setConfirmDelete({type:activeCard.type, id:activeCard.data.id})} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'8px',padding:'9px 16px',fontSize:'13px',cursor:'pointer'}}>Delete</button>
-              <button onClick={()=>openEdit(activeCard.type, activeCard.data)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>✎ Edit</button>
+              <button onClick={()=>openEdit(activeCard.type, activeCard.data)} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'9px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Edit</button>
             </div>
           </div>
         </div>

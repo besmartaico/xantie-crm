@@ -33,7 +33,7 @@ export default function HelpPage() {
         </p>
       </div>
 
-      <Section icon="👋" title="Getting Started" defaultOpen>
+      <Section icon="" title="Getting Started" defaultOpen>
         <p>Welcome to Xantie CRM — your time tracking, project management, and team coordination hub.</p>
         <h3 style={h3}>Signing in</h3>
         <p>Sign in with your <span style={codeChip}>@xantie.com</span> email. If you don't have an account yet, register from the login page — your role defaults to Editor.</p>
@@ -45,7 +45,7 @@ export default function HelpPage() {
         </ul>
       </Section>
 
-      <Section icon="📊" title="Dashboard">
+      <Section icon="" title="Dashboard">
         <p>Your overview of hours worked. Editors see only their own data; Viewers and Admins see everyone.</p>
         <h3 style={h3}>Filters</h3>
         <ul style={{paddingLeft:'18px'}}>
@@ -59,7 +59,7 @@ export default function HelpPage() {
         <p>Click <span style={codeChip}>↓ Export CSV</span> top-right. Whatever filters you have active is what gets exported.</p>
       </Section>
 
-      <Section icon="⏱️" title="Time Entries">
+      <Section icon="⏱" title="Time Entries">
         <h3 style={h3}>Adding time</h3>
         <ol style={{paddingLeft:'18px'}}>
           <li>Click <span style={codeChip}>+ Add Entry</span></li>
@@ -70,10 +70,10 @@ export default function HelpPage() {
         </ol>
         <h3 style={h3}>Logging a previous week</h3>
         <p>Click <span style={codeChip}>+ Add previous week</span> to prepend prior 7 days, or use the "Week starting" date picker.</p>
-        <div style={tipBox}>💡 The description applies to every day in that batch. For different descriptions, save in separate batches.</div>
+        <div style={tipBox}>The description applies to every day in that batch. For different descriptions, save in separate batches.</div>
       </Section>
 
-      <Section icon="🌴" title="Time Off">
+      <Section icon="" title="Time Off">
         <h3 style={h3}>Requesting</h3>
         <ol style={{paddingLeft:'18px'}}>
           <li>Go to Time Off → <strong>Request Time Off</strong></li>
@@ -85,7 +85,7 @@ export default function HelpPage() {
         <p>Switch to <strong>All Requests</strong> to approve or deny via the dropdown.</p>
       </Section>
 
-      <Section icon="🐛" title="Bugs & Feature Requests">
+      <Section icon="" title="Bugs & Feature Requests">
         <h3 style={h3}>Submitting</h3>
         <p>Pick Bug or Feature, write a clear title and details, set priority, click Submit.</p>
         <h3 style={h3}>Discussion</h3>
@@ -93,7 +93,7 @@ export default function HelpPage() {
         <p>Admins move status: Open → In Progress → Done → Closed.</p>
       </Section>
 
-      <Section icon="📋" title="Boards">
+      <Section icon="" title="Boards">
         <p>Trello-style boards for tracking work.</p>
         <h3 style={h3}>Creating</h3>
         <p>Boards → <span style={codeChip}>+ New Board</span> → name, description, color → Create.</p>
@@ -109,13 +109,13 @@ export default function HelpPage() {
         <p>Click <span style={codeChip}>Share</span> in the board header to add Xantie users. Shared boards appear under "Shared With You" on their boards page.</p>
       </Section>
 
-      <Section icon="🏢" title="Clients & Projects (Admin)">
+      <Section icon="" title="Clients & Projects (Admin)">
         <p>Hierarchy: <strong style={{color:'#fff'}}>Client</strong> → <strong style={{color:'#fff'}}>Project</strong>.</p>
         <p>Each new client gets an <span style={codeChip}>N/A</span> default project so people can log time without a sub-project.</p>
         <p>Expand a client card and click <span style={codeChip}>+ Add Project</span> to add specific projects.</p>
       </Section>
 
-      <Section icon="👥" title="Users (Admin)">
+      <Section icon="" title="Users (Admin)">
         <h3 style={h3}>Roles</h3>
         <p>Use the dropdown next to the user's role. Saves automatically.</p>
         <h3 style={h3}>Inactivate / Reactivate</h3>
@@ -124,11 +124,11 @@ export default function HelpPage() {
         <p>See the app exactly as another user does — useful for debugging or training. A yellow banner reminds you you're impersonating. Click <span style={codeChip}>Exit — Back to Admin</span> to return.</p>
       </Section>
 
-      <Section icon="📥" title="Import (Admin)">
+      <Section icon="" title="Import (Admin)">
         <p>Bulk-import historical time entries from CSV. Columns must match the Time Entries sheet headers.</p>
       </Section>
 
-      <Section icon="📱" title="Tips & Tricks">
+      <Section icon="" title="Tips & Tricks">
         <h3 style={h3}>Date inputs</h3>
         <p>Click anywhere in a date field — the whole field opens the calendar.</p>
         <h3 style={h3}>Mobile</h3>

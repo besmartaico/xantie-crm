@@ -180,8 +180,8 @@ export default function RatesPage() {
                 <div style={{fontSize:'10px',color:'#4b5563'}}>{fmtDate(r.updatedAt)}</div>
               </div>
               <div style={{display:'flex',gap:'4px'}}>
-                <button onClick={()=>openEdit(r)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'6px',padding:'6px 10px',fontSize:'12px',cursor:'pointer'}}>✎</button>
-                <button onClick={()=>setConfirmDelete(r.id)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'6px',padding:'6px 10px',fontSize:'12px',cursor:'pointer'}}>🗑</button>
+                <button onClick={()=>openEdit(r)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#9ca3af',borderRadius:'6px',padding:'6px 10px',fontSize:'12px',cursor:'pointer'}}></button>
+                <button onClick={()=>setConfirmDelete(r.id)} style={{background:'#1e1e1e',border:'1px solid #252525',color:'#f87171',borderRadius:'6px',padding:'6px 10px',fontSize:'12px',cursor:'pointer'}}></button>
               </div>
             </div>
           ))}

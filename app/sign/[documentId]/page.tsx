@@ -129,7 +129,7 @@ export default function PublicSignPage({ params }) {
   if (!resolvedParams) return null
 
   if (loadError) {
-    return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}>⚠</div><h1 style={{fontSize:'18px',fontWeight:700,margin:'0 0 8px'}}>Unable to load</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:0}}>{loadError}</p></div></div>)
+    return (<div style={{minHeight:'100vh',background:'#0a0a0a',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',color:'#fff'}}><div style={{background:'#141414',border:'1px solid #1e1e1e',borderRadius:'16px',padding:'32px',maxWidth:'500px',width:'100%',textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'12px'}}></div><h1 style={{fontSize:'18px',fontWeight:700,margin:'0 0 8px'}}>Unable to load</h1><p style={{color:'#9ca3af',fontSize:'14px',margin:0}}>{loadError}</p></div></div>)
   }
 
   if (request && request.alreadySigned && !submitResult) {
@@ -286,7 +286,7 @@ function FieldModal({ field, fields, restrictedAssignee, currentValue, onClose, 
               if (!field.group) return null
               const linkedCount = fields.filter(f => f.id !== field.id && f.type === field.type && f.group === field.group && fieldMatchesScope(f)).length
               if (linkedCount === 0) return null
-              return <p style={{fontSize:'11px',color:'#8DC63F',margin:'4px 0 0'}}>🔗 Will also fill {linkedCount} linked field{linkedCount===1?'':'s'} in group "{field.group}"</p>
+              return <p style={{fontSize:'11px',color:'#8DC63F',margin:'4px 0 0'}}>Will also fill {linkedCount} linked field{linkedCount===1?'':'s'} in group "{field.group}"</p>
             })()}
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
@@ -349,10 +349,10 @@ function SignatureInput({ value, onChange, mode, setMode, drawOnly }) {
   return (
     <div>
       {drawOnly
-        ? <div style={{fontSize:'12px',color:'#8DC63F',marginBottom:'10px',fontWeight:600}}>✎ Please draw your signature (typing is disabled for this field)</div>
+        ? <div style={{fontSize:'12px',color:'#8DC63F',marginBottom:'10px',fontWeight:600}}>Please draw your signature (typing is disabled for this field)</div>
         : <div style={{display:'flex',gap:'6px',marginBottom:'10px'}}>
-            <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>✎ Draw</button>
-            <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>⌨ Type</button>
+            <button onClick={()=>setMode('draw')} style={tabStyle(mode==='draw')}>Draw</button>
+            <button onClick={()=>setMode('type')} style={tabStyle(mode==='type')}>Type</button>
           </div>}
       {(drawOnly || mode === 'draw') && SignatureCanvas && <SignatureCanvas value={value} onChange={onChange} height={150}/>}
       {(drawOnly || mode === 'draw') && !SignatureCanvas && <div style={{height:150,background:'#0f0f0f',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',color:'#6b7280'}}>Loading…</div>}

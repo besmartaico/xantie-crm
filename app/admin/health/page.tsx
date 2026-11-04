@@ -135,7 +135,7 @@ export default function HealthPage() {
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'12px',marginBottom:'16px'}}>
         <div>
-          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>🏆 Health Competition</h1>
+          <h1 style={{fontSize:'22px',fontWeight:700,margin:0}}>Health Competition</h1>
           {comp && <p style={{color:'#6b7280',fontSize:'13px',margin:'4px 0 0'}}>{comp.name}{comp.startDate ? ` · ${comp.startDate}${comp.endDate?' → '+comp.endDate:''}` : ''}</p>}
         </div>
         {comps.length > 1 && (
@@ -160,7 +160,6 @@ export default function HealthPage() {
             <div style={{...card,flex:'1 1 180px'}}>
               <div style={{fontSize:'11px',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:700}}>Days completed</div>
               <div style={{fontSize:'32px',fontWeight:800,color:LIME}}>{completedDays(me)}{potentialDays()!=null && <span style={{color:'#6b7280',fontSize:'20px',fontWeight:700}}> / {potentialDays()}</span>}</div>
-              <div style={{fontSize:'11px',color:'#6b7280'}}>{potentialDays()!=null ? `of ${potentialDays()} day${potentialDays()===1?'':'s'} so far — today isn't counted yet` : `all ${myElements.length} activit${myElements.length===1?'y':'ies'} done`}</div>
             </div>
           </div>
 
@@ -212,7 +211,6 @@ export default function HealthPage() {
                   </tbody>
                 </table>
               </div>
-              <p style={{fontSize:'11px',color:'#4b5563',margin:'12px 0 0'}}>Tap a box to mark an activity done for that day. A day counts only when every activity is checked.</p>
             </div>
           )}
         </div>
@@ -269,7 +267,6 @@ export default function HealthPage() {
               </table>
             </div>
           )}
-          <p style={{fontSize:'11px',color:'#4b5563',margin:'12px 0 0'}}>✓ = all activities done that day (a completed day). Numbers show activities done out of assigned. Today isn't counted toward totals yet.</p>
         </div>
       )}
 
@@ -289,7 +286,7 @@ export default function HealthPage() {
                   const mine = row.p.email === email
                   return (
                     <tr key={row.p.id} style={{borderTop:'1px solid #1a1a1a', background: mine?'rgba(141,198,63,0.06)':'transparent'}}>
-                      <td style={{padding:'10px 8px',fontSize:'14px',fontWeight:800,color: i===0?LIME:'#6b7280'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
+                      <td style={{padding:'10px 8px',fontSize:'14px',fontWeight:800,color: i===0?LIME:'#6b7280'}}>{i+1}</td>
                       <td style={{padding:'10px 8px',fontSize:'14px',color:'#fff',fontWeight:500}}>{row.p.name||row.p.email}{mine&&<span style={{fontSize:'10px',color:LIME,marginLeft:'6px'}}>(you)</span>}</td>
                       <td style={{padding:'10px 8px',fontSize:'12px',color:'#6b7280',textAlign:'center'}}>{row.p.elementIds.filter(id=>elements.some(e=>e.id===id)).length}</td>
                       <td style={{padding:'10px 8px',fontSize:'18px',fontWeight:800,color:LIME,textAlign:'right'}}>{row.days}</td>
