@@ -22,18 +22,60 @@ function fmtMoney(n) {
   return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
+// Mountain Time helpers — contacts are stamped on the MT calendar day, never UTC.
+function mtToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Denver' }).format(new Date())
+}
+function mtStamp(d) {
+  // mid-day MT so the date portion is always the MT day in every US zone
+  return d ? d.slice(0,10) + 'T18:00:00.000Z' : ''
+}
+function mtDay(iso) {
+  if (!iso) return ''
+  if (iso.length <= 10) return iso.slice(0,10)        // already a plain YYYY-MM-DD
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso.slice(0,10)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Denver' }).format(d)
+}
+
 function fmtDate(iso) {
   if (!iso) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (m) {   // pure date (funnel/project/bench) — render as-is, no timezone shift
+    const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]))
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+  }
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone:'America/Denver' })
 }
 
 function dateInputVal(iso) {
   if (!iso) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0,10)
   const d = new Date(iso)
   if (isNaN(d.getTime())) return ''
-  return d.toISOString().split('T')[0]
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Denver' }).format(d)
+}
+
+// Identity key for duplicate detection: LinkedIn/URL first, else normalized name.
+function contactKey(c) {
+  const u = (c.url || '').trim().toLowerCase()
+  if (u) return 'u:' + u.replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/[?#].*$/,'').replace(/\/+$/,'')
+  const n = (c.name || '').trim().toLowerCase().replace(/\s+/g,' ')
+  return n ? 'n:' + n : ''
+}
+
+function DupTag({ cross }) {
+  return (
+    <span title={cross ? 'Added by more than one person' : 'Added more than once'} style={{
+      display:'inline-flex', alignItems:'center', gap:'3px', fontSize:'10px', fontWeight:800,
+      padding:'2px 7px', borderRadius:'999px', verticalAlign:'middle',
+      background: cross ? 'rgba(251,191,36,0.15)' : 'rgba(107,114,128,0.18)',
+      color: cross ? '#fbbf24' : '#9ca3af',
+      border: '1px solid ' + (cross ? 'rgba(251,191,36,0.4)' : 'rgba(107,114,128,0.35)')
+    }}>🔗 {cross ? 'cross-user dup' : 'dup'}</span>
+  )
 }
 
 function normalizeUrl(u) {
@@ -75,6 +117,7 @@ export default function SalesCrmPage() {
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') })
   const [dayPopup, setDayPopup] = useState(null)
   const [showAllContacts, setShowAllContacts] = useState(false)
+  const [showDups, setShowDups] = useState(false)
 
   useEffect(() => {
     const u = JSON.parse(sessionStorage.getItem('xantie_user') || '{}')
@@ -103,7 +146,7 @@ export default function SalesCrmPage() {
   function openAdd(type) {
     setModalType(type)
     setEditId(null)
-    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : type==='contacts' ? {createdAt: new Date().toISOString(), createdBy: currentUser.name || currentUser.email || ''} : {})
+    setForm(type==='funnel' ? {stage:'Lead', probability:0.05} : type==='contacts' ? {createdAt: mtStamp(mtToday()), createdBy: currentUser.name || currentUser.email || ''} : {})
     setShowModal(true)
     setActiveCard(null)
   }
@@ -167,6 +210,20 @@ export default function SalesCrmPage() {
     }
     return true
   })
+
+  // ── Contacts: partner colors + duplicate detection (shared by the calendar and the dup panel)
+  const partnerOf = c => (c.createdBy && c.createdBy.trim()) ? c.createdBy.trim() : 'Unknown'
+  const partners = [...new Set(contacts.map(partnerOf))].sort((a,b)=> a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
+  const realPartners = partners.filter(p => p !== 'Unknown')
+  const colorFor = p => p==='Unknown' ? '#6b7280' : PARTNER_PALETTE[realPartners.indexOf(p) % PARTNER_PALETTE.length]
+  const dupGroups = {}
+  contacts.forEach(c => { const k=contactKey(c); if(!k) return; (dupGroups[k]=dupGroups[k]||[]).push(c) })
+  const clusterOf = c => dupGroups[contactKey(c)] || [c]
+  const isDup = c => (dupGroups[contactKey(c)]||[]).length > 1
+  const isCrossUser = g => new Set(g.map(partnerOf)).size > 1
+  const dupClusters = Object.values(dupGroups).filter(g => g.length > 1)
+    .sort((a,b) => { const ax=isCrossUser(a)?1:0, bx=isCrossUser(b)?1:0; return ax!==bx ? bx-ax : b.length-a.length })
+  const crossUserCount = dupClusters.filter(isCrossUser).length
 
   return (
     <div>
@@ -299,13 +356,10 @@ export default function SalesCrmPage() {
           const s = search.toLowerCase()
           return ['name','url','notes'].some(k => (c[k]||'').toLowerCase().includes(s))
         })
-        const partnerOf = c => (c.createdBy && c.createdBy.trim()) ? c.createdBy.trim() : 'Unknown'
-        const partners = [...new Set(contacts.map(partnerOf))].sort((a,b) => a==='Unknown'?1 : b==='Unknown'?-1 : a.localeCompare(b))
-        const realPartners = partners.filter(p => p !== 'Unknown')
-        const colorFor = p => p==='Unknown' ? '#6b7280' : PARTNER_PALETTE[realPartners.indexOf(p) % PARTNER_PALETTE.length]
-        // group filtered contacts by day (YYYY-MM-DD)
+        // partnerOf / partners / colorFor are shared (component scope) so the dup panel matches these colors
+        // group filtered contacts by Mountain-Time day
         const byDay = {}
-        filteredContacts.forEach(c => { const day=(c.createdAt||'').slice(0,10); if(!day) return; (byDay[day]=byDay[day]||[]).push(c) })
+        filteredContacts.forEach(c => { const day=mtDay(c.createdAt); if(!day) return; (byDay[day]=byDay[day]||[]).push(c) })
         // month grid (6 weeks)
         const [cy, cm] = calMonth.split('-').map(Number)
         const first = new Date(cy, cm-1, 1)
@@ -322,6 +376,18 @@ export default function SalesCrmPage() {
                 <button onClick={()=>openAdd('contacts')} style={{background:'#8DC63F',color:'#0a0a0a',border:'none',borderRadius:'8px',padding:'10px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>+ New Contact</button>
               </div>
             </div>
+
+            {/* Duplicate summary strip */}
+            {dupClusters.length > 0 && (
+              <div onClick={()=>setShowDups(true)} style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',background:'rgba(251,191,36,0.07)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'10px',padding:'10px 14px',marginBottom:'12px'}}>
+                <span style={{fontSize:'16px'}}>🔗</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'13px',color:'#fde68a',fontWeight:700}}>{dupClusters.length} duplicate contact{dupClusters.length===1?'':'s'} on file{crossUserCount>0 ? ` · ${crossUserCount} added by more than one person` : ''}</div>
+                  <div style={{fontSize:'11px',color:'#9ca3af'}}>Same LinkedIn/URL (or name) entered more than once — click to review</div>
+                </div>
+                <span style={{fontSize:'12px',color:'#fbbf24',fontWeight:700,whiteSpace:'nowrap'}}>Review →</span>
+              </div>
+            )}
 
             {/* Legend */}
             <div style={{display:'flex',gap:'14px',flexWrap:'wrap',alignItems:'center',marginBottom:'12px'}}>
@@ -349,12 +415,13 @@ export default function SalesCrmPage() {
                   const counts = {}
                   dayContacts.forEach(c => { const p=partnerOf(c); counts[p]=(counts[p]||0)+1 })
                   const total = dayContacts.length
+                  const dayHasDup = dayContacts.some(c => isDup(c))
                   return (
                     <div key={i} onClick={()=> total>0 && setDayPopup(key)}
                       style={{minHeight:'60px',border:'1px solid '+(inMonth?'#232323':'#161616'),borderRadius:'8px',padding:'5px',display:'flex',flexDirection:'column',cursor: total>0?'pointer':'default',opacity: inMonth?1:0.45}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                         <span style={{fontSize:'11px',color:inMonth?'#9ca3af':'#4b5563',fontWeight:600}}>{d.getDate()}</span>
-                        {total>0 && <span style={{fontSize:'10px',color:'#6b7280'}}>{total}</span>}
+                        {total>0 && <span style={{fontSize:'10px',color:'#6b7280',display:'inline-flex',alignItems:'center',gap:'3px'}}>{dayHasDup && <span title="Includes a duplicate contact" style={{width:'6px',height:'6px',borderRadius:'50%',background:'#fbbf24'}}/>}{total}</span>}
                       </div>
                       <div style={{flex:1,display:'flex',gap:'2px',marginTop:'4px'}}>
                         {partners.map(p => {
@@ -439,7 +506,7 @@ export default function SalesCrmPage() {
                 {activeCard.type==='funnel' && activeCard.data.companyName}
                 {activeCard.type==='projects' && activeCard.data.customerName}
                 {activeCard.type==='bench' && activeCard.data.name}
-                {activeCard.type==='contacts' && activeCard.data.name}
+                {activeCard.type==='contacts' && (<>{activeCard.data.name}{isDup(activeCard.data) && <span style={{marginLeft:'8px'}}><DupTag cross={isCrossUser(clusterOf(activeCard.data))}/></span>}</>)}
               </h2>
               <button onClick={()=>setActiveCard(null)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1}}>✕</button>
             </div>
@@ -492,6 +559,28 @@ export default function SalesCrmPage() {
                   {activeCard.data.createdBy && <div><label style={lbl}>Added by</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{activeCard.data.createdBy}</div></div>}
                   {activeCard.data.createdAt && <div><label style={lbl}>Date</label><div style={{color:'#d1d5db',fontSize:'13px'}}>{fmtDate(activeCard.data.createdAt)}</div></div>}
                 </div>
+                {isDup(activeCard.data) && (() => {
+                  const others = clusterOf(activeCard.data).filter(x => x.id !== activeCard.data.id)
+                  if (!others.length) return null
+                  const cross = isCrossUser(clusterOf(activeCard.data))
+                  return (
+                    <div style={{marginBottom:'12px',background:cross?'rgba(251,191,36,0.06)':'#0f0f0f',border:'1px solid '+(cross?'rgba(251,191,36,0.3)':'#1e1e1e'),borderRadius:'8px',padding:'10px 14px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+                        <DupTag cross={cross}/>
+                        <span style={{fontSize:'12px',color:'#9ca3af'}}>Also on file ({others.length})</span>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                        {others.map(o => (
+                          <div key={o.id} onClick={()=>setActiveCard({type:'contacts',data:o})} style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'12px'}}>
+                            <span style={{width:'9px',height:'9px',borderRadius:'3px',background:colorFor(partnerOf(o)),flex:'0 0 auto'}}/>
+                            <span style={{color:'#d1d5db',fontWeight:600}}>{partnerOf(o)}</span>
+                            <span style={{color:'#6b7280'}}>· {o.createdAt?fmtDate(o.createdAt):'—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
                 {activeCard.data.url && <div style={{marginBottom:'12px'}}><label style={lbl}>URL</label><a href={normalizeUrl(activeCard.data.url)} target="_blank" rel="noopener noreferrer" style={{color:'#8DC63F',fontSize:'13px',wordBreak:'break-all'}}>{activeCard.data.url}</a></div>}
                 {activeCard.data.notes && <div><label style={lbl}>Notes</label><div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'8px',padding:'10px 14px',color:'#d1d5db',fontSize:'13px',whiteSpace:'pre-wrap'}}>{activeCard.data.notes}</div></div>}
               </div>
@@ -579,7 +668,7 @@ export default function SalesCrmPage() {
               <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'18px'}}>
                 <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
                   <div style={{flex:'1 1 200px'}}><label style={lbl}>Contact Name *</label><input autoFocus value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} style={inp}/></div>
-                  <div style={{flex:'0 1 170px'}}><label style={lbl}>Date</label><input type="date" value={dateInputVal(form.createdAt)} onChange={e=>setForm({...form, createdAt: e.target.value ? new Date(e.target.value+'T12:00:00').toISOString() : ''})} style={{...inp,colorScheme:'dark'}}/></div>
+                  <div style={{flex:'0 1 170px'}}><label style={lbl}>Date</label><input type="date" value={dateInputVal(form.createdAt)} onChange={e=>setForm({...form, createdAt: mtStamp(e.target.value)})} style={{...inp,colorScheme:'dark'}}/></div>
                 </div>
                 <div><label style={lbl}>URL</label><input value={form.url||''} onChange={e=>setForm({...form,url:e.target.value})} placeholder="https://..." style={inp}/></div>
                 <div><label style={lbl}>Notes <span style={{textTransform:'none',letterSpacing:0,color:'#4b5563'}}>(optional)</span></label><textarea rows={3} value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="How you know them, context…" style={{...inp,resize:'vertical'}}/></div>
@@ -596,7 +685,7 @@ export default function SalesCrmPage() {
 
       {/* DAY DETAIL POPUP */}
       {dayPopup && (() => {
-        const dayContacts = contacts.filter(c => (c.createdAt||'').slice(0,10) === dayPopup)
+        const dayContacts = contacts.filter(c => mtDay(c.createdAt) === dayPopup)
         const label = new Date(dayPopup+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
         const groups = {}
         dayContacts.forEach(c => { const p=(c.createdBy&&c.createdBy.trim())||'Unknown'; (groups[p]=groups[p]||[]).push(c) })
@@ -616,7 +705,7 @@ export default function SalesCrmPage() {
                     {groups[p].map(c => (
                       <div key={c.id} onClick={()=>{setActiveCard({type:'contacts',data:c});setDayPopup(null)}}
                         style={{background:'#0f0f0f',borderRadius:'8px',padding:'10px 12px',cursor:'pointer',display:'flex',justifyContent:'space-between',gap:'10px',alignItems:'center'}}>
-                        <span style={{fontSize:'13px',color:'#fff',fontWeight:500}}>{c.name}</span>
+                        <span style={{fontSize:'13px',color:'#fff',fontWeight:500,display:'inline-flex',alignItems:'center',gap:'7px'}}>{c.name}{isDup(c) && <DupTag cross={isCrossUser(clusterOf(c))}/>}</span>
                         {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'12px',color:'#8DC63F',textDecoration:'none',maxWidth:'260px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
                       </div>
                     ))}
@@ -649,7 +738,7 @@ export default function SalesCrmPage() {
                   <div key={c.id} onClick={()=>{setActiveCard({type:'contacts',data:c});setShowAllContacts(false)}}
                     style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:'10px',padding:'12px 14px',cursor:'pointer',display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 180px',minWidth:0}}>
-                      <div style={{fontSize:'14px',fontWeight:600,color:'#fff'}}>{c.name}</div>
+                      <div style={{fontSize:'14px',fontWeight:600,color:'#fff',display:'flex',alignItems:'center',gap:'7px',flexWrap:'wrap'}}>{c.name}{isDup(c) && <DupTag cross={isCrossUser(clusterOf(c))}/>}</div>
                       {c.notes && <div style={{fontSize:'12px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
                     </div>
                     {c.url && <a href={normalizeUrl(c.url)} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'13px',color:'#8DC63F',textDecoration:'none',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.url}</a>}
@@ -664,6 +753,51 @@ export default function SalesCrmPage() {
           </div>
         )
       })()}
+
+      {/* DUPLICATES */}
+      {showDups && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1060,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}} onClick={()=>setShowDups(false)}>
+          <div style={{background:'#141414',border:'1px solid #252525',borderRadius:'16px',padding:'24px',width:'720px',maxWidth:'100%',maxHeight:'88vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'4px'}}>
+              <h2 style={{fontSize:'17px',fontWeight:700,margin:0}}>🔗 Duplicate contacts</h2>
+              <button onClick={()=>setShowDups(false)} style={{background:'none',border:'none',color:'#6b7280',fontSize:'22px',cursor:'pointer',lineHeight:1}}>✕</button>
+            </div>
+            <p style={{color:'#6b7280',fontSize:'12px',margin:'0 0 16px'}}>
+              {dupClusters.length} contact{dupClusters.length===1?'':'s'} entered more than once
+              {crossUserCount>0 ? ` · ${crossUserCount} added by more than one person (highlighted)` : ''}. Matched on LinkedIn/URL, or on name when there is no URL.
+            </p>
+            {dupClusters.length===0 && <p style={{color:'#6b7280',margin:0}}>No duplicates. 🎉</p>}
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              {dupClusters.map((g,gi) => {
+                const cross = isCrossUser(g)
+                const lead = g.find(x=>x.name) || g[0]
+                const url = (g.find(x=>x.url)||{}).url
+                const peopleCount = new Set(g.map(partnerOf)).size
+                return (
+                  <div key={gi} style={{background:cross?'rgba(251,191,36,0.05)':'#0f0f0f',border:'1px solid '+(cross?'rgba(251,191,36,0.3)':'#1e1e1e'),borderLeft:'3px solid '+(cross?'#fbbf24':'#333'),borderRadius:'10px',padding:'12px 14px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}}>
+                      <span style={{fontSize:'14px',fontWeight:700,color:'#fff'}}>{lead.name||'(no name)'}</span>
+                      {cross && <DupTag cross/>}
+                      <span style={{fontSize:'11px',color:'#6b7280'}}>{g.length} entries · {peopleCount} {peopleCount===1?'person':'people'}</span>
+                      {url && <a href={normalizeUrl(url)} target="_blank" rel="noopener noreferrer" style={{fontSize:'12px',color:'#8DC63F',textDecoration:'none',marginLeft:'auto',maxWidth:'280px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{url}</a>}
+                    </div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                      {g.slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).map(c => (
+                        <div key={c.id} onClick={()=>{setActiveCard({type:'contacts',data:c});setShowDups(false)}}
+                          style={{display:'inline-flex',alignItems:'center',gap:'7px',background:'#1a1a1a',border:'1px solid #262626',borderRadius:'999px',padding:'5px 11px 5px 7px',cursor:'pointer'}}>
+                          <span style={{width:'10px',height:'10px',borderRadius:'50%',background:colorFor(partnerOf(c)),flex:'0 0 auto'}}/>
+                          <span style={{fontSize:'12px',color:'#e5e7eb',fontWeight:600}}>{partnerOf(c)}</span>
+                          <span style={{fontSize:'11px',color:'#6b7280'}}>{c.createdAt?fmtDate(c.createdAt):'—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDelete && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}}
