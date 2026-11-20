@@ -94,6 +94,8 @@ export default function PlaceFieldsPage({ params }) {
   const [pdfBlobUrl, setPdfBlobUrl] = useState('')
   const [selectedFieldId, setSelectedFieldId] = useState(null)
   const [recipientCount, setRecipientCount] = useState(1)
+  // Who newly-added fields are assigned to by default ('r1'..'rN' or 'admin').
+  const [defaultAssignee, setDefaultAssignee] = useState('r1')
 
   const visiblePage = useVisiblePage([pdfBlobUrl])
 
@@ -150,8 +152,12 @@ export default function PlaceFieldsPage({ params }) {
       width: base.width,
       height: base.height,
       label: base.label,
-      assignee: 'r1',
+      assignee: defaultAssignee,
     }])
+  }
+
+  function setAllAssignee(assignee) {
+    setFields(prev => prev.map(f => ({ ...f, assignee })))
   }
 
   function setFieldAssignee(id, assignee) {
@@ -257,6 +263,22 @@ export default function PlaceFieldsPage({ params }) {
         <span style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#d1d5db',marginLeft:'6px'}}>
           <span style={{width:'10px',height:'10px',borderRadius:'3px',background:'#f97316'}}/>Admin (you)
         </span>
+
+        <span style={{width:'1px',height:'18px',background:'#2a2a2a',margin:'0 4px'}}/>
+        <label style={{display:'inline-flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#6b7280'}}>
+          New fields →
+          <select value={defaultAssignee} onChange={e=>setDefaultAssignee(e.target.value)}
+            style={{background:'#1a1a1a',border:'1px solid '+(defaultAssignee==='admin'?'#f9731688':'#2a2a2a'),color:defaultAssignee==='admin'?'#f97316':'#d1d5db',borderRadius:'6px',padding:'4px 8px',fontSize:'11px',fontWeight:700,cursor:'pointer',outline:'none'}}>
+            {Array.from({length: recipientCount}, (_, i) => 'r' + (i + 1)).map(rid => (
+              <option key={rid} value={rid}>{ridLabel(rid)}</option>
+            ))}
+            <option value="admin">Admin (you)</option>
+          </select>
+        </label>
+        {fields.length > 0 && (
+          <button onClick={()=>setAllAssignee('admin')} title="Reassign every placed field to Admin"
+            style={{background:'#f9731622',border:'1px solid #f9731666',color:'#f97316',borderRadius:'6px',padding:'4px 10px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>Make all Admin</button>
+        )}
       </div>
 
       <div style={{display:'flex',gap:'12px',flex:1,minHeight:0}}>
