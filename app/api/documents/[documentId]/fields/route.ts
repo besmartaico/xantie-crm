@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import zlib from 'zlib'
 import { getDriveFileMeta, updateDriveFileMeta, deleteDriveFile, renameDriveFile } from '@/lib/googleDrive'
+import { deleteMeta } from '@/lib/documentMeta'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -143,6 +144,7 @@ export async function DELETE(_req, ctx) {
   try {
     const { documentId } = await ctx.params
     await deleteDriveFile(documentId)
+    try { await deleteMeta(documentId) } catch(e) { console.warn('deleteMeta failed:', e.message) }
     return NextResponse.json({ success: true })
   } catch(e) {
     console.error('DELETE template error:', e)
