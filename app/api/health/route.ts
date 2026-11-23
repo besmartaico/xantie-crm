@@ -26,28 +26,72 @@ const TABS = {
   Health_Logs:         ['id', 'competitionId', 'email', 'elementId', 'date', 'createdAt'],
 }
 
-async function ensureTabs(sheets) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SID() })
-  const existing = (meta.data.sheets || []).map(s => s.properties.title)
-  for (const [tab, headers] of Object.entries(TABS)) {
-    if (!existing.includes(tab)) {
-      await sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests: [{ addSheet: { properties: { title: tab } } }] } })
-      await sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A1`, valueInputOption: 'RAW', requestBody: { values: [headers] } })
+// ── Sheets API is rate-limited to 60 reads/min PER USER (the one shared service
+// account), so every call here is kept as cheap as possible: tabs are ensured
+// once per warm instance, multi-tab reads go through a single batchGet, and
+// 429/503 bursts are retried with backoff instead of surfacing to the user.
+async function withRetry(fn, tries = 5) {
+  let delay = 400
+  for (let i = 0; i < tries; i++) {
+    try { return await fn() }
+    catch (e) {
+      const code = e?.code || e?.response?.status || e?.response?.data?.error?.code
+      if ((code === 429 || code === 503) && i < tries - 1) {
+        await new Promise(r => setTimeout(r, delay + Math.floor(Math.random() * 200)))
+        delay *= 2
+        continue
+      }
+      throw e
     }
   }
 }
 
+let ensurePromise = null
+async function ensureTabsImpl(sheets) {
+  const meta = await withRetry(() => sheets.spreadsheets.get({ spreadsheetId: SID() }))
+  const existing = (meta.data.sheets || []).map(s => s.properties.title)
+  for (const [tab, headers] of Object.entries(TABS)) {
+    if (!existing.includes(tab)) {
+      await withRetry(() => sheets.spreadsheets.batchUpdate({ spreadsheetId: SID(), requestBody: { requests: [{ addSheet: { properties: { title: tab } } }] } }))
+      await withRetry(() => sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A1`, valueInputOption: 'RAW', requestBody: { values: [headers] } }))
+    }
+  }
+}
+// Memoize so tabs are verified/created only once per warm instance (saves one
+// spreadsheets.get metadata read on every request). Resets on failure so a
+// cold error doesn't permanently poison the cache.
+function ensureTabs(sheets) {
+  if (!ensurePromise) ensurePromise = ensureTabsImpl(sheets).catch(e => { ensurePromise = null; throw e })
+  return ensurePromise
+}
+
 async function getRows(sheets, tab) {
-  try { const r = await sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `'${tab}'!A2:Z200000` }); return r.data.values || [] } catch(e) { return [] }
+  try { const r = await withRetry(() => sheets.spreadsheets.values.get({ spreadsheetId: SID(), range: `'${tab}'!A2:Z200000` })); return r.data.values || [] } catch(e) { return [] }
+}
+// Read several tabs in ONE API request (counts as a single read against quota).
+async function batchGet(sheets, tabs) {
+  try {
+    const r = await withRetry(() => sheets.spreadsheets.values.batchGet({ spreadsheetId: SID(), ranges: tabs.map(t => `'${t}'!A2:Z200000`) }))
+    const vr = r.data.valueRanges || []
+    const out = {}
+    tabs.forEach((t, i) => { out[t] = (vr[i] && vr[i].values) || [] })
+    return out
+  } catch(e) {
+    const out = {}; tabs.forEach(t => { out[t] = [] }); return out
+  }
 }
 async function clearAndRewrite(sheets, tab, rows) {
-  await sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: `'${tab}'!A2:Z200000` })
-  if (rows.length) await sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A2`, valueInputOption: 'RAW', requestBody: { values: rows } })
+  await withRetry(() => sheets.spreadsheets.values.clear({ spreadsheetId: SID(), range: `'${tab}'!A2:Z200000` }))
+  if (rows.length) await withRetry(() => sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A2`, valueInputOption: 'RAW', requestBody: { values: rows } }))
+}
+// Append from an already-known row count (avoids a redundant read of the tab).
+async function appendAt(sheets, tab, row, existingCount) {
+  const nextRow = existingCount + 2
+  await withRetry(() => sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A${nextRow}`, valueInputOption: 'RAW', requestBody: { values: [row] } }))
 }
 async function appendRow(sheets, tab, row) {
   const existing = await getRows(sheets, tab)
-  const nextRow = existing.length + 2
-  await sheets.spreadsheets.values.update({ spreadsheetId: SID(), range: `'${tab}'!A${nextRow}`, valueInputOption: 'RAW', requestBody: { values: [row] } })
+  await appendAt(sheets, tab, row, existing.length)
 }
 
 function parseIds(s) { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : [] } catch(e) { return (s || '').split(',').map(x => x.trim()).filter(Boolean) } }
@@ -62,23 +106,22 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const check = (searchParams.get('check') || '').trim().toLowerCase()
     await ensureTabs(sheets)
-    const [comps, elems, parts, logs] = await Promise.all([
-      getRows(sheets, 'Health_Competitions'), getRows(sheets, 'Health_Elements'),
-      getRows(sheets, 'Health_Participants'), getRows(sheets, 'Health_Logs'),
-    ])
-    const participants = parts.map(partObj)
 
     // Lightweight check for the nav: is this email an active participant?
+    // Only needs two tabs, fetched in a single batched read.
     if (check) {
-      const activeIds = new Set(comps.map(compObj).filter(c => c.status !== 'archived').map(c => c.id))
-      return NextResponse.json({ participant: participants.some(p => p.email === check && activeIds.has(p.competitionId)) })
+      const m = await batchGet(sheets, ['Health_Competitions', 'Health_Participants'])
+      const activeIds = new Set(m['Health_Competitions'].map(compObj).filter(c => c.status !== 'archived').map(c => c.id))
+      const participant = m['Health_Participants'].map(partObj).some(p => p.email === check && activeIds.has(p.competitionId))
+      return NextResponse.json({ participant })
     }
 
+    const m = await batchGet(sheets, ['Health_Competitions', 'Health_Elements', 'Health_Participants', 'Health_Logs'])
     return NextResponse.json({
-      competitions: comps.map(compObj),
-      elements: elems.map(elemObj),
-      participants,
-      logs: logs.map(logObj),
+      competitions: m['Health_Competitions'].map(compObj),
+      elements: m['Health_Elements'].map(elemObj),
+      participants: m['Health_Participants'].map(partObj),
+      logs: m['Health_Logs'].map(logObj),
     })
   } catch(e) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
@@ -107,7 +150,7 @@ export async function POST(req) {
       const rows = await getRows(sheets, 'Health_Elements')
       const pos = rows.filter(r => r[1] === body.competitionId).length
       const id = uid('he')
-      await appendRow(sheets, 'Health_Elements', [id, body.competitionId, body.name || '', String(body.points ?? 1), String(pos), now])
+      await appendAt(sheets, 'Health_Elements', [id, body.competitionId, body.name || '', String(body.points ?? 1), String(pos), now], rows.length)
       return NextResponse.json({ success: true, id })
     }
 
@@ -118,15 +161,13 @@ export async function POST(req) {
     }
 
     if (a === 'delete_element') {
-      const elems = await getRows(sheets, 'Health_Elements')
-      await clearAndRewrite(sheets, 'Health_Elements', elems.filter(r => r[0] !== body.id))
-      const parts = await getRows(sheets, 'Health_Participants')
-      await clearAndRewrite(sheets, 'Health_Participants', parts.map(r => {
+      const m = await batchGet(sheets, ['Health_Elements', 'Health_Participants', 'Health_Logs'])
+      await clearAndRewrite(sheets, 'Health_Elements', m['Health_Elements'].filter(r => r[0] !== body.id))
+      await clearAndRewrite(sheets, 'Health_Participants', m['Health_Participants'].map(r => {
         const ids = parseIds(r[4])
         return ids.includes(body.id) ? [r[0], r[1], r[2], r[3], JSON.stringify(ids.filter(x => x !== body.id)), r[5]] : r
       }))
-      const logs = await getRows(sheets, 'Health_Logs')
-      await clearAndRewrite(sheets, 'Health_Logs', logs.filter(r => r[3] !== body.id))
+      await clearAndRewrite(sheets, 'Health_Logs', m['Health_Logs'].filter(r => r[3] !== body.id))
       return NextResponse.json({ success: true })
     }
 
@@ -143,13 +184,13 @@ export async function POST(req) {
     }
 
     if (a === 'remove_participant') {
-      const rows = await getRows(sheets, 'Health_Participants')
+      const m = await batchGet(sheets, ['Health_Participants', 'Health_Logs'])
+      const rows = m['Health_Participants']
       const target = rows.find(r => r[0] === body.id)
       await clearAndRewrite(sheets, 'Health_Participants', rows.filter(r => r[0] !== body.id))
       if (target) {
         const email = (target[2] || '').toLowerCase(), comp = target[1]
-        const logs = await getRows(sheets, 'Health_Logs')
-        await clearAndRewrite(sheets, 'Health_Logs', logs.filter(r => !((r[2] || '').toLowerCase() === email && r[1] === comp)))
+        await clearAndRewrite(sheets, 'Health_Logs', m['Health_Logs'].filter(r => !((r[2] || '').toLowerCase() === email && r[1] === comp)))
       }
       return NextResponse.json({ success: true })
     }
@@ -159,17 +200,18 @@ export async function POST(req) {
       const email = (body.email || '').toLowerCase()
       const { competitionId, elementId, date } = body
       if (!email || !competitionId || !elementId || !date) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-      const parts = (await getRows(sheets, 'Health_Participants')).map(partObj)
-      const me = parts.find(p => p.email === email && p.competitionId === competitionId)
+      // Both tabs in a single read.
+      const m = await batchGet(sheets, ['Health_Participants', 'Health_Logs'])
+      const me = m['Health_Participants'].map(partObj).find(p => p.email === email && p.competitionId === competitionId)
       if (!me || !me.elementIds.includes(elementId)) return NextResponse.json({ error: 'Not assigned to this activity' }, { status: 403 })
-      const logs = await getRows(sheets, 'Health_Logs')
+      const logs = m['Health_Logs']
       const idx = logs.findIndex(r => (r[2] || '').toLowerCase() === email && r[1] === competitionId && r[3] === elementId && r[4] === date)
       if (idx >= 0) {
         logs.splice(idx, 1)
         await clearAndRewrite(sheets, 'Health_Logs', logs)
         return NextResponse.json({ success: true, logged: false })
       }
-      await appendRow(sheets, 'Health_Logs', [uid('hl'), competitionId, email, elementId, date, now])
+      await appendAt(sheets, 'Health_Logs', [uid('hl'), competitionId, email, elementId, date, now], logs.length)
       return NextResponse.json({ success: true, logged: true })
     }
 
